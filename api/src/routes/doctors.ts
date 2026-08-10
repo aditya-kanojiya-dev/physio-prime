@@ -3,8 +3,11 @@ import { and, eq, sql, type SQL } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '../db/pool';
 import { doctors, categories, symptoms } from '../db/schema';
+import { getAvailableSlots, isPast } from '../lib/slots';
 
 export const doctorsRouter = Router();
+
+const slotDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'date must be YYYY-MM-DD');
 
 const querySchema = z.object({
   q: z.string().trim().max(200).optional(),
@@ -178,4 +181,27 @@ doctorsRouter.get('/:slug', async (req, res) => {
       treatments: row.treatments,
     },
   });
+});
+
+doctorsRouter.get('/:slug/slots', async (req, res, next) => {
+  try {
+    const parsed = slotDateSchema.safeParse(req.query.date);
+    if (!parsed.success) {
+      res.status(400).json({ error: { message: 'date must be YYYY-MM-DD' } });
+      return;
+    }
+    if (isPast(parsed.data)) {
+      res.status(400).json({ error: { message: 'Date is in the past' } });
+      return;
+    }
+    const [doctor] = await db.select().from(doctors).where(eq(doctors.slug, req.params.slug));
+    if (!doctor) {
+      res.status(404).json({ error: { message: 'Doctor not found' } });
+      return;
+    }
+    const slots = await getAvailableSlots(doctor.id, parsed.data);
+    res.json({ date: parsed.data, slots });
+  } catch (err) {
+    next(err);
+  }
 });
