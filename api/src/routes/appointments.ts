@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { db } from '../db/pool';
 import { appointments, doctors, doctorSchedules } from '../db/schema';
 import { requireAuth, requireRole } from '../middleware/auth';
-import { availableFromSchedules, dayOfWeek, isPast } from '../lib/slots';
+import { availableFromSchedules, dayOfWeek, isPast, isValidDate } from '../lib/slots';
 import { createOrder, createRefund, verifySignature } from '../lib/razorpay';
 
 export const appointmentsRouter = Router();
@@ -22,10 +22,12 @@ class BookingError extends Error {
   }
 }
 
+const dateField = z.string().refine(isValidDate, 'date must be YYYY-MM-DD');
+
 const bookSchema = z.object({
   doctorSlug: z.string().min(1),
   mode: z.enum(['home', 'online', 'clinic']),
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'date must be YYYY-MM-DD'),
+  date: dateField,
   slot: z.string().regex(/^\d{2}:\d{2}-\d{2}:\d{2}$/, 'slot must be HH:MM-HH:MM'),
   symptom: z.string().max(2000).optional(),
   patientName: z.string().min(1),
@@ -39,7 +41,7 @@ const verifySchema = z.object({
 });
 
 const rescheduleSchema = z.object({
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'date must be YYYY-MM-DD'),
+  date: dateField,
   slot: z.string().regex(/^\d{2}:\d{2}-\d{2}:\d{2}$/, 'slot must be HH:MM-HH:MM'),
 });
 
@@ -313,8 +315,12 @@ appointmentsRouter.post('/:id/verify', async (req, res, next) => {
       res.status(403).json({ error: { message: 'Forbidden' } });
       return;
     }
-    if (row.paymentStatus === 'paid') {
+    if (row.paymentStatus === 'paid' && row.status === 'upcoming') {
       res.json({ appointment: serializeAppointment(row) });
+      return;
+    }
+    if (row.status !== 'upcoming') {
+      res.status(400).json({ error: { message: 'Only upcoming appointments can be verified' } });
       return;
     }
     if (!row.razorpayOrderId) {
@@ -352,6 +358,9 @@ appointmentsRouter.post('/:id/reschedule', async (req, res, next) => {
       if (!row) throw new BookingError(404, 'Appointment not found');
       if (row.patientId !== req.user!.id) throw new BookingError(403, 'Forbidden');
       if (row.status !== 'upcoming') throw new BookingError(400, 'Only upcoming appointments can be rescheduled');
+      if (row.date === body.date && row.timeSlot === body.slot) return row;
+      // serialize concurrent bookings/reschedules for the same doctor, mirroring the booking path
+      await tx.select().from(doctors).where(eq(doctors.id, row.doctorId)).for('update');
       const starts = await availableStarts(tx, row.doctorId, body.date);
       if (!starts.has(body.slot.split('-')[0])) throw new BookingError(409, 'This slot is no longer available');
       const [updated] = await tx

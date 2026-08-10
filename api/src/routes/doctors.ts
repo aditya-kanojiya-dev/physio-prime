@@ -3,11 +3,11 @@ import { and, eq, sql, type SQL } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '../db/pool';
 import { doctors, categories, symptoms } from '../db/schema';
-import { getAvailableSlots, isPast } from '../lib/slots';
+import { getAvailableSlots, isPast, isValidDate } from '../lib/slots';
 
 export const doctorsRouter = Router();
 
-const slotDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'date must be YYYY-MM-DD');
+const slotDateSchema = z.string().refine(isValidDate, 'date must be YYYY-MM-DD');
 
 const querySchema = z.object({
   q: z.string().trim().max(200).optional(),

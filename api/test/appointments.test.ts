@@ -186,6 +186,15 @@ describe('POST /api/v1/appointments validation', () => {
     expect(res.status).toBe(400);
   });
 
+  it('returns 400 for a date that is not a real calendar date', async () => {
+    const { token } = await registerPatient('apt.baddate@example.com');
+    const res = await api
+      .post('/api/v1/appointments')
+      .set('Authorization', `Bearer ${token}`)
+      .send(bookPayload({ date: '2026-13-45' }));
+    expect(res.status).toBe(400);
+  });
+
   it('returns 400 when the mode is not offered by the doctor', async () => {
     const { token } = await registerPatient('apt.mode@example.com');
     await db
@@ -237,6 +246,9 @@ describe('GET /api/v1/doctors/:slug/slots', () => {
 
     const bad = await api.get(`/api/v1/doctors/${DOCTOR}/slots?date=tomorrow`);
     expect(bad.status).toBe(400);
+
+    const badCalendar = await api.get(`/api/v1/doctors/${DOCTOR}/slots?date=2026-02-30`);
+    expect(badCalendar.status).toBe(400);
   });
 });
 
@@ -289,6 +301,35 @@ describe('POST /api/v1/appointments/:id/verify', () => {
       .send({ razorpayPaymentId: 'pay_x', razorpaySignature: 'sig_x' });
     expect(forbidden.status).toBe(403);
   });
+
+  it('returns 400 on verify for a cancelled appointment even when still marked paid', async () => {
+    const { token } = await registerPatient('apt.verifycancelled@example.com');
+    const booked = await api
+      .post('/api/v1/appointments')
+      .set('Authorization', `Bearer ${token}`)
+      .send(bookPayload({ slot: '12:30-13:00' }))
+      .expect(201);
+    const id = booked.body.appointment.id;
+
+    await api
+      .post(`/api/v1/appointments/${id}/verify`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ razorpayPaymentId: 'pay_vc', razorpaySignature: 'sig' })
+      .expect(200);
+
+    vi.mocked(createRefund).mockRejectedValueOnce(new Error('razorpay down'));
+    await api
+      .post(`/api/v1/appointments/${id}/cancel`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ reason: 'no refund possible' })
+      .expect(200);
+
+    const res = await api
+      .post(`/api/v1/appointments/${id}/verify`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ razorpayPaymentId: 'pay_vc', razorpaySignature: 'sig' });
+    expect(res.status).toBe(400);
+  });
 });
 
 describe('POST /api/v1/appointments/:id/reschedule', () => {
@@ -331,6 +372,24 @@ describe('POST /api/v1/appointments/:id/reschedule', () => {
       .set('Authorization', `Bearer ${token}`)
       .send({ date: MONDAY, slot: '12:00-12:30' });
     expect(cancelled.status).toBe(400);
+  });
+
+  it('returns 200 unchanged when rescheduling to the identical date+slot', async () => {
+    const { token } = await registerPatient('apt.noop@example.com');
+    const booked = await api
+      .post('/api/v1/appointments')
+      .set('Authorization', `Bearer ${token}`)
+      .send(bookPayload({ slot: '11:30-12:00' }))
+      .expect(201);
+    const id = booked.body.appointment.id;
+
+    const res = await api
+      .post(`/api/v1/appointments/${id}/reschedule`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ date: MONDAY, slot: '11:30-12:00' });
+    expect(res.status).toBe(200);
+    expect(res.body.appointment.date).toBe(MONDAY);
+    expect(res.body.appointment.timeSlot).toBe('11:30-12:00');
   });
 });
 

@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, type NextFunction } from 'express';
 import { eq } from 'drizzle-orm';
 import { db } from '../db/pool';
 import { appointments } from '../db/schema';
@@ -13,7 +13,7 @@ interface PaymentEntity {
 
 // Public endpoint. The raw body is parsed before the global express.json() (see
 // index.ts) so the razorpay signature can be verified against the exact bytes.
-razorpayRouter.post('/webhook', async (req, res) => {
+razorpayRouter.post('/webhook', async (req, res, next: NextFunction) => {
   const header = req.headers['x-razorpay-signature'];
   const signature = Array.isArray(header) ? header[0] : header;
   const raw = req.body instanceof Buffer ? req.body.toString('utf8') : null;
@@ -39,16 +39,21 @@ razorpayRouter.post('/webhook', async (req, res) => {
   }
 
   const payment = payload.payload?.payment?.entity;
-  if (payload.event === 'payment.captured' && payment?.order_id && payment.id) {
-    await db
-      .update(appointments)
-      .set({ paymentStatus: 'paid', razorpayPaymentId: payment.id })
-      .where(eq(appointments.razorpayOrderId, payment.order_id));
-  } else if (payload.event === 'payment.failed' && payment?.order_id) {
-    await db
-      .update(appointments)
-      .set({ paymentStatus: 'failed' })
-      .where(eq(appointments.razorpayOrderId, payment.order_id));
+  try {
+    if (payload.event === 'payment.captured' && payment?.order_id && payment.id) {
+      await db
+        .update(appointments)
+        .set({ paymentStatus: 'paid', razorpayPaymentId: payment.id })
+        .where(eq(appointments.razorpayOrderId, payment.order_id));
+    } else if (payload.event === 'payment.failed' && payment?.order_id) {
+      await db
+        .update(appointments)
+        .set({ paymentStatus: 'failed' })
+        .where(eq(appointments.razorpayOrderId, payment.order_id));
+    }
+  } catch (err) {
+    next(err);
+    return;
   }
   res.json({ received: true });
 });
