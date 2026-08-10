@@ -1,0 +1,11 @@
+{
+  "name": "admin",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "echo \"admin: not scaffolded yet (Phase 8)\"",
+    "build": "echo \"admin: not scaffolded yet (Phase 8)\"",
+    "lint": "echo \"admin: not scaffolded yet (Phase 8)\"",
+    "test": "echo \"admin: not scaffolded yet (Phase 8)\""
+  }
+}
