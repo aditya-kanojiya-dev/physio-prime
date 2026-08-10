@@ -2,10 +2,11 @@ import { Router } from 'express';
 import { and, desc, eq, inArray } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '../db/pool';
-import { appointments, doctors, doctorSchedules } from '../db/schema';
+import { appointments, doctors, doctorSchedules, users } from '../db/schema';
 import { requireAuth, requireRole } from '../middleware/auth';
 import { availableFromSchedules, dayOfWeek, isPast, isValidDate } from '../lib/slots';
 import { createOrder, createRefund, verifySignature } from '../lib/razorpay';
+import { sendNotification, templates, type NotificationCtx } from '../lib/notifications';
 
 export const appointmentsRouter = Router();
 
@@ -60,6 +61,7 @@ function randomBookingId(): string {
 }
 
 interface AppointmentView {
+  id: number;
   bookingId: string;
   patientId: number;
   doctorId: number;
@@ -88,6 +90,7 @@ interface AppointmentView {
 }
 
 const appointmentColumns = {
+  id: appointments.id,
   bookingId: appointments.bookingId,
   patientId: appointments.patientId,
   doctorId: appointments.doctorId,
@@ -146,6 +149,56 @@ function serializeAppointment(row: AppointmentView) {
     cancellationReason: row.cancellationReason,
     createdAt: row.createdAt,
   };
+}
+
+// Send booking notifications for an appointment after a state change. Never
+// blocks or fails the caller: sendNotification never throws.
+async function sendBookingNotifications(
+  row: AppointmentView,
+  kind: 'confirmed' | 'rescheduled' | 'cancelled',
+  extra: { refunded?: boolean; amountPaise?: number } = {},
+): Promise<void> {
+  const [doctorRow] = row.doctor
+    ? []
+    : await db.select({ name: doctors.name }).from(doctors).where(eq(doctors.id, row.doctorId));
+  const ctx: NotificationCtx = {
+    patientName: row.patientName,
+    doctorName: row.doctor?.name ?? doctorRow?.name ?? 'your physiotherapist',
+    date: row.date,
+    timeSlot: row.timeSlot,
+    mode: row.mode,
+    bookingId: row.bookingId,
+  };
+  const tpl =
+    kind === 'confirmed'
+      ? templates.bookingConfirmed({ ...ctx, amountPaise: extra.amountPaise })
+      : kind === 'rescheduled'
+        ? templates.bookingRescheduled(ctx)
+        : templates.bookingCancelled({ ...ctx, refunded: extra.refunded });
+
+  const [patient] = await db.select({ email: users.email }).from(users).where(eq(users.id, row.patientId));
+  if (patient?.email) {
+    await sendNotification({
+      userId: row.patientId,
+      appointmentId: row.id,
+      channel: 'email',
+      to: patient.email,
+      subject: tpl.subject,
+      body: tpl.body,
+      template: kind,
+    });
+  }
+  if (row.patientPhone) {
+    await sendNotification({
+      userId: row.patientId,
+      appointmentId: row.id,
+      channel: 'whatsapp',
+      to: row.patientPhone,
+      subject: tpl.subject,
+      body: tpl.body,
+      template: kind,
+    });
+  }
 }
 
 // Available slot starts (HH:mm) for a doctor+date, computed on the caller's
@@ -336,6 +389,7 @@ appointmentsRouter.post('/:id/verify', async (req, res, next) => {
       .set({ paymentStatus: 'paid', razorpayPaymentId: body.razorpayPaymentId })
       .where(eq(appointments.bookingId, req.params.id))
       .returning(appointmentColumns);
+    await sendBookingNotifications(updated!, 'confirmed', { amountPaise: updated!.feePaise });
     res.json({ appointment: serializeAppointment(updated!) });
   } catch (err) {
     next(err);
@@ -349,7 +403,7 @@ appointmentsRouter.post('/:id/reschedule', async (req, res, next) => {
       res.status(400).json({ error: { message: 'Date is in the past' } });
       return;
     }
-    const updated = await db.transaction(async (tx) => {
+    const { row: updated, changed } = await db.transaction(async (tx) => {
       const [row] = await tx
         .select(appointmentColumns)
         .from(appointments)
@@ -358,7 +412,7 @@ appointmentsRouter.post('/:id/reschedule', async (req, res, next) => {
       if (!row) throw new BookingError(404, 'Appointment not found');
       if (row.patientId !== req.user!.id) throw new BookingError(403, 'Forbidden');
       if (row.status !== 'upcoming') throw new BookingError(400, 'Only upcoming appointments can be rescheduled');
-      if (row.date === body.date && row.timeSlot === body.slot) return row;
+      if (row.date === body.date && row.timeSlot === body.slot) return { row, changed: false };
       // serialize concurrent bookings/reschedules for the same doctor, mirroring the booking path
       await tx.select().from(doctors).where(eq(doctors.id, row.doctorId)).for('update');
       const starts = await availableStarts(tx, row.doctorId, body.date);
@@ -368,8 +422,9 @@ appointmentsRouter.post('/:id/reschedule', async (req, res, next) => {
         .set({ date: body.date, timeSlot: body.slot })
         .where(eq(appointments.bookingId, req.params.id))
         .returning(appointmentColumns);
-      return updated!;
+      return { row: updated!, changed: true };
     });
+    if (changed) await sendBookingNotifications(updated, 'rescheduled');
     res.json({ appointment: serializeAppointment(updated) });
   } catch (err) {
     if (err instanceof BookingError) {
@@ -408,6 +463,7 @@ appointmentsRouter.post('/:id/cancel', async (req, res, next) => {
         .returning(appointmentColumns);
       return updated!;
     });
+    await sendBookingNotifications(updated, 'cancelled', { refunded: updated.paymentStatus === 'refunded' });
     res.json({ appointment: serializeAppointment(updated) });
   } catch (err) {
     if (err instanceof BookingError) {
