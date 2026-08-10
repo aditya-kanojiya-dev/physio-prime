@@ -8,6 +8,13 @@
       "when": 1786358112889,
       "tag": "0000_init",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1786367121732,
+      "tag": "0001_skinny_amazoness",
+      "breakpoints": true
     }
   ]
 }

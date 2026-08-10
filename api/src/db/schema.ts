@@ -155,10 +155,12 @@ export const contentSections = pgTable(
 export const notifications = pgTable('notifications', {
   id: serial('id').primaryKey(),
   userId: integer('user_id').references(() => users.id),
+  appointmentId: integer('appointment_id').references(() => appointments.id),
   channel: text('channel').notNull(),
   toAddress: text('to_address').notNull(),
   subject: text('subject'),
   body: text('body'),
+  template: text('template'),
   status: text('status').notNull().default('queued'),
   providerId: text('provider_id'),
   error: text('error'),
