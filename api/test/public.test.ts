@@ -1,12 +1,11 @@
 import { describe, it, beforeAll, afterAll, expect } from 'vitest';
 import request from 'supertest';
-import bcrypt from 'bcryptjs';
-import { sql, eq } from 'drizzle-orm';
+import { sql } from 'drizzle-orm';
 import { db } from '../src/db/pool';
 import { runMigrations } from '../src/db/migrate';
 import { seed } from '../src/lib/seed';
 import { createApp } from '../src/index';
-import { contentSections, categories, users, doctors } from '../src/db/schema';
+import { contentSections } from '../src/db/schema';
 
 const api = request(createApp());
 
@@ -117,43 +116,37 @@ describe('GET /api/v1/doctors filters', () => {
     expect(byGender.body.doctors).toHaveLength(3);
     expect(byGender.body.doctors.every((d: { gender: string }) => d.gender === 'female')).toBe(true);
 
-    // No seeded doctor's specialty/expertise/treatments contains any full category title,
-    // so prove category matching with a runtime-inserted doctor whose expertise uses the
-    // real seeded category title.
-    const [ortho] = await db
-      .select({ title: categories.title })
-      .from(categories)
-      .where(eq(categories.slug, 'orthopedic'));
-    const [probeUser] = await db
-      .insert(users)
-      .values({
-        email: 'cat.probe@physio.example',
-        passwordHash: bcrypt.hashSync('probe', 4),
-        role: 'doctor',
-        name: 'Dr Category Probe',
-      })
-      .returning({ id: users.id });
-    await db.insert(doctors).values({
-      userId: probeUser!.id,
-      name: 'Dr Category Probe',
-      slug: 'doc-category-probe',
-      title: 'Probe Physiotherapist',
-      specialty: 'General Practice',
-      gender: 'male',
-      fees: { clinic: 1500 },
-      expertise: [ortho!.title],
-    });
-
+    // category filters token-match real seed data: the "Orthopedic Physiotherapy"
+    // title matches Tarannum's "Orthopedic & Post-Op Rehab Specialist" specialty
+    // and Jayshree's "Antenatal & Postnatal Physiotherapy" (OR across tokens).
     const byCategory = await api.get('/api/v1/doctors?category=orthopedic');
     expect(byCategory.status).toBe(200);
-    expect(byCategory.body.doctors.map((d: { slug: string }) => d.slug)).toEqual(['doc-category-probe']);
+    expect(byCategory.body.doctors.map((d: { slug: string }) => d.slug)).toEqual([
+      'doc-tarannum-sayyed',
+      'doc-jayshree-ingole',
+    ]);
 
-    const categoryPlusGender = await api.get('/api/v1/doctors?category=orthopedic&gender=female');
+    // "Sports Injury & Performance" title matches Pritam's "Sports Injury & Stroke Rehabilitation".
+    const sportsInjury = await api.get('/api/v1/doctors?category=sports-injury');
+    expect(sportsInjury.status).toBe(200);
+    expect(sportsInjury.body.doctors.map((d: { slug: string }) => d.slug)).toEqual(['doc-pritam-rathod']);
+
+    const categoryPlusGender = await api.get('/api/v1/doctors?category=sports-injury&gender=female');
     expect(categoryPlusGender.body.doctors).toHaveLength(0);
+
+    // symptom filters token-match too, including the doctor's bio (the "Back Pain" title
+    // matches via bio; featured then id tiebreaks make the order deterministic).
+    const bySymptom = await api.get('/api/v1/doctors?symptom=back-pain');
+    expect(bySymptom.status).toBe(200);
+    expect(bySymptom.body.doctors.map((d: { slug: string }) => d.slug)).toEqual([
+      'doc-tarannum-sayyed',
+      'doc-jayshree-ingole',
+      'doc-pratyush-kulkarni',
+    ]);
 
     const modeClinic = await api.get('/api/v1/doctors?mode=clinic');
     expect(modeClinic.status).toBe(200);
-    expect(modeClinic.body.doctors).toHaveLength(7);
+    expect(modeClinic.body.doctors).toHaveLength(6);
     const modeHome = await api.get('/api/v1/doctors?mode=home');
     expect(modeHome.status).toBe(200);
     expect(modeHome.body.doctors).toHaveLength(6);

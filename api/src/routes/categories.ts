@@ -10,7 +10,7 @@ categoriesRouter.get('/', async (_req, res) => {
     .select()
     .from(categories)
     .where(eq(categories.active, true))
-    .orderBy(categories.sortOrder);
+    .orderBy(categories.sortOrder, categories.id);
   // ponytail: `id` mirrors the app's slug-as-id contract.
   res.json(
     rows.map((row) => ({

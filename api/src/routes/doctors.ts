@@ -21,6 +21,31 @@ function like(value: string): string {
   return `%${value.replace(/[\\%_]/g, (ch) => `\\${ch}`)}%`;
 }
 
+// ponytail: category/symptom titles are token-matched (OR across tokens, a doctor
+// wins if ANY token appears in specialty/expertise/treatments, +bio for symptoms)
+// so real seeds like "Orthopedic Physiotherapy" vs "Orthopedic & Post-Op" match.
+const ignoredTokens = new Set(['and', 'for', 'the', 'of']);
+function tokens(title: string): string[] {
+  return title
+    .split(/\s+/)
+    .map((word) => word.replace(/[^A-Za-z0-9]/g, ''))
+    .filter((word) => word.length >= 3 && !ignoredTokens.has(word.toLowerCase()));
+}
+function tokenMatchSql(title: string, withBio: boolean): SQL {
+  const clauses = tokens(title).map((token) => {
+    const pattern = like(token);
+    const parts: SQL[] = [
+      sql`${doctors.specialty} ILIKE ${pattern} ESCAPE '\\'`,
+      sql`EXISTS (SELECT 1 FROM unnest(${doctors.expertise}) AS _e WHERE _e ILIKE ${pattern} ESCAPE '\\')`,
+      sql`EXISTS (SELECT 1 FROM unnest(${doctors.treatments}) AS _t WHERE _t ILIKE ${pattern} ESCAPE '\\')`,
+    ];
+    if (withBio) parts.push(sql`${doctors.bio} ILIKE ${pattern} ESCAPE '\\'`);
+    return sql`(${sql.join(parts, sql` OR `)})`;
+  });
+  if (clauses.length === 0) return sql`false`;
+  return sql`(${sql.join(clauses, sql` OR `)})`;
+}
+
 const summaryColumns = {
   name: doctors.name,
   title: doctors.title,
@@ -69,12 +94,7 @@ doctorsRouter.get('/', async (req, res) => {
       res.json({ doctors: [] });
       return;
     }
-    const pattern = like(category.title);
-    conditions.push(
-      sql`(${doctors.specialty} ILIKE ${pattern} ESCAPE '\\'
-        OR EXISTS (SELECT 1 FROM unnest(${doctors.expertise}) AS _e WHERE _e ILIKE ${pattern} ESCAPE '\\')
-        OR EXISTS (SELECT 1 FROM unnest(${doctors.treatments}) AS _t WHERE _t ILIKE ${pattern} ESCAPE '\\'))`,
-    );
+    conditions.push(tokenMatchSql(category.title, false));
   }
   if (query.symptom) {
     const [symptom] = await db
@@ -85,12 +105,7 @@ doctorsRouter.get('/', async (req, res) => {
       res.json({ doctors: [] });
       return;
     }
-    const pattern = like(symptom.title);
-    conditions.push(
-      sql`(EXISTS (SELECT 1 FROM unnest(${doctors.expertise}) AS _e WHERE _e ILIKE ${pattern} ESCAPE '\\')
-        OR EXISTS (SELECT 1 FROM unnest(${doctors.treatments}) AS _t WHERE _t ILIKE ${pattern} ESCAPE '\\')
-        OR ${doctors.bio} ILIKE ${pattern} ESCAPE '\\')`,
-    );
+    conditions.push(tokenMatchSql(symptom.title, true));
   }
   if (query.mode) {
     conditions.push(sql`${doctors.fees}->>${query.mode} IS NOT NULL`);
@@ -105,16 +120,16 @@ doctorsRouter.get('/', async (req, res) => {
   let order: SQL;
   switch (query.sort ?? 'recommended') {
     case 'price_low':
-      order = sql`${leastFeeSql} ASC`;
+      order = sql`${leastFeeSql} ASC, ${doctors.id} ASC`;
       break;
     case 'rating':
-      order = sql`${doctors.rating} DESC`;
+      order = sql`${doctors.rating} DESC, ${doctors.id} ASC`;
       break;
     case 'experience':
-      order = sql`${doctors.experienceYears} DESC`;
+      order = sql`${doctors.experienceYears} DESC, ${doctors.id} ASC`;
       break;
     default:
-      order = sql`${doctors.featured} DESC, ${doctors.rating} DESC`;
+      order = sql`${doctors.featured} DESC, ${doctors.rating} DESC, ${doctors.id} ASC`;
   }
 
   const rows = await db

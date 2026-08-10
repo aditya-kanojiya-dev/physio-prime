@@ -10,7 +10,7 @@ symptomsRouter.get('/', async (_req, res) => {
     .select()
     .from(symptoms)
     .where(eq(symptoms.active, true))
-    .orderBy(symptoms.sortOrder);
+    .orderBy(symptoms.sortOrder, symptoms.id);
   // ponytail: `id` mirrors the app's slug-as-id contract.
   res.json(
     rows.map((row) => ({
