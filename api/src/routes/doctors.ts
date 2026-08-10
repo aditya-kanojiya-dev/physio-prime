@@ -1,0 +1,166 @@
+import { Router } from 'express';
+import { and, eq, sql, type SQL } from 'drizzle-orm';
+import { z } from 'zod';
+import { db } from '../db/pool';
+import { doctors, categories, symptoms } from '../db/schema';
+
+export const doctorsRouter = Router();
+
+const querySchema = z.object({
+  q: z.string().trim().max(200).optional(),
+  category: z.string().max(200).optional(),
+  symptom: z.string().max(200).optional(),
+  mode: z.enum(['home', 'online', 'clinic']).optional(),
+  gender: z.enum(['male', 'female']).optional(),
+  maxFee: z.coerce.number().int().positive().optional(),
+  sort: z.enum(['recommended', 'price_low', 'rating', 'experience']).optional(),
+});
+
+// ponytail: ILIKE patterns are escaped against % _ \ so a user's q can't act as a wildcard.
+function like(value: string): string {
+  return `%${value.replace(/[\\%_]/g, (ch) => `\\${ch}`)}%`;
+}
+
+const summaryColumns = {
+  name: doctors.name,
+  title: doctors.title,
+  specialty: doctors.specialty,
+  slug: doctors.slug,
+  photo: doctors.photo,
+  rating: doctors.rating,
+  reviewCount: doctors.reviewCount,
+  experienceYears: doctors.experienceYears,
+  patientsTreated: doctors.patientsTreated,
+  languages: doctors.languages,
+  location: doctors.location,
+  fees: doctors.fees,
+  nextAvailable: doctors.nextAvailable,
+  verified: doctors.verified,
+  featured: doctors.featured,
+  gender: doctors.gender,
+  bio: doctors.bio,
+};
+
+// Least of the present home/online fees; missing ones are treated as +Infinity so a
+// doctor with neither never passes maxFee/price_low sorting.
+const leastFeeSql = sql`LEAST(
+  COALESCE((${doctors.fees}->>'home')::numeric, 'Infinity'::numeric),
+  COALESCE((${doctors.fees}->>'online')::numeric, 'Infinity'::numeric)
+)`;
+
+doctorsRouter.get('/', async (req, res) => {
+  const query = querySchema.parse(req.query);
+  const conditions: SQL[] = [];
+
+  if (query.q) {
+    const pattern = like(query.q);
+    conditions.push(
+      sql`(${doctors.name} ILIKE ${pattern} ESCAPE '\\'
+        OR ${doctors.title} ILIKE ${pattern} ESCAPE '\\'
+        OR ${doctors.specialty} ILIKE ${pattern} ESCAPE '\\')`,
+    );
+  }
+  if (query.category) {
+    const [category] = await db
+      .select({ title: categories.title })
+      .from(categories)
+      .where(eq(categories.slug, query.category));
+    if (!category) {
+      res.json({ doctors: [] });
+      return;
+    }
+    const pattern = like(category.title);
+    conditions.push(
+      sql`(${doctors.specialty} ILIKE ${pattern} ESCAPE '\\'
+        OR EXISTS (SELECT 1 FROM unnest(${doctors.expertise}) AS _e WHERE _e ILIKE ${pattern} ESCAPE '\\')
+        OR EXISTS (SELECT 1 FROM unnest(${doctors.treatments}) AS _t WHERE _t ILIKE ${pattern} ESCAPE '\\'))`,
+    );
+  }
+  if (query.symptom) {
+    const [symptom] = await db
+      .select({ title: symptoms.title })
+      .from(symptoms)
+      .where(eq(symptoms.slug, query.symptom));
+    if (!symptom) {
+      res.json({ doctors: [] });
+      return;
+    }
+    const pattern = like(symptom.title);
+    conditions.push(
+      sql`(EXISTS (SELECT 1 FROM unnest(${doctors.expertise}) AS _e WHERE _e ILIKE ${pattern} ESCAPE '\\')
+        OR EXISTS (SELECT 1 FROM unnest(${doctors.treatments}) AS _t WHERE _t ILIKE ${pattern} ESCAPE '\\')
+        OR ${doctors.bio} ILIKE ${pattern} ESCAPE '\\')`,
+    );
+  }
+  if (query.mode) {
+    conditions.push(sql`${doctors.fees}->>${query.mode} IS NOT NULL`);
+  }
+  if (query.gender) {
+    conditions.push(eq(doctors.gender, query.gender));
+  }
+  if (query.maxFee != null) {
+    conditions.push(sql`${leastFeeSql} <= ${query.maxFee}`);
+  }
+
+  let order: SQL;
+  switch (query.sort ?? 'recommended') {
+    case 'price_low':
+      order = sql`${leastFeeSql} ASC`;
+      break;
+    case 'rating':
+      order = sql`${doctors.rating} DESC`;
+      break;
+    case 'experience':
+      order = sql`${doctors.experienceYears} DESC`;
+      break;
+    default:
+      order = sql`${doctors.featured} DESC, ${doctors.rating} DESC`;
+  }
+
+  const rows = await db
+    .select(summaryColumns)
+    .from(doctors)
+    .where(and(...conditions))
+    .orderBy(order);
+
+  // ponytail: numeric columns arrive as strings from pg; rating is a number in the API
+  // contract. `id` mirrors the app's slug-as-id contract (slug == the app's original doc id).
+  res.json({
+    doctors: rows.map((row) => ({ ...row, id: row.slug, rating: Number(row.rating) })),
+  });
+});
+
+doctorsRouter.get('/:slug', async (req, res) => {
+  const [row] = await db.select().from(doctors).where(eq(doctors.slug, req.params.slug));
+  if (!row) {
+    res.status(404).json({ error: { message: 'Doctor not found' } });
+    return;
+  }
+  res.json({
+    doctor: {
+      id: row.slug,
+      name: row.name,
+      title: row.title,
+      specialty: row.specialty,
+      slug: row.slug,
+      photo: row.photo,
+      rating: Number(row.rating),
+      reviewCount: row.reviewCount,
+      experienceYears: row.experienceYears,
+      patientsTreated: row.patientsTreated,
+      languages: row.languages,
+      location: row.location,
+      fees: row.fees,
+      nextAvailable: row.nextAvailable,
+      verified: row.verified,
+      featured: row.featured,
+      gender: row.gender,
+      bio: row.bio,
+      education: row.education,
+      experience: row.experience,
+      registration: row.registration,
+      expertise: row.expertise,
+      treatments: row.treatments,
+    },
+  });
+});
