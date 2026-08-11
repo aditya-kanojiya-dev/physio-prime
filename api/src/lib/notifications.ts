@@ -16,22 +16,8 @@ function isNotOnWhatsApp(err: unknown): boolean {
   return /not.*whatsapp|invalid.*to.*number|channel.*unavailable/i.test(msg);
 }
 
-async function sendResendEmail(params: { to: string; subject: string; html: string }): Promise<void> {
-  const res = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${requireEnv('RESEND_API_KEY')}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      from: requireEnv('RESEND_FROM_EMAIL'),
-      to: params.to,
-      subject: params.subject,
-      html: params.html,
-    }),
-  });
-  if (!res.ok) throw new Error(`Resend failed: ${res.status} ${await res.text()}`);
-}
+// ponytail: 10s hard timeout so a hung provider can never stall the booking response
+const FETCH_TIMEOUT_MS = 10_000;
 
 async function sendTwilioMessage(params: { to: string; body: string; whatsapp: boolean }): Promise<void> {
   const accountSid = requireEnv('TWILIO_ACCOUNT_SID');
@@ -43,6 +29,7 @@ async function sendTwilioMessage(params: { to: string; body: string; whatsapp: b
     `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`,
     {
       method: 'POST',
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
       headers: {
         Authorization: `Basic ${Buffer.from(`${accountSid}:${authToken}`).toString('base64')}`,
         'Content-Type': 'application/x-www-form-urlencoded',
@@ -60,9 +47,6 @@ async function sendTwilioMessage(params: { to: string; body: string; whatsapp: b
 // Module-level dispatch so tests can vi.mock. sendNotification catches provider
 // errors itself (marks the row failed) — callers must never need a try/catch.
 export const providers = {
-  async resend(params: { to: string; subject: string; html: string }): Promise<void> {
-    await sendResendEmail(params);
-  },
   async twilioWhatsApp(params: { to: string; body: string }): Promise<void> {
     await sendTwilioMessage({ ...params, whatsapp: true });
   },
@@ -108,23 +92,14 @@ export const templates = {
   }),
 };
 
-function htmlify(subject: string, body: string): string {
-  const safe = body.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  return `<div style="font-family:sans-serif"><h2>${subject}</h2><p>${safe}</p></div>`;
-}
-
 export async function dispatch(notification: {
   channel: string;
   toAddress: string;
   subject: string | null;
   body: string | null;
 }): Promise<void> {
-  const subject = notification.subject ?? '';
   const body = notification.body ?? '';
   switch (notification.channel) {
-    case 'email':
-      await providers.resend({ to: notification.toAddress, subject, html: htmlify(subject, body) });
-      return;
     case 'whatsapp':
       try {
         await providers.twilioWhatsApp({ to: notification.toAddress, body });
@@ -153,19 +128,26 @@ export async function sendNotification(params: {
   body?: string;
   template?: string;
 }): Promise<void> {
-  const [row] = await db
-    .insert(notifications)
-    .values({
-      userId: params.userId ?? null,
-      appointmentId: params.appointmentId ?? null,
-      channel: params.channel,
-      toAddress: params.to,
-      subject: params.subject ?? null,
-      body: params.body ?? null,
-      template: params.template ?? null,
-      status: 'queued',
-    })
-    .returning();
+  let row;
+  try {
+    const [inserted] = await db
+      .insert(notifications)
+      .values({
+        userId: params.userId ?? null,
+        appointmentId: params.appointmentId ?? null,
+        channel: params.channel,
+        toAddress: params.to,
+        subject: params.subject ?? null,
+        body: params.body ?? null,
+        template: params.template ?? null,
+        status: 'queued',
+      })
+      .returning();
+    row = inserted;
+  } catch {
+    // ponytail: even the insert must not reach the booking flow
+    return;
+  }
   try {
     await dispatch({
       channel: row.channel,
@@ -176,7 +158,11 @@ export async function sendNotification(params: {
     await db.update(notifications).set({ status: 'sent', sentAt: new Date() }).where(eq(notifications.id, row.id));
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    await db.update(notifications).set({ status: 'failed', error: message }).where(eq(notifications.id, row.id));
+    try {
+      await db.update(notifications).set({ status: 'failed', error: message }).where(eq(notifications.id, row.id));
+    } catch {
+      // ponytail: recording the failure is best-effort too
+    }
   }
 }
 
@@ -217,11 +203,13 @@ export async function sendReminderPass(): Promise<number> {
       mode: apt.mode,
       bookingId: apt.bookingId,
     });
+    // whatsapp with sms fallback inside dispatch; nothing to send without a phone
+    if (!apt.patientPhone) continue;
     await sendNotification({
       userId: apt.patientId,
       appointmentId: apt.id,
-      channel: apt.patientPhone ? 'whatsapp' : 'email',
-      to: apt.patientPhone ?? '',
+      channel: 'whatsapp',
+      to: apt.patientPhone,
       subject: tpl.subject,
       body: tpl.body,
       template: 'reminder',

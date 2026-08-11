@@ -117,28 +117,27 @@ beforeEach(() => {
   vi.mocked(createOrder).mockImplementation(async ({ amountPaise }) => ({ id: 'order_default', amountPaise }));
   vi.mocked(verifySignature).mockReturnValue(true);
   vi.mocked(createRefund).mockResolvedValue();
-  providers.resend = vi.fn(async () => undefined);
   providers.twilioWhatsApp = vi.fn(async () => undefined);
   providers.twilioSms = vi.fn(async () => undefined);
 });
 
 describe('sendNotification', () => {
   it('inserts a row and dispatches via the mock provider (status sent)', async () => {
-    await sendNotification({ channel: 'email', to: 'ok@b.com', subject: 'S', body: 'B' });
+    await sendNotification({ channel: 'whatsapp', to: '9876543210', subject: 'S', body: 'B' });
     const rows = await db.select().from(notifications);
-    const row = rows.find((r) => r.toAddress === 'ok@b.com');
+    const row = rows.find((r) => r.toAddress === '9876543210');
     expect(row).toBeDefined();
     expect(row!.status).toBe('sent');
   });
 
   it('marks the row failed and does not throw when the provider throws', async () => {
-    vi.mocked(providers.resend).mockRejectedValueOnce(new Error('Resend 500'));
-    await expect(sendNotification({ channel: 'email', to: 'fail@b.com', subject: 'S', body: 'B' })).resolves.toBeUndefined();
+    vi.mocked(providers.twilioWhatsApp).mockRejectedValueOnce(new Error('Twilio 500'));
+    await expect(sendNotification({ channel: 'whatsapp', to: '9876543211', subject: 'S', body: 'B' })).resolves.toBeUndefined();
     const rows = await db.select().from(notifications);
-    const row = rows.find((r) => r.toAddress === 'fail@b.com');
+    const row = rows.find((r) => r.toAddress === '9876543211');
     expect(row).toBeDefined();
     expect(row!.status).toBe('failed');
-    expect(row!.error).toContain('Resend 500');
+    expect(row!.error).toContain('Twilio 500');
   });
 });
 
@@ -172,14 +171,13 @@ describe('templates', () => {
 });
 
 describe('booking flow notifications', () => {
-  it('creates bookingConfirmed rows (email + whatsapp) when a payment is verified', async () => {
+  it('creates a bookingConfirmed whatsapp row when a payment is verified', async () => {
     await bookAndVerify('ntf.confirm@example.com', '10:00-10:30');
     const rows = await db.select().from(notifications);
     const confirmed = rows.filter((r) => r.template === 'confirmed');
-    expect(confirmed.length).toBe(2);
-    expect(confirmed.every((r) => r.status === 'sent')).toBe(true);
-    expect(confirmed.some((r) => r.channel === 'email')).toBe(true);
-    expect(confirmed.some((r) => r.channel === 'whatsapp')).toBe(true);
+    expect(confirmed.length).toBe(1);
+    expect(confirmed[0].channel).toBe('whatsapp');
+    expect(confirmed[0].status).toBe('sent');
     expect(confirmed[0].body).toContain('confirmed');
   });
 
@@ -192,7 +190,8 @@ describe('booking flow notifications', () => {
       .expect(200);
     const rows = await db.select().from(notifications);
     const rescheduled = rows.filter((r) => r.template === 'rescheduled');
-    expect(rescheduled.length).toBe(2);
+    expect(rescheduled.length).toBe(1);
+    expect(rescheduled[0].channel).toBe('whatsapp');
     expect(rescheduled[0].body).toContain('moved to');
 
     await api
@@ -201,10 +200,10 @@ describe('booking flow notifications', () => {
       .send({ date: futureWeekday(2), slot: '11:00-11:30' })
       .expect(200);
     const after = await db.select().from(notifications);
-    expect(after.filter((r) => r.template === 'rescheduled').length).toBe(2);
+    expect(after.filter((r) => r.template === 'rescheduled').length).toBe(1);
   });
 
-  it('creates bookingCancelled rows (with refund note) after cancel', async () => {
+  it('creates a bookingCancelled row (with refund note) after cancel', async () => {
     const { token, bookingId } = await bookAndVerify('ntf.cancel@example.com', '12:00-12:30');
     await api
       .post(`/api/v1/appointments/${bookingId}/cancel`)
@@ -213,7 +212,8 @@ describe('booking flow notifications', () => {
       .expect(200);
     const rows = await db.select().from(notifications);
     const cancelled = rows.filter((r) => r.template === 'cancelled');
-    expect(cancelled.length).toBe(2);
+    expect(cancelled.length).toBe(1);
+    expect(cancelled[0].channel).toBe('whatsapp');
     expect(cancelled[0].body).toContain('refunded');
   });
 });
@@ -258,10 +258,10 @@ describe('POST /api/v1/notifications', () => {
   });
 
   it('retry re-dispatches a failed row; rejects retrying a non-failed row', async () => {
-    vi.mocked(providers.resend).mockRejectedValueOnce(new Error('Resend 500'));
-    await sendNotification({ channel: 'email', to: 'retry@b.com', subject: 'S', body: 'B' });
+    vi.mocked(providers.twilioWhatsApp).mockRejectedValueOnce(new Error('Twilio 500'));
+    await sendNotification({ channel: 'whatsapp', to: '9876543212', subject: 'S', body: 'B' });
     const rows = await db.select().from(notifications);
-    const failed = rows.find((r) => r.toAddress === 'retry@b.com');
+    const failed = rows.find((r) => r.toAddress === '9876543212');
     expect(failed!.status).toBe('failed');
 
     const admin = await registerAdmin('ntf.admin3@example.com');
