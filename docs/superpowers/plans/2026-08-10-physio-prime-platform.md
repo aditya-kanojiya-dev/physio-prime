@@ -10,7 +10,7 @@
 - API: Node 20+, Express 5, `pg` + Drizzle ORM, `drizzle-kit` migrations, Zod for validation, `bcryptjs`, `jsonwebtoken`
 - Tests: Vitest + Supertest (API), oxlint + `tsc -b` (static)
 - Payments: Razorpay (orders + webhooks)
-- Notifications: email via Resend, WhatsApp/SMS via Twilio
+- Notifications: WhatsApp/SMS via Twilio
 - Fronts: Vite 8 + React 19 + Tailwind v4 + Framer Motion (existing patient app), same stack for `admin/`
 - Charts (admin insights): recharts
 - Deploy: Vercel (monorepo, API as single serverless function) + Neon Postgres
@@ -240,7 +240,7 @@ Protected — admin (`requireRole('admin')`):
     return app;
   }
   ```
-  `api/src/config.ts`: zod-parses `DATABASE_URL`, `JWT_SECRET`, `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RESEND_API_KEY`, `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_WHATSAPP_FROM`, `APP_URL`; throws at boot if missing (dev uses `.env` via `dotenv/config`).
+  `api/src/config.ts`: zod-parses `DATABASE_URL`, `JWT_SECRET`, `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_WHATSAPP_FROM`, `APP_URL`; throws at boot if missing (dev uses `.env` via `dotenv/config`).
 
 - [ ] **Step 5: Run test to verify it passes**
   Run: `npm test -w api` — Expected: PASS.
@@ -351,7 +351,7 @@ Protected — admin (`requireRole('admin')`):
 
 ---
 
-## Phase 5: Notifications (Email + WhatsApp/SMS)
+## Phase 5: Notifications (WhatsApp/SMS)
 
 **Files:**
 - Create: `api/src/lib/notifications.ts`, `api/src/routes/notifications.ts` (admin view/retry), `api/test/notifications.test.ts`
@@ -359,17 +359,17 @@ Protected — admin (`requireRole('admin')`):
 
 **Interfaces:**
 - `notify(userId, channel, to, subject, body)` → inserts `notifications` row `queued`, then dispatches; on provider error marks row `failed` with error (never throws into the booking flow)
-- Email via Resend; WhatsApp via Twilio WhatsApp API, falling back to SMS when no WhatsApp-enabled number
+- WhatsApp via Twilio WhatsApp API, falling back to SMS when no WhatsApp-enabled number. No email channel (decision: whatsapp/sms only)
 - Templates: `booking-confirmed`, `booking-rescheduled`, `booking-cancelled`, `appointment-reminder` (sent by a scheduled reminder pass)
 
 - [ ] **Step 1: Write failing tests** — `notify` writes a `queued` row; provider failure marks `failed` but does not reject the caller; templates render expected body strings.
 - [ ] **Step 2: Run to verify failure.**
-- [ ] **Step 3: Implement `lib/notifications.ts` + template functions** (Resend/Twilio clients injected so tests stub them).
+- [ ] **Step 3: Implement `lib/notifications.ts` + template functions** (Twilio clients injected so tests stub them).
 - [ ] **Step 4: Wire into appointments router** at paid/reschedule/cancel.
 - [ ] **Step 5: Run tests** — Expected: PASS.
 - [ ] **Step 6: Commit**
   ```bash
-  git commit -am "feat(api): email + whatsapp/sms notifications on booking events"
+  git commit -am "feat(api): whatsapp/sms notifications on booking events"
   ```
 
 ---
@@ -484,7 +484,7 @@ Protected — admin (`requireRole('admin')`):
 **Behaviors:**
 - Provision Neon DB, run `drizzle-kit migrate` against prod, seed prod admin
 - Vercel monorepo: root `vercel.json` rewrites `/(api/*)` → the Express function; patient app + admin app as two Vercel projects (or one project with distinct builds) — decide at execution, minimal config wins
-- Configure env: `DATABASE_URL`, `JWT_SECRET`, `RAZORPAY_KEY_ID/SECRET` (test mode first), `RESEND_API_KEY`, `TWILIO_*`, `APP_URL`
+- Configure env: `DATABASE_URL`, `JWT_SECRET`, `RAZORPAY_KEY_ID/SECRET` (test mode first), `TWILIO_*`, `APP_URL`
 - Smoke test on prod: register → login → book with Razorpay test card → verify → admin sees booking + insight
 
 - [ ] **Step 1: Write `docs/DEPLOY.md`.**
