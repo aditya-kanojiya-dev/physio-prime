@@ -86,6 +86,7 @@ interface AppointmentView {
     title: string | null;
     specialty: string | null;
     photo: string | null;
+    location: unknown;
   } | null;
 }
 
@@ -117,6 +118,7 @@ const doctorSummary = {
   title: doctors.title,
   specialty: doctors.specialty,
   photo: doctors.photo,
+  location: doctors.location,
 };
 
 function serializeAppointment(row: AppointmentView) {
@@ -131,6 +133,7 @@ function serializeAppointment(row: AppointmentView) {
           title: row.doctor.title,
           specialty: row.doctor.specialty,
           photo: row.doctor.photo,
+          location: row.doctor.location,
         }
       : null,
     mode: row.mode,

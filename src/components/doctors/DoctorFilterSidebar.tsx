@@ -1,7 +1,6 @@
 import React from 'react';
 import { ConsultationMode } from '../../types';
-import { SYMPTOMS_DATA } from '../../data/symptoms';
-import { CATEGORIES_DATA } from '../../data/categories';
+import { useSymptoms, useCategories } from '../../hooks/queries';
 import { Filter, Search, RotateCcw, Home, Video } from 'lucide-react';
 
 interface FilterSidebarProps {
@@ -35,6 +34,9 @@ export const DoctorFilterSidebar: React.FC<FilterSidebarProps> = ({
   setSelectedGender,
   resetFilters,
 }) => {
+  const { data: symptoms = [] } = useSymptoms();
+  const { data: categories = [] } = useCategories();
+
   return (
     <div className="glass-panel p-6 rounded-3xl border border-slate-200 shadow-xl space-y-6 sticky top-28">
       
@@ -142,7 +144,7 @@ export const DoctorFilterSidebar: React.FC<FilterSidebarProps> = ({
       <div className="space-y-2">
         <label className="text-xs font-bold text-slate-700">Filter By Symptom</label>
         <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto pr-1">
-          {SYMPTOMS_DATA.map(s => {
+          {symptoms.map(s => {
             const isSel = selectedSymptom === s.slug;
             return (
               <button
@@ -165,7 +167,7 @@ export const DoctorFilterSidebar: React.FC<FilterSidebarProps> = ({
       <div className="space-y-2">
         <label className="text-xs font-bold text-slate-700">Clinical Specialty</label>
         <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto pr-1">
-          {CATEGORIES_DATA.map(c => {
+          {categories.map(c => {
             const isSel = selectedCategory === c.slug;
             return (
               <button

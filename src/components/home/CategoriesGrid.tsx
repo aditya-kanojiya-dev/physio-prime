@@ -1,11 +1,12 @@
 import React from 'react';
 import { useBooking } from '../../context/BookingContext';
-import { CATEGORIES_DATA } from '../../data/categories';
+import { useCategories } from '../../hooks/queries';
 import { motion } from 'framer-motion';
-import { ArrowRight, Stethoscope, Layers } from 'lucide-react';
+import { ArrowRight, Stethoscope, Loader2 } from 'lucide-react';
 
 export const CategoriesGrid: React.FC = () => {
   const { navigateToCategory, setCurrentPage } = useBooking();
+  const { data: categories = [], isLoading } = useCategories();
 
   return (
     <section className="py-20 bg-slate-50 relative border-y border-slate-200">
@@ -15,8 +16,14 @@ export const CategoriesGrid: React.FC = () => {
 
 
         {/* Categories Grid */}
+        {isLoading ? (
+          <div className="text-center py-16 flex items-center justify-center gap-2 text-sm font-bold text-slate-500">
+            <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
+            Loading specialties...
+          </div>
+        ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {CATEGORIES_DATA.map((cat, index) => (
+          {categories.map((cat, index) => (
             <motion.div
               key={cat.id}
               initial={{ opacity: 0, y: 20 }}
@@ -74,6 +81,7 @@ export const CategoriesGrid: React.FC = () => {
             </motion.div>
           ))}
         </div>
+        )}
 
         <div className="text-center mt-12">
           <button

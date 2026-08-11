@@ -12,8 +12,8 @@ categoriesRouter.get('/', async (_req, res) => {
     .where(eq(categories.active, true))
     .orderBy(categories.sortOrder, categories.id);
   // ponytail: `id` mirrors the app's slug-as-id contract.
-  res.json(
-    rows.map((row) => ({
+  res.json({
+    categories: rows.map((row) => ({
       id: row.slug,
       title: row.title,
       slug: row.slug,
@@ -23,5 +23,5 @@ categoriesRouter.get('/', async (_req, res) => {
       conditions: row.conditions,
       sortOrder: row.sortOrder,
     })),
-  );
+  });
 });

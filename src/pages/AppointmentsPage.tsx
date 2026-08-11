@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { useBooking } from '../context/BookingContext';
+import { useSlots } from '../hooks/queries';
+import { slotLabel } from '../lib/adapters';
 import { Appointment } from '../types';
-import { Calendar, Video, Home, MapPin, RotateCcw, XCircle, Sparkles } from 'lucide-react';
+import { Calendar, Video, Home, MapPin, RotateCcw, XCircle, Sparkles, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { DoctorTrackingModal } from '../components/tracking/DoctorTrackingModal';
 
@@ -12,8 +14,12 @@ export const AppointmentsPage: React.FC = () => {
 
   // Reschedule state
   const [rescheduleApt, setRescheduleApt] = useState<Appointment | null>(null);
-  const [newDate, setNewDate] = useState('2026-08-15');
-  const [newTime, setNewTime] = useState('04:30 PM');
+  const [newDate, setNewDate] = useState('');
+  const [newTime, setNewTime] = useState('');
+  const { data: rescheduleSlots, isLoading: rescheduleSlotsLoading } = useSlots(
+    rescheduleApt?.doctorId ?? null,
+    newDate || null
+  );
 
   // Cancel modal state
   const [cancelApt, setCancelApt] = useState<Appointment | null>(null);
@@ -21,17 +27,25 @@ export const AppointmentsPage: React.FC = () => {
 
   const filteredAppointments = appointments.filter(a => a.status === activeTab);
 
-  const handleConfirmReschedule = () => {
-    if (rescheduleApt) {
-      rescheduleAppointment(rescheduleApt.id, newDate, newTime);
-      setRescheduleApt(null);
+  const handleConfirmReschedule = async () => {
+    if (rescheduleApt && newDate && newTime) {
+      try {
+        await rescheduleAppointment(rescheduleApt.id, newDate, newTime);
+        setRescheduleApt(null);
+      } catch {
+        alert('Could not reschedule. Please try another slot.');
+      }
     }
   };
 
-  const handleConfirmCancel = () => {
+  const handleConfirmCancel = async () => {
     if (cancelApt) {
-      cancelAppointment(cancelApt.id, cancelReason);
-      setCancelApt(null);
+      try {
+        await cancelAppointment(cancelApt.id, cancelReason);
+        setCancelApt(null);
+      } catch {
+        alert('Could not cancel the appointment. Please try again.');
+      }
     }
   };
 
@@ -181,7 +195,11 @@ export const AppointmentsPage: React.FC = () => {
                     )}
 
                     <button
-                      onClick={() => setRescheduleApt(apt)}
+                      onClick={() => {
+                        setRescheduleApt(apt);
+                        setNewDate(apt.date);
+                        setNewTime('');
+                      }}
                       className="px-4 py-2.5 rounded-xl font-bold text-xs text-slate-700 bg-slate-100 hover:bg-slate-200 transition-colors flex items-center gap-1.5"
                     >
                       <RotateCcw className="w-3.5 h-3.5" />
@@ -242,29 +260,49 @@ export const AppointmentsPage: React.FC = () => {
                 <input
                   type="date"
                   value={newDate}
-                  onChange={e => setNewDate(e.target.value)}
+                  onChange={e => {
+                    setNewDate(e.target.value);
+                    setNewTime('');
+                  }}
                   className="w-full p-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-900"
                 />
               </div>
 
               <div className="space-y-2">
                 <label className="text-xs font-bold text-slate-700">New Time Slot</label>
-                <select
-                  value={newTime}
-                  onChange={e => setNewTime(e.target.value)}
-                  className="w-full p-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-900"
-                >
-                  <option value="09:00 AM">09:00 AM</option>
-                  <option value="11:30 AM">11:30 AM</option>
-                  <option value="03:00 PM">03:00 PM</option>
-                  <option value="04:30 PM">04:30 PM</option>
-                  <option value="06:00 PM">06:00 PM</option>
-                </select>
+                {rescheduleSlotsLoading ? (
+                  <p className="flex items-center gap-2 text-xs text-slate-500 bg-slate-50 border border-slate-200 rounded-xl p-3">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading slots...
+                  </p>
+                ) : rescheduleSlots && rescheduleSlots.length > 0 ? (
+                  <select
+                    value={newTime}
+                    onChange={e => setNewTime(e.target.value)}
+                    className="w-full p-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-900"
+                  >
+                    <option value="">Select a slot</option>
+                    {rescheduleSlots.map(s => (
+                      <option key={`${s.start}-${s.end}`} value={`${s.start}-${s.end}`}>
+                        {slotLabel(s)}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <p className="text-xs text-slate-500 bg-slate-50 border border-slate-200 rounded-xl p-3">
+                    No slots available for this day.
+                  </p>
+                )}
               </div>
 
               <div className="pt-2 flex items-center justify-end gap-2">
                 <button onClick={() => setRescheduleApt(null)} className="px-4 py-2 text-xs font-bold text-slate-500">Cancel</button>
-                <button onClick={handleConfirmReschedule} className="btn-gradient text-white px-5 py-2 rounded-xl font-bold text-xs">Confirm Reschedule</button>
+                <button
+                  onClick={handleConfirmReschedule}
+                  disabled={!newDate || !newTime}
+                  className="btn-gradient text-white px-5 py-2 rounded-xl font-bold text-xs disabled:opacity-50"
+                >
+                  Confirm Reschedule
+                </button>
               </div>
             </motion.div>
           </div>

@@ -12,8 +12,8 @@ symptomsRouter.get('/', async (_req, res) => {
     .where(eq(symptoms.active, true))
     .orderBy(symptoms.sortOrder, symptoms.id);
   // ponytail: `id` mirrors the app's slug-as-id contract.
-  res.json(
-    rows.map((row) => ({
+  res.json({
+    symptoms: rows.map((row) => ({
       id: row.slug,
       title: row.title,
       slug: row.slug,
@@ -24,5 +24,5 @@ symptomsRouter.get('/', async (_req, res) => {
       image: row.image,
       sortOrder: row.sortOrder,
     })),
-  );
+  });
 });

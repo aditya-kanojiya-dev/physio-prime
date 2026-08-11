@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useBooking, PageView } from '../../context/BookingContext';
-import { Activity, User, Menu, X, ArrowRight, Sparkles, MapPin, LogIn } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
+import { Activity, User, Menu, X, ArrowRight, Sparkles, MapPin, LogIn, LogOut } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AuthModal } from '../auth/AuthModal';
 
@@ -9,9 +10,9 @@ export const Navbar: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { openBookingModal, appointments } = useBooking();
+  const { user, logout, authModalOpen, openAuthModal, closeAuthModal } = useAuth();
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [authModalOpen, setAuthModalOpen] = useState(false);
 
   const upcomingCount = appointments.filter(a => a.status === 'upcoming').length;
 
@@ -116,14 +117,33 @@ export const Navbar: React.FC = () => {
 
             {/* Right Action Buttons */}
             <div className="hidden lg:flex items-center gap-3">
-              {/* Login Button */}
-              <button
-                onClick={() => setAuthModalOpen(true)}
-                className="p-2.5 rounded-xl text-slate-600 hover:bg-slate-100 transition-colors border border-slate-200/60 flex items-center gap-2 font-semibold text-sm"
-              >
-                <LogIn className="w-4 h-4" />
-                <span>Sign In</span>
-              </button>
+              {/* Auth Button */}
+              {user ? (
+                <>
+                  <button
+                    onClick={() => navigate('/dashboard')}
+                    className="p-2.5 rounded-xl text-slate-700 hover:bg-slate-100 transition-colors border border-slate-200/60 flex items-center gap-2 font-semibold text-sm"
+                  >
+                    <User className="w-4 h-4 text-blue-500" />
+                    <span className="max-w-[120px] truncate">Hi, {user.name.split(' ')[0]}</span>
+                  </button>
+                  <button
+                    onClick={logout}
+                    className="p-2.5 rounded-xl text-slate-500 hover:bg-slate-100 transition-colors border border-slate-200/60"
+                    title="Sign out"
+                  >
+                    <LogOut className="w-4 h-4" />
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={openAuthModal}
+                  className="p-2.5 rounded-xl text-slate-600 hover:bg-slate-100 transition-colors border border-slate-200/60 flex items-center gap-2 font-semibold text-sm"
+                >
+                  <LogIn className="w-4 h-4" />
+                  <span>Sign In</span>
+                </button>
+              )}
 
               {/* Account Dashboard button */}
               <Link
@@ -203,11 +223,18 @@ export const Navbar: React.FC = () => {
                 </Link>
                 
                 <button
-                  onClick={() => { setMobileMenuOpen(false); setAuthModalOpen(true); }}
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    if (user) {
+                      logout();
+                    } else {
+                      openAuthModal();
+                    }
+                  }}
                   className="px-4 py-3 rounded-xl text-left font-semibold text-base text-slate-700 hover:bg-slate-100 flex items-center gap-2 w-full"
                 >
                   <LogIn className="w-5 h-5 text-teal-500" />
-                  <span>Sign In / Create Account</span>
+                  <span>{user ? 'Sign Out' : 'Sign In / Create Account'}</span>
                 </button>
               </div>
 
@@ -227,7 +254,7 @@ export const Navbar: React.FC = () => {
           )}
         </AnimatePresence>
       </header>
-      <AuthModal isOpen={authModalOpen} onClose={() => setAuthModalOpen(false)} />
+      <AuthModal isOpen={authModalOpen} onClose={closeAuthModal} />
     </>
   );
 };

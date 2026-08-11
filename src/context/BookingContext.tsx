@@ -1,7 +1,9 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Appointment, ConsultationMode, Doctor } from '../types';
-import { INITIAL_APPOINTMENTS } from '../data/appointments';
-import confetti from 'canvas-confetti';
+import { api } from '../lib/api';
+import { ApiAppointment, toAppointment } from '../lib/adapters';
+import { useAppointments } from '../hooks/queries';
 
 export type PageView = 'home' | 'doctors' | 'doctor-detail' | 'categories' | 'appointments' | 'dashboard' | 'about';
 
@@ -9,6 +11,18 @@ interface BookingModalOptions {
   doctor?: Doctor;
   mode?: ConsultationMode;
   symptom?: string;
+  initialStep?: 1 | 2 | 3 | 4 | 5;
+}
+
+export interface CreateAppointmentParams {
+  doctorSlug: string;
+  mode: ConsultationMode;
+  date: string;
+  slot: string; // "HH:mm-HH:mm"
+  symptom?: string;
+  patientName: string;
+  patientPhone: string;
+  address?: string;
 }
 
 interface BookingContextType {
@@ -22,18 +36,21 @@ interface BookingContextType {
   setSelectedSymptomSlug: (slug: string | null) => void;
   searchQuery: string;
   setSearchQuery: (q: string) => void;
-  
+
   // Booking modal
   isBookingOpen: boolean;
   bookingOptions: BookingModalOptions;
   openBookingModal: (options?: BookingModalOptions) => void;
   closeBookingModal: () => void;
 
-  // Appointments Store
+  // Appointments store (API-backed)
   appointments: Appointment[];
-  addAppointment: (newApt: Omit<Appointment, 'id' | 'createdAt'>) => Appointment;
-  rescheduleAppointment: (id: string, newDate: string, newTime: string) => void;
-  cancelAppointment: (id: string, reason?: string) => void;
+  createAppointment: (data: CreateAppointmentParams) => Promise<{
+    appointment: Appointment;
+    razorpayOrder: { id: string; amountPaise: number };
+  }>;
+  rescheduleAppointment: (id: string, date: string, slot: string) => Promise<void>;
+  cancelAppointment: (id: string, reason?: string) => Promise<void>;
 
   // Navigation helpers
   navigateToDoctor: (doctorId: string) => void;
@@ -53,7 +70,47 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [isBookingOpen, setIsBookingOpen] = useState(false);
   const [bookingOptions, setBookingOptions] = useState<BookingModalOptions>({});
 
-  const [appointments, setAppointments] = useState<Appointment[]>(INITIAL_APPOINTMENTS);
+  const queryClient = useQueryClient();
+  const { data: apiAppointments } = useAppointments();
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+
+  useEffect(() => {
+    if (apiAppointments) setAppointments(apiAppointments);
+  }, [apiAppointments]);
+
+  const createMutation = useMutation({
+    mutationFn: async (data: CreateAppointmentParams) => {
+      const result = await api.post<{
+        appointment: ApiAppointment;
+        razorpayOrder: { id: string; amountPaise: number };
+      }>('/appointments', {
+        doctorSlug: data.doctorSlug,
+        mode: data.mode,
+        date: data.date,
+        slot: data.slot,
+        symptom: data.symptom,
+        patientName: data.patientName,
+        patientPhone: data.patientPhone,
+        address: data.address ? { text: data.address } : undefined,
+      });
+      return { appointment: toAppointment(result.appointment), razorpayOrder: result.razorpayOrder };
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['appointments'] }),
+  });
+
+  const rescheduleMutation = useMutation({
+    mutationFn: async ({ id, date, slot }: { id: string; date: string; slot: string }) => {
+      await api.post(`/appointments/${id}/reschedule`, { date, slot });
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['appointments'] }),
+  });
+
+  const cancelMutation = useMutation({
+    mutationFn: async ({ id, reason }: { id: string; reason?: string }) => {
+      await api.post(`/appointments/${id}/cancel`, { reason });
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['appointments'] }),
+  });
 
   const setCurrentPage = (page: PageView) => {
     setCurrentPageState(page);
@@ -70,42 +127,13 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setBookingOptions({});
   };
 
-  const addAppointment = (data: Omit<Appointment, 'id' | 'createdAt'>): Appointment => {
-    const id = 'apt-' + Math.floor(100000 + Math.random() * 900000);
-    const createdAt = new Date().toISOString().split('T')[0];
-    const newAppointment: Appointment = {
-      ...data,
-      id,
-      createdAt,
-    };
+  const createAppointment = (data: CreateAppointmentParams) => createMutation.mutateAsync(data);
 
-    setAppointments(prev => [newAppointment, ...prev]);
+  const rescheduleAppointment = (id: string, date: string, slot: string) =>
+    rescheduleMutation.mutateAsync({ id, date, slot });
 
-    // Trigger celebration confetti
-    try {
-      confetti({
-        particleCount: 80,
-        spread: 70,
-        origin: { y: 0.6 }
-      });
-    } catch (e) {
-      console.log('Confetti triggered', e);
-    }
-
-    return newAppointment;
-  };
-
-  const rescheduleAppointment = (id: string, newDate: string, newTime: string) => {
-    setAppointments(prev =>
-      prev.map(apt => (apt.id === id ? { ...apt, date: newDate, timeSlot: newTime } : apt))
-    );
-  };
-
-  const cancelAppointment = (id: string, reason: string = 'User requested cancellation') => {
-    setAppointments(prev =>
-      prev.map(apt => (apt.id === id ? { ...apt, status: 'cancelled', cancellationReason: reason } : apt))
-    );
-  };
+  const cancelAppointment = (id: string, reason: string = 'User requested cancellation') =>
+    cancelMutation.mutateAsync({ id, reason });
 
   const navigateToDoctor = (doctorId: string) => {
     setSelectedDoctorId(doctorId);
@@ -140,7 +168,7 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
         openBookingModal,
         closeBookingModal,
         appointments,
-        addAppointment,
+        createAppointment,
         rescheduleAppointment,
         cancelAppointment,
         navigateToDoctor,

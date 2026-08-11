@@ -1,11 +1,12 @@
 import React from 'react';
 import { useBooking } from '../../context/BookingContext';
-import { SYMPTOMS_DATA } from '../../data/symptoms';
+import { useSymptoms } from '../../hooks/queries';
 import { motion } from 'framer-motion';
-import { ArrowUpRight, Sparkles, Clock, ShieldCheck } from 'lucide-react';
+import { ArrowUpRight, Sparkles, Clock, ShieldCheck, Loader2 } from 'lucide-react';
 
 export const SymptomsGrid: React.FC = () => {
   const { navigateToSymptom, setCurrentPage } = useBooking();
+  const { data: symptoms = [], isLoading } = useSymptoms();
 
   return (
     <section className="py-20 lg:py-28 relative">
@@ -36,8 +37,14 @@ export const SymptomsGrid: React.FC = () => {
         </div>
 
         {/* Symptoms Cards Grid */}
+        {isLoading ? (
+          <div className="text-center py-16 flex items-center justify-center gap-2 text-sm font-bold text-slate-500">
+            <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
+            Loading conditions...
+          </div>
+        ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {SYMPTOMS_DATA.map((symptom, idx) => (
+          {symptoms.map((symptom, idx) => (
             <motion.div
               key={symptom.id}
               initial={{ opacity: 0, y: 20 }}
@@ -95,6 +102,7 @@ export const SymptomsGrid: React.FC = () => {
             </motion.div>
           ))}
         </div>
+        )}
 
       </div>
     </section>

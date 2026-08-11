@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Mail, Lock, User, ArrowRight, ShieldCheck } from 'lucide-react';
+import { X, Mail, Lock, User, ArrowRight, ShieldCheck, Loader2 } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
+import { ApiError } from '../../lib/api';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -8,9 +10,33 @@ interface AuthModalProps {
 }
 
 export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
+  const { login, register } = useAuth();
   const [isLogin, setIsLogin] = useState(true);
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   if (!isOpen) return null;
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+    try {
+      if (isLogin) {
+        await login(email, password);
+      } else {
+        await register(name, email, password);
+      }
+      onClose();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Something went wrong. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <AnimatePresence>
@@ -38,16 +64,22 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
               {isLogin ? 'Welcome Back' : 'Create Account'}
             </h2>
             <p className="text-sm text-slate-500 font-medium">
-              {isLogin 
-                ? 'Sign in to manage your appointments and records.' 
+              {isLogin
+                ? 'Sign in to manage your appointments and records.'
                 : 'Join PhysioPrime for personalized care.'}
             </p>
           </div>
 
           {/* Form Content */}
           <div className="px-8 pb-8 space-y-5">
-            <form onSubmit={(e) => { e.preventDefault(); onClose(); }} className="space-y-4">
-              
+            <form onSubmit={handleSubmit} className="space-y-4">
+
+              {error && (
+                <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-xs font-semibold text-red-700">
+                  {error}
+                </div>
+              )}
+
               {!isLogin && (
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-slate-700 ml-1">Full Name</label>
@@ -56,6 +88,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                     <input
                       type="text"
                       placeholder="John Doe"
+                      value={name}
+                      onChange={e => setName(e.target.value)}
                       className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 placeholder-slate-400 focus:border-blue-600 outline-none transition-all shadow-sm"
                       required
                     />
@@ -70,6 +104,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                   <input
                     type="email"
                     placeholder="you@example.com"
+                    value={email}
+                    onChange={e => setEmail(e.target.value)}
                     className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 placeholder-slate-400 focus:border-blue-600 outline-none transition-all shadow-sm"
                     required
                   />
@@ -83,6 +119,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                   <input
                     type="password"
                     placeholder="••••••••"
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
                     className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 placeholder-slate-400 focus:border-blue-600 outline-none transition-all shadow-sm"
                     required
                   />
@@ -99,10 +137,20 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
 
               <button
                 type="submit"
-                className="w-full btn-gradient text-white py-3.5 rounded-xl font-extrabold text-sm shadow-xl flex items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98] transition-all mt-2"
+                disabled={loading}
+                className="w-full btn-gradient text-white py-3.5 rounded-xl font-extrabold text-sm shadow-xl flex items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98] transition-all mt-2 disabled:opacity-70"
               >
-                <span>{isLogin ? 'Sign In' : 'Create Account'}</span>
-                <ArrowRight className="w-4 h-4" />
+                {loading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Please wait...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>{isLogin ? 'Sign In' : 'Create Account'}</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </>
+                )}
               </button>
             </form>
 

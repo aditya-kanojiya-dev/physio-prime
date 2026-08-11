@@ -1,15 +1,16 @@
 import React, { useState, useMemo } from 'react';
 import { useBooking } from '../context/BookingContext';
-import { DOCTORS_DATA } from '../data/doctors';
-import { SYMPTOMS_DATA } from '../data/symptoms';
-import { CATEGORIES_DATA } from '../data/categories';
+import { useDoctors, useSymptoms, useCategories } from '../hooks/queries';
 import { DoctorCard } from '../components/doctors/DoctorCard';
 import { DoctorFilterSidebar } from '../components/doctors/DoctorFilterSidebar';
 import { ConsultationMode } from '../types';
-import { Stethoscope, ArrowUpDown, Filter, ChevronDown } from 'lucide-react';
+import { Stethoscope, ArrowUpDown, Filter, ChevronDown, Loader2 } from 'lucide-react';
 
 export const FindDoctorsPage: React.FC = () => {
   const { selectedCategorySlug, selectedSymptomSlug, setSelectedCategorySlug, setSelectedSymptomSlug, searchQuery, setSearchQuery } = useBooking();
+  const { data: doctors = [], isLoading: doctorsLoading } = useDoctors();
+  const { data: symptoms = [] } = useSymptoms();
+  const { data: categories = [] } = useCategories();
 
   const [selectedMode, setSelectedMode] = useState<ConsultationMode | 'all'>('all');
   const [selectedSymptom, setSelectedSymptom] = useState<string | null>(selectedSymptomSlug);
@@ -19,11 +20,11 @@ export const FindDoctorsPage: React.FC = () => {
   const [sortBy, setSortBy] = useState<'recommended' | 'price-low' | 'rating-high' | 'experience'>('recommended');
   const [filtersOpen, setFiltersOpen] = useState(false);
 
-  const symptomTitle = selectedSymptom ? SYMPTOMS_DATA.find(s => s.slug === selectedSymptom)?.title.toLowerCase() : null;
-  const categoryTitle = selectedCategory ? CATEGORIES_DATA.find(c => c.slug === selectedCategory)?.title.toLowerCase() : null;
+  const symptomTitle = selectedSymptom ? symptoms.find(s => s.slug === selectedSymptom)?.title.toLowerCase() : null;
+  const categoryTitle = selectedCategory ? categories.find(c => c.slug === selectedCategory)?.title.toLowerCase() : null;
 
   const filteredDoctors = useMemo(() => {
-    return DOCTORS_DATA.filter(doc => {
+    return doctors.filter(doc => {
       // Query filter
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
@@ -60,7 +61,7 @@ export const FindDoctorsPage: React.FC = () => {
       if (sortBy === 'experience') return b.experienceYears - a.experienceYears;
       return 0;
     });
-  }, [searchQuery, selectedMode, symptomTitle, categoryTitle, maxPrice, selectedGender, sortBy]);
+  }, [doctors, searchQuery, selectedMode, symptomTitle, categoryTitle, maxPrice, selectedGender, sortBy]);
 
   const resetFilters = () => {
     setSearchQuery('');
@@ -156,7 +157,12 @@ export const FindDoctorsPage: React.FC = () => {
             </div>
 
             {/* Doctor Cards List */}
-            {filteredDoctors.length > 0 ? (
+            {doctorsLoading ? (
+              <div className="text-center py-16 glass-panel rounded-3xl p-8 border border-slate-200 flex items-center justify-center gap-2 text-sm font-bold text-slate-500">
+                <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
+                Loading therapists...
+              </div>
+            ) : filteredDoctors.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {filteredDoctors.map(doctor => (
                   <DoctorCard key={doctor.id} doctor={doctor} />

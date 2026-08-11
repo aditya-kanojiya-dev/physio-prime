@@ -86,6 +86,7 @@ reviewsRouter.get('/doctors/:slug/reviews', async (req, res, next) => {
         comment: reviews.comment,
         createdAt: reviews.createdAt,
         patientName: users.name,
+        symptom: appointments.symptom,
       })
       .from(reviews)
       .innerJoin(appointments, eq(reviews.appointmentId, appointments.id))

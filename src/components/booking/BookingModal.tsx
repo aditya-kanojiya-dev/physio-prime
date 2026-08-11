@@ -1,10 +1,18 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useBooking } from '../../context/BookingContext';
-import { DOCTORS_DATA } from '../../data/doctors';
-import { CATEGORIES_DATA } from '../../data/categories';
+import { useAuth } from '../../context/AuthContext';
+import { useDoctors, useCategories, useSlots } from '../../hooks/queries';
+import { api, ApiError } from '../../lib/api';
+import { slotLabel } from '../../lib/adapters';
 import { Doctor, ConsultationMode, Appointment } from '../../types';
-import { X, CheckCircle2, Home, Video, ArrowRight, Sparkles, Wallet, CreditCard, Banknote, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { X, CheckCircle2, Home, Video, ArrowRight, Sparkles, Loader2, ShieldCheck } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+
+declare global {
+  interface Window {
+    Razorpay?: new (options: Record<string, unknown>) => { open: () => void };
+  }
+}
 
 // Common problems data
 const COMMON_PROBLEMS = [
@@ -16,67 +24,78 @@ const COMMON_PROBLEMS = [
   { id: 'joint-stiffness', label: 'Joint Stiffness', category: 'Orthopedic Physiotherapy' },
   { id: 'sports-injury', label: 'Sports Injury', category: 'Sports Injury & Performance' },
   { id: 'stroke', label: 'Stroke', category: 'Neurological Rehabilitation' },
-  { id: 'parkinson', label: 'Parkinson\'s', category: 'Neurological Rehabilitation' },
+  { id: 'parkinson', label: "Parkinson's", category: 'Neurological Rehabilitation' },
   { id: 'neuropathy', label: 'Neuropathy', category: 'Neurological Rehabilitation' },
-  { id: 'pregnancy-pain', label: 'Pregnancy Pain', category: 'Women\'s Health Physiotherapy' },
+  { id: 'pregnancy-pain', label: 'Pregnancy Pain', category: "Women's Health Physiotherapy" },
   { id: 'copd', label: 'COPD', category: 'Cardio-Pulmonary Therapy' },
 ];
 
 // Category-specific problems mapping
 const CATEGORY_PROBLEMS: Record<string, string[]> = {
   'orthopedic-physiotherapy': [
-    'Back Pain', 'Neck Pain', 'Shoulder Pain', 'Knee Pain', 
-    'Arthritis', 'Joint Stiffness', 'Sports-Related Musculoskeletal Injuries', 
+    'Back Pain', 'Neck Pain', 'Shoulder Pain', 'Knee Pain',
+    'Arthritis', 'Joint Stiffness', 'Sports-Related Musculoskeletal Injuries',
     'Post-Surgical Rehabilitation'
   ],
   'neurological-rehabilitation': [
-    'Stroke', 'Parkinson\'s', 'Neuropathy', 'Spinal Cord Injury', 
+    'Stroke', "Parkinson's", 'Neuropathy', 'Spinal Cord Injury',
     'Multiple Sclerosis', 'Balance & Coordination Problems'
   ],
   'cardio-pulmonary-therapy': [
-    'COPD', 'Asthma', 'Cardiac Rehabilitation', 'Breathing Difficulties', 
+    'COPD', 'Asthma', 'Cardiac Rehabilitation', 'Breathing Difficulties',
     'Post-COVID Rehabilitation', 'Exercise Tolerance'
   ],
   'sports-injury-performance': [
-    'ACL Injury', 'Muscle Strain', 'Ligament Injury', 'Sports Injury', 
+    'ACL Injury', 'Muscle Strain', 'Ligament Injury', 'Sports Injury',
     'Return-to-Sport', 'Performance Enhancement'
   ],
   'womens-health-physiotherapy': [
-    'Pregnancy Pain', 'Pelvic Floor Dysfunction', 'Prenatal Care', 
+    'Pregnancy Pain', 'Pelvic Floor Dysfunction', 'Prenatal Care',
     'Postnatal Recovery', 'Postpartum Rehabilitation', 'Incontinence'
   ],
   'pediatric-physiotherapy': [
-    'Cerebral Palsy', 'Developmental Delay', 'Motor Development', 
+    'Cerebral Palsy', 'Developmental Delay', 'Motor Development',
     'Pediatric Posture', 'Childhood Musculoskeletal Conditions'
   ],
   'geriatric-rehabilitation': [
-    'Arthritis', 'Balance Problems', 'Fall Prevention', 'Age-Related Weakness', 
+    'Arthritis', 'Balance Problems', 'Fall Prevention', 'Age-Related Weakness',
     'Mobility Issues', 'Osteoporosis Rehabilitation'
   ],
   'hand-micro-rehabilitation': [
-    'Hand Injury', 'Wrist Pain', 'Finger Injury', 'Carpal Tunnel Syndrome', 
+    'Hand Injury', 'Wrist Pain', 'Finger Injury', 'Carpal Tunnel Syndrome',
     'Hand Surgery Recovery', 'Fine Motor Rehabilitation'
   ],
   'psychosomatic-ergonomic-care': [
-    'Work-Related Pain', 'Poor Posture', 'Computer Neck Pain', 
+    'Work-Related Pain', 'Poor Posture', 'Computer Neck Pain',
     'Repetitive Strain', 'Stress-Related Muscle Tension', 'Workplace Ergonomics'
   ]
 };
 
+let razorpayLoaded: Promise<void> | null = null;
+function loadRazorpay(): Promise<void> {
+  if (!razorpayLoaded) {
+    razorpayLoaded = new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+      script.onload = () => resolve();
+      script.onerror = () => reject(new Error('Failed to load Razorpay checkout'));
+      document.body.appendChild(script);
+    });
+  }
+  return razorpayLoaded;
+}
+
 export const BookingModal: React.FC = () => {
-  const { isBookingOpen, closeBookingModal, bookingOptions, addAppointment, setCurrentPage } = useBooking();
+  const { isBookingOpen, closeBookingModal, bookingOptions, createAppointment, setCurrentPage } = useBooking();
+  const { user, openAuthModal } = useAuth();
+  const { data: doctors = [] } = useDoctors();
+  const { data: categories = [] } = useCategories();
 
   const [step, setStep] = useState<1 | 2 | 3 | 4 | 5>(1);
   const [category, setCategory] = useState<string | null>(null);
-  const [selectedDoctor, setSelectedDoctor] = useState<Doctor>(
-    bookingOptions.doctor || DOCTORS_DATA[0]
-  );
-  const [mode, setMode] = useState<ConsultationMode>(
-    bookingOptions.mode || 'home'
-  );
-  const [symptom, setSymptom] = useState<string>(
-    bookingOptions.symptom || 'Knee & Joint Rehab'
-  );
+  const [selectedDoctor, setSelectedDoctor] = useState<Doctor | null>(bookingOptions.doctor || null);
+  const [mode, setMode] = useState<ConsultationMode>(bookingOptions.mode || 'home');
+  const [symptom, setSymptom] = useState<string>(bookingOptions.symptom || '');
   const [selectedDate, setSelectedDate] = useState('');
   const [selectedTime, setSelectedTime] = useState('');
 
@@ -89,20 +108,12 @@ export const BookingModal: React.FC = () => {
   const [patientHeight, setPatientHeight] = useState('');
   const [address, setAddress] = useState('');
 
-  // Dummy payment
-  const [paymentMethod, setPaymentMethod] = useState<'upi' | 'card' | 'cash'>('upi');
-  const [upiId, setUpiId] = useState('');
-  const [cardNumber, setCardNumber] = useState('');
-  const [cardName, setCardName] = useState('');
-  const [cardExpiry, setCardExpiry] = useState('');
-  const [cardCvv, setCardCvv] = useState('');
   const [processing, setProcessing] = useState(false);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
+  const [paymentNotice, setPaymentNotice] = useState<string | null>(null);
 
   const [createdAppointment, setCreatedAppointment] = useState<Appointment | null>(null);
   const [selectedProblem, setSelectedProblem] = useState<string | null>(null);
-
-  const cancelledRef = useRef(false);
-  const payTimerRef = useRef<number | null>(null);
 
   // Generate week dates
   const weekDates = useMemo(() => {
@@ -122,87 +133,121 @@ export const BookingModal: React.FC = () => {
     return dates;
   }, []);
 
-  // Time slots from 7AM to 9PM
-  const timeSlots = useMemo(() => {
-    const slots = [];
-    for (let hour = 7; hour <= 21; hour += 2) {
-      const ampm = hour >= 12 ? 'PM' : 'AM';
-      const displayHour = hour > 12 ? hour - 12 : hour;
-      slots.push(`${displayHour}:00 ${ampm}`);
-    }
-    return slots;
-  }, []);
+  const { data: slots, isLoading: slotsLoading, error: slotsError } = useSlots(
+    selectedDoctor?.id ?? null,
+    selectedDate || null
+  );
 
   useEffect(() => {
-    cancelledRef.current = false;
-    setStep(1);
+    setStep((bookingOptions.initialStep || 1) as 1 | 2 | 3 | 4 | 5);
     setCategory(null);
-    setSelectedDoctor(bookingOptions.doctor || DOCTORS_DATA[0]);
+    setSelectedDoctor(bookingOptions.doctor || null);
     setMode(bookingOptions.mode || 'home');
     setSymptom(bookingOptions.symptom || '');
     setSelectedProblem(null);
     setCreatedAppointment(null);
     setProcessing(false);
+    setPaymentError(null);
+    setPaymentNotice(null);
     setSelectedDate(weekDates[0]?.full || '');
-    setSelectedTime(timeSlots[0] || '');
-  }, [bookingOptions, weekDates, timeSlots]);
+    setSelectedTime('');
+  }, [bookingOptions, weekDates]);
 
-  const categoryTitle = category ? CATEGORIES_DATA.find(c => c.slug === category)?.title : null;
+  const categoryTitle = category ? categories.find(c => c.slug === category)?.title : null;
 
   // Filter doctors based on selected problem/category
   const filteredDoctors = useMemo(() => {
-    if (!category && !selectedProblem) return DOCTORS_DATA;
-    
+    if (!category && !selectedProblem) return doctors;
+
     let searchTerms: string[] = [];
-    
+
     if (selectedProblem) {
       searchTerms = [selectedProblem.toLowerCase()];
     } else if (category) {
-      const cat = CATEGORIES_DATA.find(c => c.slug === category);
+      const cat = categories.find(c => c.slug === category);
       if (cat) {
         searchTerms = [cat.title.toLowerCase(), ...cat.conditions.map(c => c.toLowerCase())];
       }
     }
 
-    if (searchTerms.length === 0) return DOCTORS_DATA;
+    if (searchTerms.length === 0) return doctors;
 
-    return DOCTORS_DATA.filter(doc => {
+    return doctors.filter(doc => {
       const hay = [doc.specialty, ...doc.expertise, ...doc.treatments, doc.bio].join(' ').toLowerCase();
       return searchTerms.some(term => hay.includes(term));
     });
-  }, [category, selectedProblem]);
+  }, [category, selectedProblem, doctors, categories]);
 
   if (!isBookingOpen) return null;
 
-  const fee = selectedDoctor.fees[mode];
+  const fee = selectedDoctor?.fees[mode] ?? 0;
 
-  const handlePay = () => {
+  const handlePay = async () => {
+    if (!selectedDoctor) return;
     setProcessing(true);
-    payTimerRef.current = window.setTimeout(() => {
-      if (cancelledRef.current) return;
-      const newApt = addAppointment({
-        doctorId: selectedDoctor.id,
-        doctorName: selectedDoctor.name,
-        doctorSpecialty: selectedDoctor.specialty,
-        doctorPhoto: selectedDoctor.photo,
-        doctorLocation: `${selectedDoctor.location.area}, ${selectedDoctor.location.city}`,
-        consultationMode: mode,
+    setPaymentError(null);
+    try {
+      const { appointment, razorpayOrder } = await createAppointment({
+        doctorSlug: selectedDoctor.id,
+        mode,
         date: selectedDate,
-        timeSlot: selectedTime,
-        status: 'upcoming',
+        slot: selectedTime,
+        symptom: selectedProblem || symptom || undefined,
         patientName,
         patientPhone,
-        symptom: selectedProblem || symptom || 'General Consultation',
-        fee,
         address: mode === 'home' ? address : undefined,
-        videoCallLink: mode === 'online' ? `https://physioprime.health/meet/${selectedDoctor.id}-live` : undefined,
-        paymentMethod: paymentMethod === 'upi' ? 'UPI' : paymentMethod === 'card' ? 'Card' : 'Cash on Visit',
-        doctorPhone: selectedDoctor.phone
       });
-      setCreatedAppointment(newApt);
+      setCreatedAppointment(appointment);
+
+      const key = import.meta.env.VITE_RAZORPAY_KEY_ID;
+      if (!key) {
+        setPaymentNotice('Payment gateway is not configured in this environment — your appointment is reserved but unpaid.');
+        setStep(5);
+        return;
+      }
+
+      await loadRazorpay();
+      const rzp = new window.Razorpay!({
+        key,
+        order_id: razorpayOrder.id,
+        amount: razorpayOrder.amountPaise,
+        currency: 'INR',
+        name: 'PhysioPrime',
+        description: `${appointment.doctorName} • ${appointment.doctorSpecialty}`,
+        prefill: { name: patientName, email: patientEmail, contact: patientPhone },
+        handler: async (response: { razorpay_payment_id: string; razorpay_signature: string }) => {
+          try {
+            await api.post(`/appointments/${appointment.id}/verify`, {
+              razorpayPaymentId: response.razorpay_payment_id,
+              razorpaySignature: response.razorpay_signature,
+            });
+            setStep(5);
+          } catch {
+            setPaymentNotice('Payment received, but we could not verify it immediately. Your appointment is reserved — our team will confirm shortly.');
+            setStep(5);
+          }
+        },
+        modal: {
+          ondismiss: () => {
+            setPaymentNotice('Payment was not completed. Your appointment is reserved but unpaid.');
+            setStep(5);
+          },
+        },
+      });
+      rzp.open();
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setPaymentError(
+          /razorpay/i.test(err.message)
+            ? 'Payment gateway is not configured. Add RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET to api/.env and VITE_RAZORPAY_KEY_ID to your .env.'
+            : err.message
+        );
+      } else {
+        setPaymentError('Something went wrong. Please try again.');
+      }
+    } finally {
       setProcessing(false);
-      setStep(5);
-    }, 1200);
+    }
   };
 
   const handleNextStep = () => {
@@ -214,8 +259,6 @@ export const BookingModal: React.FC = () => {
   };
 
   const handleClose = () => {
-    cancelledRef.current = true;
-    if (payTimerRef.current) window.clearTimeout(payTimerRef.current);
     closeBookingModal();
     setStep(1);
     setCreatedAppointment(null);
@@ -230,7 +273,7 @@ export const BookingModal: React.FC = () => {
       case 3:
         return !!selectedDate && !!selectedTime;
       case 4:
-        return patientName && patientPhone && patientEmail && patientGender && patientWeight && patientHeight;
+        return !!user && !!patientName && !!patientPhone && !!patientEmail && !!patientGender && !!patientWeight && !!patientHeight;
       default:
         return true;
     }
@@ -241,7 +284,7 @@ export const BookingModal: React.FC = () => {
       key={doc.id}
       onClick={() => setSelectedDoctor(doc)}
       className={`p-3.5 rounded-2xl border cursor-pointer flex items-center justify-between transition-all ${
-        selectedDoctor.id === doc.id
+        selectedDoctor?.id === doc.id
           ? 'bg-blue-50 border-blue-600 shadow-sm'
           : 'bg-slate-50 border-slate-200 hover:border-blue-300'
       }`}
@@ -257,31 +300,6 @@ export const BookingModal: React.FC = () => {
     </div>
   );
 
-  const paymentCard = (
-    method: 'upi' | 'card' | 'cash',
-    icon: React.ReactNode,
-    label: string,
-    sub: string
-  ) => (
-    <button
-      type="button"
-      onClick={() => setPaymentMethod(method)}
-      className={`p-3.5 rounded-2xl border text-left flex items-center gap-3 transition-all ${
-        paymentMethod === method
-          ? 'bg-blue-50 border-blue-600 shadow-sm'
-          : 'bg-slate-50 border-slate-200 hover:border-blue-300'
-      }`}
-    >
-      <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center flex-shrink-0">
-        {icon}
-      </div>
-      <div>
-        <p className="text-sm font-extrabold text-slate-900">{label}</p>
-        <p className="text-[11px] text-slate-500">{sub}</p>
-      </div>
-    </button>
-  );
-
   return (
     <AnimatePresence>
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm overflow-y-auto">
@@ -291,12 +309,11 @@ export const BookingModal: React.FC = () => {
           exit={{ opacity: 0, scale: 0.95 }}
           className="relative w-full max-w-2xl bg-white rounded-3xl border border-slate-200 shadow-2xl overflow-hidden my-8"
         >
-
           {/* Header Bar */}
           <div className="px-6 py-5 border-b border-slate-200 flex items-center justify-between bg-slate-50">
             <div>
               <span className="text-xs font-bold text-blue-600 uppercase tracking-wider">
-                {step < 5 ? `Step ${step} of 4 • Quick Booking` : 'Booking Confirmed 🎉'}
+                {step < 5 ? `Step ${step} of 4 • Quick Booking` : 'Booking Confirmed'}
               </span>
               <h2 className="text-xl font-extrabold text-slate-900">
                 {step === 1 && 'Select Service & Problem'}
@@ -316,6 +333,12 @@ export const BookingModal: React.FC = () => {
 
           {/* Modal Body */}
           <div className="p-6 sm:p-8 space-y-6 max-h-[75vh] overflow-y-auto">
+
+            {step === 4 && paymentError && (
+              <div className="p-4 rounded-2xl bg-red-50 border border-red-200 text-xs font-semibold text-red-700">
+                {paymentError}
+              </div>
+            )}
 
             {/* STEP 1: Mode & Problem Selection */}
             {step === 1 && (
@@ -373,8 +396,7 @@ export const BookingModal: React.FC = () => {
                         type="button"
                         onClick={() => {
                           setSelectedProblem(problem.label);
-                          // Find the category for this problem
-                          const cat = CATEGORIES_DATA.find(c => c.title === problem.category);
+                          const cat = categories.find(c => c.title === problem.category);
                           if (cat) {
                             setCategory(cat.slug);
                           }
@@ -396,7 +418,7 @@ export const BookingModal: React.FC = () => {
                 <div className="space-y-2">
                   <label className="text-xs font-bold text-slate-700">Physiotherapy Services</label>
                   <div className="space-y-3">
-                    {CATEGORIES_DATA.map(cat => {
+                    {categories.map(cat => {
                       const isSel = category === cat.slug;
                       const problems = CATEGORY_PROBLEMS[cat.slug] || [];
                       return (
@@ -422,7 +444,7 @@ export const BookingModal: React.FC = () => {
                             <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">{cat.description}</p>
                             <p className="text-[10px] font-bold text-teal-600 mt-1">{cat.doctorCount} Certified Doctors</p>
                           </button>
-                          
+
                           {isSel && problems.length > 0 && (
                             <div className="p-3 bg-white flex flex-wrap gap-1.5">
                               {problems.map(problem => (
@@ -490,7 +512,10 @@ export const BookingModal: React.FC = () => {
                       <button
                         type="button"
                         key={d.full}
-                        onClick={() => setSelectedDate(d.full)}
+                        onClick={() => {
+                          setSelectedDate(d.full);
+                          setSelectedTime('');
+                        }}
                         className={`p-2 rounded-2xl border text-center transition-all ${
                           selectedDate === d.full
                             ? 'bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-500/20'
@@ -508,25 +533,42 @@ export const BookingModal: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Time Slots - 7AM to 9PM */}
+                {/* Time Slots from API */}
                 <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-700">Select Time Slot (7AM - 9PM)</label>
-                  <div className="grid grid-cols-4 gap-2">
-                    {timeSlots.map(s => (
-                      <button
-                        type="button"
-                        key={s}
-                        onClick={() => setSelectedTime(s)}
-                        className={`p-2.5 rounded-2xl text-xs font-bold border transition-all ${
-                          selectedTime === s
-                            ? 'bg-teal-600 text-white border-teal-600 shadow-md shadow-teal-500/20'
-                            : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100 hover:border-teal-300'
-                        }`}
-                      >
-                        {s}
-                      </button>
-                    ))}
-                  </div>
+                  <label className="text-xs font-bold text-slate-700">Select Time Slot</label>
+                  {slotsLoading ? (
+                    <p className="text-xs text-slate-500 bg-slate-50 border border-slate-200 rounded-xl p-3 flex items-center gap-2">
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading available slots...
+                    </p>
+                  ) : slotsError ? (
+                    <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-xl p-3">
+                      Could not load slots. Please try again.
+                    </p>
+                  ) : slots && slots.length > 0 ? (
+                    <div className="grid grid-cols-4 gap-2">
+                      {slots.map(s => {
+                        const value = `${s.start}-${s.end}`;
+                        return (
+                          <button
+                            type="button"
+                            key={value}
+                            onClick={() => setSelectedTime(value)}
+                            className={`p-2.5 rounded-2xl text-xs font-bold border transition-all ${
+                              selectedTime === value
+                                ? 'bg-teal-600 text-white border-teal-600 shadow-md shadow-teal-500/20'
+                                : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100 hover:border-teal-300'
+                            }`}
+                          >
+                            {slotLabel(s)}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-slate-500 bg-slate-50 border border-slate-200 rounded-xl p-3">
+                      No slots available for this day. Please pick another date.
+                    </p>
+                  )}
                 </div>
 
               </div>
@@ -534,174 +576,131 @@ export const BookingModal: React.FC = () => {
 
             {/* STEP 4: Patient Details & Payment */}
             {step === 4 && (
-              <div className="space-y-4">
-
-                {/* Patient Details Grid */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-700">Full Name *</label>
-                    <input
-                      type="text"
-                      value={patientName}
-                      onChange={e => setPatientName(e.target.value)}
-                      placeholder="Enter full name"
-                      className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 shadow-sm"
-                    />
+              !user ? (
+                <div className="text-center py-12 space-y-4">
+                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-blue-600 via-blue-500 to-teal-400 flex items-center justify-center text-white mx-auto shadow-lg">
+                    <ShieldCheck className="w-7 h-7" />
                   </div>
-
                   <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-700">Email *</label>
-                    <input
-                      type="email"
-                      value={patientEmail}
-                      onChange={e => setPatientEmail(e.target.value)}
-                      placeholder="Enter email address"
-                      className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 shadow-sm"
-                    />
+                    <h3 className="text-lg font-extrabold text-slate-900">Sign in to book your appointment</h3>
+                    <p className="text-xs text-slate-500">You need an account to confirm a booking with {selectedDoctor?.name}.</p>
                   </div>
-
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-700">Phone Number *</label>
-                    <input
-                      type="tel"
-                      value={patientPhone}
-                      onChange={e => setPatientPhone(e.target.value)}
-                      placeholder="Enter phone number"
-                      className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 shadow-sm"
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-700">Gender *</label>
-                    <select
-                      value={patientGender}
-                      onChange={e => setPatientGender(e.target.value as 'male' | 'female' | 'other')}
-                      className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 focus:outline-none focus:border-blue-600 shadow-sm"
-                    >
-                      <option value="male">Male</option>
-                      <option value="female">Female</option>
-                      <option value="other">Other</option>
-                    </select>
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-700">Weight (kg) *</label>
-                    <input
-                      type="number"
-                      value={patientWeight}
-                      onChange={e => setPatientWeight(e.target.value)}
-                      placeholder="Enter weight in kg"
-                      className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 shadow-sm"
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-700">Height (cm) *</label>
-                    <input
-                      type="number"
-                      value={patientHeight}
-                      onChange={e => setPatientHeight(e.target.value)}
-                      placeholder="Enter height in cm"
-                      className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 shadow-sm"
-                    />
-                  </div>
+                  <button
+                    type="button"
+                    onClick={openAuthModal}
+                    className="btn-gradient text-white px-6 py-2.5 rounded-xl font-extrabold text-xs shadow-lg hover:scale-[1.02] active:scale-[0.98] transition-all"
+                  >
+                    Sign In / Create Account
+                  </button>
                 </div>
+              ) : (
+                <div className="space-y-4">
 
-                {mode === 'home' && (
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-700">Home Visit Address (Nagpur)</label>
-                    <textarea
-                      rows={2}
-                      value={address}
-                      onChange={e => setAddress(e.target.value)}
-                      placeholder="Enter home address"
-                      className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 shadow-sm"
-                    />
-                  </div>
-                )}
-
-                {/* Dummy Payment */}
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-700">Select Payment Method</label>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                    {paymentCard('upi', <Wallet className="w-4 h-4" />, 'UPI', 'GPay / PhonePe')}
-                    {paymentCard('card', <CreditCard className="w-4 h-4" />, 'Card', 'Credit / Debit')}
-                    {paymentCard('cash', <Banknote className="w-4 h-4" />, 'Cash', 'Pay on visit')}
-                  </div>
-
-                  {paymentMethod === 'upi' && (
+                  {/* Patient Details Grid */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="space-y-1">
-                      <label className="text-xs font-bold text-slate-700">UPI ID</label>
+                      <label className="text-xs font-bold text-slate-700">Full Name *</label>
                       <input
                         type="text"
-                        value={upiId}
-                        onChange={e => setUpiId(e.target.value)}
-                        placeholder="yourname@upi"
+                        value={patientName}
+                        onChange={e => setPatientName(e.target.value)}
+                        placeholder="Enter full name"
+                        className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 shadow-sm"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-slate-700">Email *</label>
+                      <input
+                        type="email"
+                        value={patientEmail}
+                        onChange={e => setPatientEmail(e.target.value)}
+                        placeholder="Enter email address"
+                        className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 shadow-sm"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-slate-700">Phone Number *</label>
+                      <input
+                        type="tel"
+                        value={patientPhone}
+                        onChange={e => setPatientPhone(e.target.value)}
+                        placeholder="Enter phone number"
+                        className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 shadow-sm"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-slate-700">Gender *</label>
+                      <select
+                        value={patientGender}
+                        onChange={e => setPatientGender(e.target.value as 'male' | 'female' | 'other')}
+                        className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 focus:outline-none focus:border-blue-600 shadow-sm"
+                      >
+                        <option value="male">Male</option>
+                        <option value="female">Female</option>
+                        <option value="other">Other</option>
+                      </select>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-slate-700">Weight (kg) *</label>
+                      <input
+                        type="number"
+                        value={patientWeight}
+                        onChange={e => setPatientWeight(e.target.value)}
+                        placeholder="Enter weight in kg"
+                        className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 shadow-sm"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-slate-700">Height (cm) *</label>
+                      <input
+                        type="number"
+                        value={patientHeight}
+                        onChange={e => setPatientHeight(e.target.value)}
+                        placeholder="Enter height in cm"
+                        className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 shadow-sm"
+                      />
+                    </div>
+                  </div>
+
+                  {mode === 'home' && (
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-slate-700">Home Visit Address (Nagpur)</label>
+                      <textarea
+                        rows={2}
+                        value={address}
+                        onChange={e => setAddress(e.target.value)}
+                        placeholder="Enter home address"
                         className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 shadow-sm"
                       />
                     </div>
                   )}
 
-                  {paymentMethod === 'card' && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div className="sm:col-span-2 space-y-1">
-                        <label className="text-xs font-bold text-slate-700">Card Number</label>
-                        <input
-                          type="text"
-                          value={cardNumber}
-                          onChange={e => setCardNumber(e.target.value)}
-                          placeholder="4242 4242 4242 4242"
-                          className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 shadow-sm"
-                        />
+                  {/* Razorpay Payment */}
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-slate-700">Payment</label>
+                    <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center flex-shrink-0">
+                        <ShieldCheck className="w-4 h-4" />
                       </div>
-                      <div className="space-y-1">
-                        <label className="text-xs font-bold text-slate-700">Cardholder Name</label>
-                        <input
-                          type="text"
-                          value={cardName}
-                          onChange={e => setCardName(e.target.value)}
-                          placeholder="NAME ON CARD"
-                          className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 shadow-sm"
-                        />
-                      </div>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-1">
-                          <label className="text-xs font-bold text-slate-700">Expiry</label>
-                          <input
-                            type="text"
-                            value={cardExpiry}
-                            onChange={e => setCardExpiry(e.target.value)}
-                            placeholder="MM/YY"
-                            className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 shadow-sm"
-                          />
-                        </div>
-                        <div className="space-y-1">
-                          <label className="text-xs font-bold text-slate-700">CVV</label>
-                          <input
-                            type="password"
-                            value={cardCvv}
-                            onChange={e => setCardCvv(e.target.value)}
-                            placeholder="•••"
-                            className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 shadow-sm"
-                          />
-                        </div>
-                      </div>
+                      <p className="text-xs text-slate-600 leading-relaxed">
+                        Pay securely with <strong>UPI, Cards or Net Banking</strong> via Razorpay.
+                        You'll be taken to the payment window after confirming.
+                      </p>
                     </div>
-                  )}
+                  </div>
 
-                  {paymentMethod === 'cash' && (
-                    <p className="text-xs text-slate-500 bg-slate-50 border border-slate-200 rounded-xl p-3">
-                      Pay ₹{fee} in cash when the therapist arrives. No advance needed.
-                    </p>
-                  )}
+                  <div className="p-4 rounded-2xl bg-blue-50 border border-blue-200 flex justify-between items-center text-xs">
+                    <span className="font-bold text-slate-700">Total Payable</span>
+                    <span className="text-base font-extrabold text-blue-600">₹{fee}</span>
+                  </div>
+
                 </div>
-
-                <div className="p-4 rounded-2xl bg-blue-50 border border-blue-200 flex justify-between items-center text-xs">
-                  <span className="font-bold text-slate-700">Total Payable</span>
-                  <span className="text-base font-extrabold text-blue-600">₹{fee}</span>
-                </div>
-
-              </div>
+              )
             )}
 
             {/* STEP 5: CONFIRMATION RECEIPT */}
@@ -716,6 +715,12 @@ export const BookingModal: React.FC = () => {
                   <h3 className="text-2xl font-extrabold text-slate-900">Appointment Scheduled!</h3>
                   <p className="text-xs text-slate-500">Booking ID: <strong className="text-slate-900">{createdAppointment.id}</strong></p>
                 </div>
+
+                {paymentNotice && (
+                  <p className="text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-xl p-3">
+                    {paymentNotice}
+                  </p>
+                )}
 
                 {/* Printable Card Pass */}
                 <div className="p-6 rounded-3xl bg-slate-50 border border-slate-200 text-left space-y-4 shadow-md">
@@ -737,8 +742,8 @@ export const BookingModal: React.FC = () => {
                       <p className="font-extrabold text-blue-600 capitalize">{createdAppointment.consultationMode} Visit</p>
                     </div>
                     <div>
-                      <span className="text-slate-400 font-semibold">Payment Method</span>
-                      <p className="font-extrabold text-teal-600">{createdAppointment.paymentMethod || 'Cash'}</p>
+                      <span className="text-slate-400 font-semibold">Payment</span>
+                      <p className="font-extrabold text-teal-600">{createdAppointment.paymentMethod || 'Pending'}</p>
                     </div>
                     <div>
                       <span className="text-slate-400 font-semibold">Total Paid</span>
@@ -749,7 +754,6 @@ export const BookingModal: React.FC = () => {
 
               </div>
             )}
-
           </div>
 
           {/* Modal Footer Controls */}
@@ -803,7 +807,6 @@ export const BookingModal: React.FC = () => {
               </button>
             )}
           </div>
-
         </motion.div>
       </div>
     </AnimatePresence>

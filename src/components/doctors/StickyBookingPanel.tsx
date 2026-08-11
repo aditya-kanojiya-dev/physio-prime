@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Doctor, ConsultationMode } from '../../types';
 import { useBooking } from '../../context/BookingContext';
-import { Home, Video, Calendar, Clock, Sparkles, Shield } from 'lucide-react';
+import { useSlots } from '../../hooks/queries';
+import { slotLabel } from '../../lib/adapters';
+import { Home, Video, Calendar, Clock, Sparkles, Shield, Loader2 } from 'lucide-react';
 
 interface StickyBookingPanelProps {
   doctor: Doctor;
@@ -10,17 +12,23 @@ interface StickyBookingPanelProps {
 export const StickyBookingPanel: React.FC<StickyBookingPanelProps> = ({ doctor }) => {
   const { openBookingModal } = useBooking();
   const [selectedMode, setSelectedMode] = useState<ConsultationMode>('home');
-  const [selectedDate, setSelectedDate] = useState('2026-08-12');
-  const [selectedSlot, setSelectedSlot] = useState('03:00 PM');
 
-  const dates = [
-    { day: 'Wed', date: '12 Aug', full: '2026-08-12' },
-    { day: 'Thu', date: '13 Aug', full: '2026-08-13' },
-    { day: 'Fri', date: '14 Aug', full: '2026-08-14' },
-    { day: 'Sat', date: '15 Aug', full: '2026-08-15' },
-  ];
+  const dates = useMemo(() => {
+    const today = new Date();
+    return Array.from({ length: 4 }, (_, i) => {
+      const d = new Date(today);
+      d.setDate(today.getDate() + i);
+      return {
+        day: d.toLocaleDateString('en-US', { weekday: 'short' }),
+        date: d.toLocaleDateString('en-US', { day: 'numeric', month: 'short' }),
+        full: d.toISOString().split('T')[0],
+      };
+    });
+  }, []);
 
-  const afternoonSlots = ['02:00 PM', '03:00 PM', '04:30 PM'];
+  const [selectedDate, setSelectedDate] = useState(dates[0].full);
+  const [selectedSlot, setSelectedSlot] = useState('');
+  const { data: slots, isLoading, error } = useSlots(doctor.id, selectedDate);
 
   const fee = doctor.fees[selectedMode];
 
@@ -73,7 +81,10 @@ export const StickyBookingPanel: React.FC<StickyBookingPanelProps> = ({ doctor }
           {dates.map(d => (
             <button
               key={d.full}
-              onClick={() => setSelectedDate(d.full)}
+              onClick={() => {
+                setSelectedDate(d.full);
+                setSelectedSlot('');
+              }}
               className={`p-2.5 rounded-xl border text-center transition-all ${
                 selectedDate === d.full
                   ? 'bg-blue-600 text-white border-blue-600 font-extrabold shadow-md shadow-blue-500/20'
@@ -95,22 +106,39 @@ export const StickyBookingPanel: React.FC<StickyBookingPanelProps> = ({ doctor }
         </label>
 
         <div className="space-y-2">
-          <p className="text-[11px] font-bold text-slate-400 uppercase">Afternoon Slots</p>
-          <div className="grid grid-cols-3 gap-2">
-            {afternoonSlots.map(slot => (
-              <button
-                key={slot}
-                onClick={() => setSelectedSlot(slot)}
-                className={`py-2 rounded-xl text-xs font-bold border transition-all ${
-                  selectedSlot === slot
-                    ? 'bg-teal-600 text-white border-teal-600 shadow-md shadow-teal-500/20'
-                    : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100 hover:border-teal-300'
-                }`}
-              >
-                {slot}
-              </button>
-            ))}
-          </div>
+          <p className="text-[11px] font-bold text-slate-400 uppercase">Available Slots</p>
+          {isLoading ? (
+            <p className="flex items-center gap-2 text-xs text-slate-500 bg-slate-50 border border-slate-200 rounded-xl p-3">
+              <Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading slots...
+            </p>
+          ) : error ? (
+            <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-xl p-3">
+              Could not load slots.
+            </p>
+          ) : slots && slots.length > 0 ? (
+            <div className="grid grid-cols-3 gap-2">
+              {slots.map(s => {
+                const value = `${s.start}-${s.end}`;
+                return (
+                  <button
+                    key={value}
+                    onClick={() => setSelectedSlot(value)}
+                    className={`py-2 rounded-xl text-xs font-bold border transition-all ${
+                      selectedSlot === value
+                        ? 'bg-teal-600 text-white border-teal-600 shadow-md shadow-teal-500/20'
+                        : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100 hover:border-teal-300'
+                    }`}
+                  >
+                    {slotLabel(s)}
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="text-xs text-slate-500 bg-slate-50 border border-slate-200 rounded-xl p-3">
+              No slots available for this day.
+            </p>
+          )}
         </div>
       </div>
 

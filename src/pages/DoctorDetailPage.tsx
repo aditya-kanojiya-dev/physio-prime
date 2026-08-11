@@ -1,29 +1,38 @@
 import React, { useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useBooking } from '../context/BookingContext';
-import { DOCTORS_DATA } from '../data/doctors';
+import { useDoctorDetail } from '../hooks/queries';
 import { DoctorProfileHeader } from '../components/doctors/DoctorProfileHeader';
 import { DoctorProfileTabs } from '../components/doctors/DoctorProfileTabs';
 import { StickyBookingPanel } from '../components/doctors/StickyBookingPanel';
-import { ArrowLeft, AlertCircle } from 'lucide-react';
+import { ArrowLeft, AlertCircle, Loader2 } from 'lucide-react';
 
 export const DoctorDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { setSelectedDoctorId } = useBooking();
-
-  // Find doctor by ID from URL
-  const doctor = DOCTORS_DATA.find(d => d.id === id);
+  const { data: doctor, isLoading, error } = useDoctorDetail(id || '');
 
   // Update context when doctor is found
   useEffect(() => {
-    if (doctor) {
-      setSelectedDoctorId(doctor.id);
+    if (id) {
+      setSelectedDoctorId(id);
     }
-  }, [doctor, setSelectedDoctorId]);
+  }, [id, setSelectedDoctorId]);
 
   // Handle case where doctor is not found
-  if (!doctor) {
+  if (isLoading) {
+    return (
+      <div className="pt-28 pb-20 min-h-screen flex items-center justify-center px-4">
+        <div className="text-center flex items-center gap-2 text-sm font-bold text-slate-500">
+          <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
+          Loading therapist profile...
+        </div>
+      </div>
+    );
+  }
+
+  if (!doctor || error) {
     return (
       <div className="pt-28 pb-20 min-h-screen flex items-center justify-center px-4">
         <div className="text-center max-w-md">

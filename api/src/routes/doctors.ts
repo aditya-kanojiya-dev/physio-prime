@@ -67,6 +67,10 @@ const summaryColumns = {
   featured: doctors.featured,
   gender: doctors.gender,
   bio: doctors.bio,
+  // ponytail: added to the list contract so the patient app's home search and
+  // booking filters can match on expertise/treatments without a detail fetch per doctor.
+  expertise: doctors.expertise,
+  treatments: doctors.treatments,
 };
 
 // Least of the present home/online fees; missing ones are treated as +Infinity so a

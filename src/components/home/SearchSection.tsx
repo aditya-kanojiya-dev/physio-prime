@@ -1,23 +1,24 @@
 import React, { useState } from 'react';
 import { useBooking } from '../../context/BookingContext';
-import { DOCTORS_DATA } from '../../data/doctors';
-import { SYMPTOMS_DATA } from '../../data/symptoms';
+import { useDoctors, useSymptoms } from '../../hooks/queries';
 import { Search, MapPin, Stethoscope, ArrowRight, X, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export const SearchSection: React.FC = () => {
   const { navigateToDoctor, navigateToSymptom, setCurrentPage, setSearchQuery } = useBooking();
+  const { data: doctors = [] } = useDoctors();
+  const { data: symptoms = [] } = useSymptoms();
   const [query, setQuery] = useState('');
   const [selectedCity, setSelectedCity] = useState('Nagpur');
   const [isFocused, setIsFocused] = useState(false);
 
-  const filteredDoctors = DOCTORS_DATA.filter(doc =>
+  const filteredDoctors = doctors.filter(doc =>
     doc.name.toLowerCase().includes(query.toLowerCase()) ||
     doc.specialty.toLowerCase().includes(query.toLowerCase()) ||
     doc.expertise.some(e => e.toLowerCase().includes(query.toLowerCase()))
   ).slice(0, 3);
 
-  const filteredSymptoms = SYMPTOMS_DATA.filter(s =>
+  const filteredSymptoms = symptoms.filter(s =>
     s.title.toLowerCase().includes(query.toLowerCase()) ||
     s.description.toLowerCase().includes(query.toLowerCase())
   ).slice(0, 4);

@@ -26,8 +26,8 @@ describe('GET /api/v1/categories', () => {
   it('returns 9 active categories with camelCase fields, ordered by sortOrder', async () => {
     const res = await api.get('/api/v1/categories');
     expect(res.status).toBe(200);
-    expect(res.body).toHaveLength(9);
-    const cat = res.body[0];
+    expect(res.body.categories).toHaveLength(9);
+    const cat = res.body.categories[0];
     expect(cat).toMatchObject({
       id: expect.any(String),
       title: expect.any(String),
@@ -38,11 +38,11 @@ describe('GET /api/v1/categories', () => {
       conditions: expect.any(Array),
       sortOrder: expect.any(Number),
     });
-    expect(res.body.every((c: { id: string; slug: string }) => c.id === c.slug)).toBe(true);
-    expect(res.body.map((c: { slug: string }) => c.slug)).toEqual(
+    expect(res.body.categories.every((c: { id: string; slug: string }) => c.id === c.slug)).toBe(true);
+    expect(res.body.categories.map((c: { slug: string }) => c.slug)).toEqual(
       expect.arrayContaining(['orthopedic', 'neurological', 'sports-injury', 'womens-health', 'hand-rehab']),
     );
-    const orders = res.body.map((c: { sortOrder: number }) => c.sortOrder);
+    const orders = res.body.categories.map((c: { sortOrder: number }) => c.sortOrder);
     expect(orders.every((v: number, i: number) => i === 0 || orders[i - 1] <= v)).toBe(true);
   });
 });
@@ -51,8 +51,8 @@ describe('GET /api/v1/symptoms', () => {
   it('returns 12 active symptoms with camelCase fields, ordered by sortOrder', async () => {
     const res = await api.get('/api/v1/symptoms');
     expect(res.status).toBe(200);
-    expect(res.body).toHaveLength(12);
-    const sym = res.body[0];
+    expect(res.body.symptoms).toHaveLength(12);
+    const sym = res.body.symptoms[0];
     expect(sym).toMatchObject({
       id: expect.any(String),
       title: expect.any(String),
@@ -64,7 +64,7 @@ describe('GET /api/v1/symptoms', () => {
       image: expect.any(String),
       sortOrder: expect.any(Number),
     });
-    expect(res.body.map((s: { slug: string }) => s.slug)).toEqual(
+    expect(res.body.symptoms.map((s: { slug: string }) => s.slug)).toEqual(
       expect.arrayContaining(['back-pain', 'sports-injury', 'stroke-rehab', 'knee-replacement', 'geriatric-care']),
     );
   });
@@ -97,7 +97,8 @@ describe('GET /api/v1/doctors', () => {
       bio: expect.any(String),
     });
     expect(d.id).toBe(d.slug);
-    for (const key of ['education', 'experience', 'registration', 'expertise', 'treatments']) {
+    // detail fields are excluded, but searchable expertise/treatments are kept
+    for (const key of ['education', 'experience', 'registration']) {
       expect(d).not.toHaveProperty(key);
     }
     // default sort = recommended: featured first

@@ -1,11 +1,12 @@
 import React from 'react';
 import { useBooking } from '../../context/BookingContext';
-import { DOCTORS_DATA } from '../../data/doctors';
+import { useDoctors } from '../../hooks/queries';
 import { motion } from 'framer-motion';
-import { Star, ShieldCheck, MapPin, Clock, ArrowRight, CheckCircle2 } from 'lucide-react';
+import { Star, ShieldCheck, MapPin, Clock, ArrowRight, CheckCircle2, Loader2 } from 'lucide-react';
 
 export const FeaturedDoctors: React.FC = () => {
   const { openBookingModal, navigateToDoctor, setCurrentPage } = useBooking();
+  const { data: doctors = [], isLoading } = useDoctors();
 
   return (
     <section className="py-20 lg:py-28 relative">
@@ -36,8 +37,14 @@ export const FeaturedDoctors: React.FC = () => {
         </div>
 
         {/* Doctor Cards Grid */}
+        {isLoading ? (
+          <div className="text-center py-16 flex items-center justify-center gap-2 text-sm font-bold text-slate-500">
+            <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
+            Loading therapists...
+          </div>
+        ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {DOCTORS_DATA.slice(0, 3).map((doctor, idx) => (
+          {doctors.slice(0, 3).map((doctor, idx) => (
             <motion.div
               key={doctor.id}
               initial={{ opacity: 0, y: 20 }}
@@ -127,6 +134,7 @@ export const FeaturedDoctors: React.FC = () => {
             </motion.div>
           ))}
         </div>
+        )}
 
       </div>
     </section>
