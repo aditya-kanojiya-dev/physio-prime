@@ -11,6 +11,7 @@ import { appointmentsRouter } from './routes/appointments';
 import { razorpayRouter } from './routes/razorpay';
 import { notificationsRouter } from './routes/notifications';
 import { reviewsRouter } from './routes/reviews';
+import { doctorRouter } from './routes/doctor';
 
 export function createApp() {
   const app = express();
@@ -29,6 +30,7 @@ export function createApp() {
   app.use('/api/v1/razorpay', razorpayRouter);
   app.use('/api/v1/notifications', notificationsRouter);
   app.use('/api/v1', reviewsRouter);
+  app.use('/api/v1/doctor', doctorRouter);
   app.use(errorHandler);
   return app;
 }
