@@ -6,6 +6,7 @@ import { runMigrations } from '../src/db/migrate';
 import { seed } from '../src/lib/seed';
 import { createApp } from '../src/index';
 import { appointments, doctors, reviews } from '../src/db/schema';
+import { registerPatient } from './helpers';
 
 vi.mock('../src/lib/razorpay', () => ({
   createOrder: vi.fn(),
@@ -17,17 +18,6 @@ vi.mock('../src/lib/razorpay', () => ({
 const api = request(createApp());
 
 const DOCTOR = 'doc-tarannum-sayyed';
-
-async function registerPatient(email: string): Promise<{ token: string; id: number }> {
-  const res = await api.post('/api/v1/auth/register').send({
-    name: 'Review Patient',
-    email,
-    phone: '9876543210',
-    password: 'patient-pass-123',
-  });
-  expect(res.status).toBe(201);
-  return { token: res.body.token, id: res.body.user.id };
-}
 
 async function insertAppointment(
   patientId: number,
@@ -166,7 +156,7 @@ describe('GET /api/v1/doctors/:slug/reviews', () => {
     const ours = res.body.reviews.filter((r: { comment: string }) => r.comment === 'Great' || r.comment === 'Okay');
     expect(ours.length).toBe(2);
     expect(ours[0].comment === 'Okay' || ours[0].comment === 'Great').toBe(true);
-    expect(ours[0].patientName).toBe('Review Patient');
+    expect(ours[0].patientName).toBe('Test Patient');
 
     const missing = await api.get('/api/v1/doctors/does-not-exist/reviews');
     expect(missing.status).toBe(404);

@@ -1,17 +1,20 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
-import { api, clearAuth, getStoredUser, getToken, saveAuth } from '../lib/api';
+import { supabase } from '../lib/supabase';
+import { api, getStoredUser, saveAuth, clearAuth, setToken } from '../lib/api';
 
 export interface AuthUser {
   id: number;
   name: string;
   email?: string;
+  phone?: string | null;
 }
 
 interface AuthContextType {
   user: AuthUser | null;
   hydrated: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (name: string, email: string, password: string) => Promise<void>;
+  register: (name: string, email: string, password: string) => Promise<boolean>;
+  loginWithGoogle: () => Promise<void>;
   logout: () => void;
   authModalOpen: boolean;
   openAuthModal: () => void;
@@ -20,6 +23,20 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// ponytail: session lives in localStorage (Supabase default) and /auth/me syncs the
+// app users row (role, phone). Login state = Supabase session, profile = our users table.
+async function syncUserFromSession() {
+  const { data } = await supabase.auth.getSession();
+  if (!data.session) {
+    clearAuth();
+    return null;
+  }
+  setToken(data.session.access_token);
+  const me = await api.get<{ user: AuthUser }>('/auth/me');
+  saveAuth(data.session.access_token, me.user);
+  return me.user;
+}
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<AuthUser | null>(getStoredUser());
   const [hydrated, setHydrated] = useState(false);
@@ -27,42 +44,49 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     let cancelled = false;
-    async function hydrate() {
-      if (!getToken()) {
-        setHydrated(true);
-        return;
-      }
-      try {
-        const data = await api.get<{ user: AuthUser }>('/auth/me');
-        if (!cancelled) setUser(data.user);
-      } catch {
-        if (!cancelled) {
-          clearAuth();
-          setUser(null);
-        }
-      } finally {
-        if (!cancelled) setHydrated(true);
-      }
-    }
-    hydrate();
+    supabase.auth.onAuthStateChange(() => {
+      syncUserFromSession()
+        .then(u => {
+          if (!cancelled) {
+            setUser(u);
+            setHydrated(true);
+          }
+        })
+        .catch(() => {
+          if (!cancelled) {
+            clearAuth();
+            setUser(null);
+            setHydrated(true);
+          }
+        });
+    });
     return () => {
       cancelled = true;
     };
   }, []);
 
   const login = useCallback(async (email: string, password: string) => {
-    const data = await api.post<{ token: string; user: AuthUser }>('/auth/login', { email, password });
-    saveAuth(data.token, data.user);
-    setUser(data.user);
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+    const u = await syncUserFromSession();
+    setUser(u);
   }, []);
 
   const register = useCallback(async (name: string, email: string, password: string) => {
-    const data = await api.post<{ token: string; user: AuthUser }>('/auth/register', { name, email, password });
-    saveAuth(data.token, data.user);
-    setUser(data.user);
+    const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { name } } });
+    if (error) throw error;
+    if (!data.session) return false;
+    const u = await syncUserFromSession();
+    setUser(u);
+    return true;
   }, []);
 
-  const logout = useCallback(() => {
+  const loginWithGoogle = useCallback(async () => {
+    await supabase.auth.signInWithOAuth({ provider: 'google' });
+  }, []);
+
+  const logout = useCallback(async () => {
+    await supabase.auth.signOut();
     clearAuth();
     setUser(null);
   }, []);
@@ -74,6 +98,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         hydrated,
         login,
         register,
+        loginWithGoogle,
         logout,
         authModalOpen,
         openAuthModal: () => setAuthModalOpen(true),

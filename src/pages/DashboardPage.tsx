@@ -1,38 +1,47 @@
 import React, { useState } from 'react';
 import { User, FileText, Bell, Shield, Edit3 } from 'lucide-react';
+import { Navigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 export const DashboardPage: React.FC = () => {
+  const { user, hydrated } = useAuth();
   const [activeTab, setActiveTab] = useState<'profile' | 'records' | 'notifications' | 'privacy'>('profile');
+
+  if (!hydrated) {
+    return (
+      <div className="pt-28 pb-20 min-h-screen flex items-center justify-center">
+        <p className="text-sm font-semibold text-slate-400">Loading your profile...</p>
+      </div>
+    );
+  }
+
+  if (!user) return <Navigate to="/" replace />;
+
+  const initials = (user.name || '?')
+    .split(' ')
+    .map(p => p[0])
+    .slice(0, 2)
+    .join('')
+    .toUpperCase();
 
   return (
     <div className="pt-28 pb-20 min-h-screen">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
-        
+
         {/* Profile Banner Header */}
         <div className="glass-panel p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-xl bg-white flex flex-col sm:flex-row items-center justify-between gap-6">
           <div className="flex items-center gap-4 text-center sm:text-left">
             <div className="w-16 h-16 rounded-3xl bg-gradient-to-tr from-blue-600 to-teal-400 text-white font-black text-2xl flex items-center justify-center shadow-lg shadow-blue-500/25">
-              AK
+              {initials}
             </div>
             <div>
               <div className="flex items-center gap-2 justify-center sm:justify-start">
-                <h1 className="text-2xl font-extrabold text-slate-900">Aditya Kumar</h1>
+                <h1 className="text-2xl font-extrabold text-slate-900">{user.name}</h1>
                 <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-teal-100 text-teal-600">
-                  Verified Patient
+                  Patient
                 </span>
               </div>
-              <p className="text-xs text-slate-500">Member since July 2026 • Nagpur, MH</p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <div className="p-3 rounded-2xl bg-blue-50 border border-blue-200 text-center">
-              <p className="text-xs text-slate-500 font-semibold">Completed Sessions</p>
-              <p className="text-lg font-extrabold text-blue-600">4 Sessions</p>
-            </div>
-            <div className="p-3 rounded-2xl bg-teal-50 border border-teal-200 text-center">
-              <p className="text-xs text-slate-500 font-semibold">Health Score</p>
-              <p className="text-lg font-extrabold text-teal-600">96 / 100</p>
+              <p className="text-xs text-slate-500">{user.email}</p>
             </div>
           </div>
         </div>
@@ -86,7 +95,7 @@ export const DashboardPage: React.FC = () => {
 
         {/* Tab Contents */}
         <div className="glass-panel p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-xl bg-white">
-          
+
           {activeTab === 'profile' && (
             <div className="space-y-6">
               <div className="flex items-center justify-between">
@@ -99,28 +108,18 @@ export const DashboardPage: React.FC = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
                 <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-1">
                   <span className="text-slate-400 font-semibold">Full Name</span>
-                  <p className="font-extrabold text-sm text-slate-900">Aditya Kumar</p>
+                  <p className="font-extrabold text-sm text-slate-900">{user.name}</p>
                 </div>
 
                 <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-1">
                   <span className="text-slate-400 font-semibold">Email Address</span>
-                  <p className="font-extrabold text-sm text-slate-900">aditya@example.com</p>
+                  <p className="font-extrabold text-sm text-slate-900">{user.email || '—'}</p>
                 </div>
 
                 <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-1">
                   <span className="text-slate-400 font-semibold">Phone Number</span>
-                  <p className="font-extrabold text-sm text-slate-900">+91 98765 43210</p>
+                  <p className="font-extrabold text-sm text-slate-900">{user.phone || '—'}</p>
                 </div>
-
-                <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-1">
-                  <span className="text-slate-400 font-semibold">Blood Group & Allergy Notes</span>
-                  <p className="font-extrabold text-sm text-teal-600">O+ Positive (No known drug allergies)</p>
-                </div>
-              </div>
-
-              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-1 text-xs">
-                <span className="text-slate-400 font-semibold">Registered Home Address (Nagpur)</span>
-                <p className="font-extrabold text-slate-900">Plot 45, Civil Lines, Nagpur, MH 440001</p>
               </div>
             </div>
           )}
@@ -128,14 +127,7 @@ export const DashboardPage: React.FC = () => {
           {activeTab === 'records' && (
             <div className="space-y-4">
               <h3 className="text-xl font-extrabold text-slate-900">Digital EHR & Session Summaries</h3>
-              
-              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-between text-xs">
-                <div>
-                  <p className="font-bold text-slate-900">Post-Op Knee Mobilization Note - Session #3</p>
-                  <p className="text-slate-500">Issued by Dr. Tarannum Sayyed • 28 July 2026</p>
-                </div>
-                <button className="btn-gradient text-white px-3 py-1.5 rounded-lg font-bold">Download PDF</button>
-              </div>
+              <p className="text-xs text-slate-500">Your session notes and prescriptions will appear here after your first appointment.</p>
             </div>
           )}
 

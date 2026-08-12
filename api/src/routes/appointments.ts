@@ -319,6 +319,7 @@ appointmentsRouter.post('/', async (req, res, next) => {
           title: doctor.title,
           specialty: doctor.specialty,
           photo: doctor.photo,
+          location: doctor.location,
         },
       }),
       razorpayOrder: booked.order,

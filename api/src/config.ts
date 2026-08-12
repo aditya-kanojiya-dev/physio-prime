@@ -9,6 +9,8 @@ loadEnv({ path: path.join(repoRoot, '.env') });
 const coreSchema = z.object({
   JWT_SECRET: z.string().min(1),
   APP_URL: z.string().min(1),
+  SUPABASE_URL: z.string().min(1),
+  SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
 });
 
 export type CoreConfig = z.infer<typeof coreSchema>;

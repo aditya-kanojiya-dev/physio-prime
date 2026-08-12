@@ -7,6 +7,7 @@ import { seed } from '../src/lib/seed';
 import { createApp } from '../src/index';
 import { appointments, doctors, notifications } from '../src/db/schema';
 import { sendNotification, templates, providers } from '../src/lib/notifications';
+import { registerPatient, registerAdmin } from './helpers';
 
 vi.mock('../src/lib/razorpay', () => ({
   createOrder: vi.fn(),
@@ -33,25 +34,6 @@ function futureWeekday(dayOfWeek: number): string {
     cur = new Date(cur.getFullYear(), cur.getMonth(), cur.getDate() + 1);
   }
   return `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, '0')}-${String(cur.getDate()).padStart(2, '0')}`;
-}
-
-async function registerPatient(email: string): Promise<{ token: string; id: number }> {
-  const res = await api.post('/api/v1/auth/register').send({
-    name: 'Test Patient',
-    email,
-    phone: '9876543210',
-    password: 'patient-pass-123',
-  });
-  expect(res.status).toBe(201);
-  return { token: res.body.token, id: res.body.user.id };
-}
-
-async function registerAdmin(email: string): Promise<{ token: string }> {
-  const { id } = await registerPatient(email);
-  await db.execute(`UPDATE users SET role = 'admin' WHERE id = ${id}`);
-  const res = await api.post('/api/v1/auth/login').send({ email, password: 'patient-pass-123' });
-  expect(res.status).toBe(200);
-  return { token: res.body.token };
 }
 
 async function bookAndVerify(email: string, slot: string): Promise<{ token: string; bookingId: string }> {

@@ -81,7 +81,7 @@ export const Footer: React.FC = () => {
           
           {/* Brand Info */}
           <div className="lg:col-span-2 space-y-4">
-            <Link to="/home" className="flex items-center gap-3 group">
+            <Link to="/" className="flex items-center gap-3 group">
               <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-teal-400 flex items-center justify-center text-white shadow-md group-hover:scale-105 transition-transform">
                 <Activity className="w-6 h-6" />
               </div>
@@ -109,7 +109,7 @@ export const Footer: React.FC = () => {
             <h4 className="text-slate-900 font-bold text-base">Quick Links</h4>
             <ul className="space-y-2 text-sm text-slate-500">
               <li>
-                <Link to="/home" className="hover:text-blue-600 transition-colors block">Home</Link>
+                <Link to="/" className="hover:text-blue-600 transition-colors block">Home</Link>
               </li>
               <li>
                 <Link to="/doctors" className="hover:text-blue-600 transition-colors block">Find Physiotherapists</Link>

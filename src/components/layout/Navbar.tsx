@@ -35,7 +35,7 @@ export const Navbar: React.FC = () => {
     path: string;
     badge?: number;
   }[] = [
-    { id: 'home', label: 'Home', path: '/home' },
+    { id: 'home', label: 'Home', path: '/' },
     { id: 'doctors', label: 'Find Therapists', path: '/doctors' },
     { id: 'categories', label: 'Specialties', path: '/categories' },
     { id: 'appointments', label: 'My Appointments', path: '/appointments', badge: upcomingCount },
@@ -66,7 +66,7 @@ export const Navbar: React.FC = () => {
 
             {/* Logo - Using Link for navigation */}
             <Link
-              to="/home"
+              to="/"
               className="flex items-center gap-3 cursor-pointer group"
             >
               <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 via-blue-500 to-teal-400 flex items-center justify-center text-white shadow-md shadow-blue-500/30 group-hover:scale-105 transition-transform duration-300">
@@ -145,18 +145,6 @@ export const Navbar: React.FC = () => {
                 </button>
               )}
 
-              {/* Account Dashboard button */}
-              <Link
-                to="/dashboard"
-                className={`p-2.5 rounded-xl border transition-colors flex items-center gap-2 text-sm font-semibold ${
-                  isActiveRoute('/dashboard')
-                    ? 'bg-slate-900 text-white border-transparent'
-                    : 'text-slate-700 border-slate-200 hover:bg-slate-100'
-                }`}
-              >
-                <User className="w-4 h-4 text-blue-500" />
-              </Link>
-
               {/* Quick Book Home Visit CTA */}
               <button
                 onClick={() => openBookingModal({ mode: 'home' })}
@@ -213,14 +201,20 @@ export const Navbar: React.FC = () => {
                   );
                 })}
 
-                <Link
-                  to="/dashboard"
-                  onClick={() => setMobileMenuOpen(false)}
+                <button
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    if (user) {
+                      navigate('/dashboard');
+                    } else {
+                      openAuthModal();
+                    }
+                  }}
                   className="px-4 py-3 rounded-xl text-left font-semibold text-base text-slate-700 hover:bg-slate-100 flex items-center gap-2"
                 >
                   <User className="w-5 h-5 text-blue-500" />
                   <span>My Profile & Settings</span>
-                </Link>
+                </button>
                 
                 <button
                   onClick={() => {

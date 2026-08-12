@@ -6,18 +6,22 @@ export function getToken(): string | null {
   return localStorage.getItem(TOKEN_KEY);
 }
 
-export function getStoredUser(): { id: number; name: string; email?: string } | null {
+export function getStoredUser(): { id: number; name: string; email?: string; phone?: string | null } | null {
   try {
     const raw = localStorage.getItem(USER_KEY);
-    return raw ? (JSON.parse(raw) as { id: number; name: string; email?: string }) : null;
+    return raw ? (JSON.parse(raw) as { id: number; name: string; email?: string; phone?: string | null }) : null;
   } catch {
     return null;
   }
 }
 
-export function saveAuth(token: string, user: { id: number; name: string; email?: string }): void {
+export function saveAuth(token: string, user: { id: number; name: string; email?: string; phone?: string | null }): void {
   localStorage.setItem(TOKEN_KEY, token);
   localStorage.setItem(USER_KEY, JSON.stringify(user));
+}
+
+export function setToken(token: string): void {
+  localStorage.setItem(TOKEN_KEY, token);
 }
 
 export function clearAuth(): void {
@@ -51,8 +55,11 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   if (!res.ok) {
     let message = `Request failed (${res.status})`;
     try {
-      const body = (await res.json()) as { error?: { message?: string } };
-      message = body?.error?.message || message;
+      const body = (await res.json()) as { error?: { message?: string; issues?: { message?: string }[] } };
+      message =
+        body?.error?.message ||
+        body?.error?.issues?.map(i => i.message).join('; ') ||
+        message;
     } catch {
       // keep default message
     }

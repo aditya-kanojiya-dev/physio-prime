@@ -34,8 +34,8 @@ export function App() {
               <Navbar />
               <main className="flex-1">
                 <Routes>
-                  <Route path="/" element={<Navigate to="/home" replace />} />
-                  <Route path="/home" element={<HomePage />} />
+                  <Route path="/" element={<HomePage />} />
+                  <Route path="/home" element={<Navigate to="/" replace />} />
                   <Route path="/doctors" element={<FindDoctorsPage />} />
                   <Route path="/doctor/:id" element={<DoctorDetailPage />} />
                   <Route path="/categories" element={<CategoriesPage />} />
@@ -44,7 +44,7 @@ export function App() {
                   <Route path="/dashboard" element={<DashboardPage />} />
                   <Route path="/about" element={<AboutPage />} />
                   <Route path="/book/:doctorId" element={<BookingModal />} />
-                  <Route path="*" element={<Navigate to="/home" replace />} />
+                  <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
               </main>
               <BookingModal />

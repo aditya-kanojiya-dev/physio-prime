@@ -7,6 +7,7 @@ import { seed } from '../src/lib/seed';
 import { createApp } from '../src/index';
 import { appointments, doctors, doctorSchedules } from '../src/db/schema';
 import { buildSlotList, dayOfWeek, nowHHmm, todayStr, type Slot } from '../src/lib/slots';
+import { registerPatient } from './helpers';
 
 vi.mock('../src/lib/razorpay', () => ({
   createOrder: vi.fn(),
@@ -32,17 +33,6 @@ function futureDate(dayOfWeek: number): string {
     cur = new Date(cur.getFullYear(), cur.getMonth(), cur.getDate() + 1);
   }
   return `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, '0')}-${String(cur.getDate()).padStart(2, '0')}`;
-}
-
-async function registerPatient(email: string): Promise<{ token: string }> {
-  const res = await api.post('/api/v1/auth/register').send({
-    name: 'Test Patient',
-    email,
-    phone: '9876543210',
-    password: 'patient-pass-123',
-  });
-  expect(res.status).toBe(201);
-  return { token: res.body.token };
 }
 
 const bookPayload = (overrides: Record<string, unknown> = {}) => ({

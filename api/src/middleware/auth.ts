@@ -1,5 +1,9 @@
 import type { NextFunction, Request, Response } from 'express';
-import { verifyToken, type TokenUser } from '../lib/tokens';
+import { eq } from 'drizzle-orm';
+import { db } from '../db/pool';
+import { users } from '../db/schema';
+import type { TokenUser } from '../lib/tokens';
+import { getSupabaseAdmin } from '../lib/supabase';
 
 declare module 'express-serve-static-core' {
   interface Request {
@@ -7,14 +11,44 @@ declare module 'express-serve-static-core' {
   }
 }
 
-export function requireAuth(req: Request, res: Response, next: NextFunction) {
+// ponytail: resolves Supabase users by email and auto-creates the app users row on
+// first login so appointments/reviews/etc. keep working unchanged. Could key users
+// by supabase uid (sub) instead of email — switch when email-identity changes become a need.
+async function resolveUser(email: string, name?: string | null): Promise<TokenUser | null> {
+  const [existing] = await db.select().from(users).where(eq(users.email, email));
+  if (existing) {
+    return { id: existing.id, role: existing.role as TokenUser['role'] };
+  }
+  const [created] = await db
+    .insert(users)
+    .values({
+      email,
+      name: name || email.split('@')[0],
+      role: 'patient',
+      passwordHash: 'supabase-auth',
+    })
+    .returning({ id: users.id, role: users.role });
+  return created ? { id: created.id, role: created.role as TokenUser['role'] } : null;
+}
+
+export async function requireAuth(req: Request, res: Response, next: NextFunction) {
   const header = req.headers.authorization;
   if (!header?.startsWith('Bearer ')) {
     res.status(401).json({ error: { message: 'Unauthorized' } });
     return;
   }
   try {
-    req.user = verifyToken(header.slice('Bearer '.length));
+    const { data, error } = await getSupabaseAdmin().auth.getUser(header.slice('Bearer '.length));
+    if (error || !data.user?.email) {
+      res.status(401).json({ error: { message: 'Unauthorized' } });
+      return;
+    }
+    const tokenUser = await resolveUser(data.user.email, data.user.user_metadata?.name as string | undefined);
+    if (!tokenUser) {
+      res.status(401).json({ error: { message: 'Unauthorized' } });
+      return;
+    }
+    req.user = tokenUser;
     next();
   } catch {
     res.status(401).json({ error: { message: 'Unauthorized' } });
