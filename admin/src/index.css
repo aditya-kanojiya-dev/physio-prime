@@ -17,4 +17,15 @@
 body {
   background: #F0FDFA;
   color: #334155;
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes auth-enter {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: none; }
+  }
+  .animate-auth-enter {
+    animation: auth-enter 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  }
 }
