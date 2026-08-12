@@ -91,6 +91,11 @@ export interface ApiAppointment {
   razorpayPaymentId: string | null;
   patientName: string;
   patientPhone: string;
+  patientEmail: string | null;
+  patientGender: string | null;
+  patientAge: number | null;
+  patientWeight: string | null;
+  patientHeight: string | null;
   videoCallLink: string | null;
   cancellationReason: string | null;
   createdAt: string;
@@ -251,6 +256,11 @@ export function toAppointment(a: ApiAppointment): Appointment {
     status: (a.status as Appointment['status']) || 'upcoming',
     patientName: a.patientName,
     patientPhone: a.patientPhone,
+    patientEmail: a.patientEmail || undefined,
+    patientGender: (a.patientGender as Appointment['patientGender']) || undefined,
+    patientAge: a.patientAge != null ? String(a.patientAge) : undefined,
+    patientWeight: a.patientWeight || undefined,
+    patientHeight: a.patientHeight || undefined,
     symptom: a.symptom || '',
     fee: Math.round(a.feePaise / 100),
     address: addressToText(a.address),

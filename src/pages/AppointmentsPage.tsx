@@ -3,7 +3,7 @@ import { useBooking } from '../context/BookingContext';
 import { useSlots } from '../hooks/queries';
 import { slotLabel } from '../lib/adapters';
 import { Appointment } from '../types';
-import { Calendar, Video, Home, MapPin, RotateCcw, XCircle, Sparkles, Loader2 } from 'lucide-react';
+import { Calendar, Video, Home, MapPin, RotateCcw, XCircle, Sparkles, Loader2, User, Mail, Phone, Ruler, Weight, Users } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { DoctorTrackingModal } from '../components/tracking/DoctorTrackingModal';
 
@@ -24,6 +24,9 @@ export const AppointmentsPage: React.FC = () => {
   // Cancel modal state
   const [cancelApt, setCancelApt] = useState<Appointment | null>(null);
   const [cancelReason, setCancelReason] = useState('Schedule conflict');
+
+  // View patient modal state
+  const [viewPatientApt, setViewPatientApt] = useState<Appointment | null>(null);
 
   const filteredAppointments = appointments.filter(a => a.status === activeTab);
 
@@ -151,6 +154,84 @@ export const AppointmentsPage: React.FC = () => {
                   </div>
                 </div>
 
+                {/* Patient Details Section */}
+                <div className="bg-gradient-to-r from-blue-50 to-teal-50 p-4 rounded-2xl border border-blue-100">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Users className="w-4 h-4 text-blue-600" />
+                    <h4 className="text-xs font-extrabold text-slate-700">Patient Details</h4>
+                    <span className="text-[10px] text-slate-400 font-medium">•</span>
+                    <span className="text-[10px] font-medium text-teal-600">{apt.symptom || 'General Consultation'}</span>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                    <div className="flex items-center gap-2 bg-white/60 rounded-xl px-3 py-2 border border-white">
+                      <User className="w-3.5 h-3.5 text-blue-500" />
+                      <div>
+                        <p className="text-[10px] text-slate-400 font-semibold">Name</p>
+                        <p className="text-xs font-bold text-slate-900">{apt.patientName}</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 bg-white/60 rounded-xl px-3 py-2 border border-white">
+                      <Phone className="w-3.5 h-3.5 text-green-500" />
+                      <div>
+                        <p className="text-[10px] text-slate-400 font-semibold">Phone</p>
+                        <p className="text-xs font-bold text-slate-900">{apt.patientPhone}</p>
+                      </div>
+                    </div>
+
+                    {apt.patientEmail && (
+                      <div className="flex items-center gap-2 bg-white/60 rounded-xl px-3 py-2 border border-white">
+                        <Mail className="w-3.5 h-3.5 text-purple-500" />
+                        <div>
+                          <p className="text-[10px] text-slate-400 font-semibold">Email</p>
+                          <p className="text-xs font-bold text-slate-900 truncate">{apt.patientEmail}</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {apt.patientGender && (
+                      <div className="flex items-center gap-2 bg-white/60 rounded-xl px-3 py-2 border border-white">
+                        <Users className="w-3.5 h-3.5 text-pink-500" />
+                        <div>
+                          <p className="text-[10px] text-slate-400 font-semibold">Gender</p>
+                          <p className="text-xs font-bold text-slate-900 capitalize">{apt.patientGender}</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {apt.patientAge && (
+                      <div className="flex items-center gap-2 bg-white/60 rounded-xl px-3 py-2 border border-white">
+                        <Calendar className="w-3.5 h-3.5 text-amber-500" />
+                        <div>
+                          <p className="text-[10px] text-slate-400 font-semibold">Age</p>
+                          <p className="text-xs font-bold text-slate-900">{apt.patientAge} years</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {apt.patientWeight && (
+                      <div className="flex items-center gap-2 bg-white/60 rounded-xl px-3 py-2 border border-white">
+                        <Weight className="w-3.5 h-3.5 text-orange-500" />
+                        <div>
+                          <p className="text-[10px] text-slate-400 font-semibold">Weight</p>
+                          <p className="text-xs font-bold text-slate-900">{apt.patientWeight} kg</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {apt.patientHeight && (
+                      <div className="flex items-center gap-2 bg-white/60 rounded-xl px-3 py-2 border border-white">
+                        <Ruler className="w-3.5 h-3.5 text-indigo-500" />
+                        <div>
+                          <p className="text-[10px] text-slate-400 font-semibold">Height</p>
+                          <p className="text-xs font-bold text-slate-900">{apt.patientHeight} cm</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
                 {/* Schedule & Address Metrics */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
                   <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-0.5">
@@ -173,6 +254,14 @@ export const AppointmentsPage: React.FC = () => {
                 {/* Actions Bar */}
                 {apt.status === 'upcoming' && (
                   <div className="pt-2 flex flex-wrap items-center justify-end gap-3">
+                    <button
+                      onClick={() => setViewPatientApt(apt)}
+                      className="px-4 py-2.5 rounded-xl font-bold text-xs text-blue-600 bg-blue-50 hover:bg-blue-100 transition-colors flex items-center gap-1.5"
+                    >
+                      <Users className="w-3.5 h-3.5" />
+                      <span>View Patient</span>
+                    </button>
+
                     {apt.consultationMode === 'online' && (
                       <a
                         href={apt.videoCallLink || '#'}
@@ -330,6 +419,136 @@ export const AppointmentsPage: React.FC = () => {
               <div className="pt-2 flex items-center justify-end gap-2">
                 <button onClick={() => setCancelApt(null)} className="px-4 py-2 text-xs font-bold text-slate-500">Keep Appointment</button>
                 <button onClick={handleConfirmCancel} className="bg-rose-600 text-white px-5 py-2 rounded-xl font-bold text-xs">Confirm Cancellation</button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* View Patient Details Modal */}
+      <AnimatePresence>
+        {viewPatientApt && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-md">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white p-6 rounded-3xl border border-slate-200 shadow-2xl max-w-lg w-full space-y-4"
+            >
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-extrabold text-slate-900">Patient Details</h3>
+                <button
+                  onClick={() => setViewPatientApt(null)}
+                  className="p-2 rounded-full hover:bg-slate-100 transition-colors"
+                >
+                  <XCircle className="w-5 h-5 text-slate-400" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                {/* Patient Info Card */}
+                <div className="bg-gradient-to-r from-blue-50 to-teal-50 p-4 rounded-2xl border border-blue-100">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center">
+                      <User className="w-6 h-6 text-blue-600" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-extrabold text-slate-900">{viewPatientApt.patientName}</p>
+                      <p className="text-xs text-teal-600 font-semibold">{viewPatientApt.symptom || 'General Consultation'}</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="bg-white/60 rounded-xl px-3 py-2 border border-white">
+                      <p className="text-[10px] text-slate-400 font-semibold">Phone</p>
+                      <p className="text-sm font-bold text-slate-900">{viewPatientApt.patientPhone}</p>
+                    </div>
+
+                    {viewPatientApt.patientEmail && (
+                      <div className="bg-white/60 rounded-xl px-3 py-2 border border-white">
+                        <p className="text-[10px] text-slate-400 font-semibold">Email</p>
+                        <p className="text-sm font-bold text-slate-900 truncate">{viewPatientApt.patientEmail}</p>
+                      </div>
+                    )}
+
+                    {viewPatientApt.patientGender && (
+                      <div className="bg-white/60 rounded-xl px-3 py-2 border border-white">
+                        <p className="text-[10px] text-slate-400 font-semibold">Gender</p>
+                        <p className="text-sm font-bold text-slate-900 capitalize">{viewPatientApt.patientGender}</p>
+                      </div>
+                    )}
+
+                    {viewPatientApt.patientAge && (
+                      <div className="bg-white/60 rounded-xl px-3 py-2 border border-white">
+                        <p className="text-[10px] text-slate-400 font-semibold">Age</p>
+                        <p className="text-sm font-bold text-slate-900">{viewPatientApt.patientAge} years</p>
+                      </div>
+                    )}
+
+                    {viewPatientApt.patientWeight && (
+                      <div className="bg-white/60 rounded-xl px-3 py-2 border border-white">
+                        <p className="text-[10px] text-slate-400 font-semibold">Weight</p>
+                        <p className="text-sm font-bold text-slate-900">{viewPatientApt.patientWeight} kg</p>
+                      </div>
+                    )}
+
+                    {viewPatientApt.patientHeight && (
+                      <div className="bg-white/60 rounded-xl px-3 py-2 border border-white">
+                        <p className="text-[10px] text-slate-400 font-semibold">Height</p>
+                        <p className="text-sm font-bold text-slate-900">{viewPatientApt.patientHeight} cm</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Appointment Details */}
+                <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-2">
+                  <h4 className="text-xs font-extrabold text-slate-700">Appointment Details</h4>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div>
+                      <p className="text-slate-400 font-semibold">Doctor</p>
+                      <p className="font-bold text-slate-900">{viewPatientApt.doctorName}</p>
+                    </div>
+                    <div>
+                      <p className="text-slate-400 font-semibold">Specialty</p>
+                      <p className="font-bold text-slate-900">{viewPatientApt.doctorSpecialty}</p>
+                    </div>
+                    <div>
+                      <p className="text-slate-400 font-semibold">Date & Time</p>
+                      <p className="font-bold text-slate-900">{viewPatientApt.date} at {viewPatientApt.timeSlot}</p>
+                    </div>
+                    <div>
+                      <p className="text-slate-400 font-semibold">Mode</p>
+                      <p className="font-bold text-slate-900 capitalize">{viewPatientApt.consultationMode}</p>
+                    </div>
+                    <div>
+                      <p className="text-slate-400 font-semibold">Payment</p>
+                      <p className="font-bold text-slate-900">{viewPatientApt.paymentMethod || 'Cash'}</p>
+                    </div>
+                    <div>
+                      <p className="text-slate-400 font-semibold">Fee</p>
+                      <p className="font-bold text-blue-600">₹{viewPatientApt.fee}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {viewPatientApt.consultationMode === 'home' && viewPatientApt.address && (
+                  <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200">
+                    <h4 className="text-xs font-extrabold text-slate-700 flex items-center gap-1">
+                      <MapPin className="w-3.5 h-3.5 text-teal-500" /> Home Address
+                    </h4>
+                    <p className="text-sm font-semibold text-slate-900 mt-1">{viewPatientApt.address}</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="pt-2 flex items-center justify-end">
+                <button
+                  onClick={() => setViewPatientApt(null)}
+                  className="btn-gradient text-white px-6 py-2.5 rounded-xl font-bold text-xs shadow-md"
+                >
+                  Close Details
+                </button>
               </div>
             </motion.div>
           </div>

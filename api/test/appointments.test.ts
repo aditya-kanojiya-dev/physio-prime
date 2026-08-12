@@ -39,7 +39,7 @@ const bookPayload = (overrides: Record<string, unknown> = {}) => ({
   doctorSlug: DOCTOR,
   mode: 'online',
   date: MONDAY,
-  slot: '10:00-10:30',
+  slot: '10:00-10:45',
   symptom: 'Knee pain',
   patientName: 'Test Patient',
   patientPhone: '9876543210',
@@ -133,17 +133,36 @@ describe('POST /api/v1/appointments', () => {
     expect(res.body.appointment.patientName).toBe('Test Patient');
   });
 
+  it('stores patient email/gender/age/weight/height and falls back email to the auth email', async () => {
+    const { token } = await registerPatient('apt.patientdetails@example.com');
+    const res = await api
+      .post('/api/v1/appointments')
+      .set('Authorization', `Bearer ${token}`)
+      .send(bookPayload({ slot: '14:30-15:15', patientGender: 'female', patientAge: 29, patientWeight: 58.5, patientHeight: 165 }));
+    expect(res.status).toBe(201);
+    expect(res.body.appointment.patientEmail).toBe('apt.patientdetails@example.com');
+    expect(res.body.appointment.patientGender).toBe('female');
+    expect(res.body.appointment.patientAge).toBe(29);
+    expect(res.body.appointment.patientWeight).toBe('58.5');
+    expect(res.body.appointment.patientHeight).toBe('165');
+
+    const list = await api.get('/api/v1/appointments').set('Authorization', `Bearer ${token}`);
+    const apt = list.body.appointments.find((a: { id: string }) => a.id === res.body.appointment.id);
+    expect(apt.patientEmail).toBe('apt.patientdetails@example.com');
+    expect(apt.patientAge).toBe(29);
+  });
+
   it('returns 409 when the same doctor+date+slot is already booked', async () => {
     const { token } = await registerPatient('apt.dup@example.com');
     await api
       .post('/api/v1/appointments')
       .set('Authorization', `Bearer ${token}`)
-      .send(bookPayload({ slot: '12:00-12:30' }))
+      .send(bookPayload({ slot: '12:15-13:00' }))
       .expect(201);
     const res = await api
       .post('/api/v1/appointments')
       .set('Authorization', `Bearer ${token}`)
-      .send(bookPayload({ slot: '12:00-12:30' }));
+      .send(bookPayload({ slot: '12:15-13:00' }));
     expect(res.status).toBe(409);
   });
 });
@@ -200,15 +219,27 @@ describe('POST /api/v1/appointments validation', () => {
 });
 
 describe('GET /api/v1/doctors/:slug/slots', () => {
-  it('returns the weekday 30-min list minus the break band and booked slots', async () => {
+  it('returns the weekday 45-min list minus the break band and booked slots', async () => {
     const res = await api.get(`/api/v1/doctors/${DOCTOR}/slots?date=${MONDAY}`);
     expect(res.status).toBe(200);
     expect(res.body.date).toBe(MONDAY);
     expect(res.body.slots).toEqual(await expectedSlots(MONDAY, DOCTOR));
     expect(res.body.slots).toHaveLength((await expectedSlots(MONDAY, DOCTOR)).length);
-    expect(res.body.slots[0]).toEqual({ start: '09:00', end: '09:30' });
-    expect(res.body.slots[res.body.slots.length - 1]).toEqual({ start: '16:30', end: '17:00' });
-    expect(res.body.slots.some((s: Slot) => s.start === '13:00' || s.start === '13:30')).toBe(false);
+    const [slotDoc] = await db.select().from(doctors).where(eq(doctors.slug, DOCTOR));
+    const [slotSched] = await db
+      .select()
+      .from(doctorSchedules)
+      .where(
+        and(
+          eq(doctorSchedules.doctorId, slotDoc.id),
+          eq(doctorSchedules.dayOfWeek, dayOfWeek(MONDAY)),
+          eq(doctorSchedules.active, true),
+        ),
+      );
+    expect(res.body.total).toBe(buildSlotList(slotSched).length);
+    expect(res.body.slots[0]).toEqual({ start: '07:00', end: '07:45' });
+    expect(res.body.slots[res.body.slots.length - 1]).toEqual({ start: '19:45', end: '20:30' });
+    expect(res.body.slots.some((s: Slot) => s.start === '13:00' || s.start === '13:45')).toBe(false);
     expect(res.body.slots.some((s: Slot) => s.start === '10:00')).toBe(false);
   });
 
@@ -248,7 +279,7 @@ describe('POST /api/v1/appointments/:id/verify', () => {
     const booked = await api
       .post('/api/v1/appointments')
       .set('Authorization', `Bearer ${token}`)
-      .send(bookPayload({ slot: '14:00-14:30' }))
+      .send(bookPayload({ slot: '15:15-16:00' }))
       .expect(201);
     const id = booked.body.appointment.id;
 
@@ -274,7 +305,7 @@ describe('POST /api/v1/appointments/:id/verify', () => {
     const booked = await api
       .post('/api/v1/appointments')
       .set('Authorization', `Bearer ${token}`)
-      .send(bookPayload({ slot: '14:30-15:00' }))
+      .send(bookPayload({ slot: '16:00-16:45' }))
       .expect(201);
     const id = booked.body.appointment.id;
 
@@ -297,7 +328,7 @@ describe('POST /api/v1/appointments/:id/verify', () => {
     const booked = await api
       .post('/api/v1/appointments')
       .set('Authorization', `Bearer ${token}`)
-      .send(bookPayload({ slot: '12:30-13:00' }))
+      .send(bookPayload({ slot: '11:30-12:15' }))
       .expect(201);
     const id = booked.body.appointment.id;
 
@@ -328,27 +359,27 @@ describe('POST /api/v1/appointments/:id/reschedule', () => {
     const taken = await api
       .post('/api/v1/appointments')
       .set('Authorization', `Bearer ${token}`)
-      .send(bookPayload({ slot: '09:30-10:00' }))
+      .send(bookPayload({ slot: '09:15-10:00' }))
       .expect(201);
 
     const booked = await api
       .post('/api/v1/appointments')
       .set('Authorization', `Bearer ${token}`)
-      .send(bookPayload({ slot: '15:00-15:30' }))
+      .send(bookPayload({ slot: '08:30-09:15' }))
       .expect(201);
     const id = booked.body.appointment.id;
 
     const ok = await api
       .post(`/api/v1/appointments/${id}/reschedule`)
       .set('Authorization', `Bearer ${token}`)
-      .send({ date: MONDAY, slot: '11:00-11:30' });
+      .send({ date: MONDAY, slot: '16:45-17:30' });
     expect(ok.status).toBe(200);
-    expect(ok.body.appointment.timeSlot).toBe('11:00-11:30');
+    expect(ok.body.appointment.timeSlot).toBe('16:45-17:30');
 
     const conflict = await api
       .post(`/api/v1/appointments/${id}/reschedule`)
       .set('Authorization', `Bearer ${token}`)
-      .send({ date: MONDAY, slot: '10:00-10:30' });
+      .send({ date: MONDAY, slot: '09:15-10:00' });
     expect(conflict.status).toBe(409);
 
     await api
@@ -360,7 +391,7 @@ describe('POST /api/v1/appointments/:id/reschedule', () => {
     const cancelled = await api
       .post(`/api/v1/appointments/${taken.body.appointment.id}/reschedule`)
       .set('Authorization', `Bearer ${token}`)
-      .send({ date: MONDAY, slot: '12:00-12:30' });
+      .send({ date: MONDAY, slot: '12:15-13:00' });
     expect(cancelled.status).toBe(400);
   });
 
@@ -369,17 +400,17 @@ describe('POST /api/v1/appointments/:id/reschedule', () => {
     const booked = await api
       .post('/api/v1/appointments')
       .set('Authorization', `Bearer ${token}`)
-      .send(bookPayload({ slot: '11:30-12:00' }))
+      .send(bookPayload({ slot: '10:45-11:30' }))
       .expect(201);
     const id = booked.body.appointment.id;
 
     const res = await api
       .post(`/api/v1/appointments/${id}/reschedule`)
       .set('Authorization', `Bearer ${token}`)
-      .send({ date: MONDAY, slot: '11:30-12:00' });
+      .send({ date: MONDAY, slot: '10:45-11:30' });
     expect(res.status).toBe(200);
     expect(res.body.appointment.date).toBe(MONDAY);
-    expect(res.body.appointment.timeSlot).toBe('11:30-12:00');
+    expect(res.body.appointment.timeSlot).toBe('10:45-11:30');
   });
 });
 
@@ -389,7 +420,7 @@ describe('POST /api/v1/appointments/:id/cancel', () => {
     const booked = await api
       .post('/api/v1/appointments')
       .set('Authorization', `Bearer ${token}`)
-      .send(bookPayload({ slot: '15:30-16:00' }))
+      .send(bookPayload({ doctorSlug: SECOND_DOCTOR, slot: '09:15-10:00' }))
       .expect(201);
     const id = booked.body.appointment.id;
 
@@ -408,7 +439,7 @@ describe('POST /api/v1/appointments/:id/cancel', () => {
     const booked = await api
       .post('/api/v1/appointments')
       .set('Authorization', `Bearer ${token}`)
-      .send(bookPayload({ slot: '16:00-16:30' }))
+      .send(bookPayload({ doctorSlug: SECOND_DOCTOR, slot: '10:45-11:30' }))
       .expect(201);
     const id = booked.body.appointment.id;
 
@@ -433,7 +464,7 @@ describe('POST /api/v1/appointments/:id/cancel', () => {
     const booked = await api
       .post('/api/v1/appointments')
       .set('Authorization', `Bearer ${token}`)
-      .send(bookPayload({ slot: '16:30-17:00' }))
+      .send(bookPayload({ doctorSlug: SECOND_DOCTOR, slot: '11:30-12:15' }))
       .expect(201);
     const id = booked.body.appointment.id;
 
@@ -468,7 +499,7 @@ describe('POST /api/v1/razorpay/webhook', () => {
     const booked = await api
       .post('/api/v1/appointments')
       .set('Authorization', `Bearer ${token}`)
-      .send(bookPayload({ slot: '09:00-09:30' }))
+      .send(bookPayload({ doctorSlug: SECOND_DOCTOR, slot: '12:15-13:00' }))
       .expect(201);
     const id = booked.body.appointment.id;
 
@@ -489,7 +520,7 @@ describe('POST /api/v1/razorpay/webhook', () => {
     const booked = await api
       .post('/api/v1/appointments')
       .set('Authorization', `Bearer ${token}`)
-      .send(bookPayload({ slot: '10:30-11:00' }))
+      .send(bookPayload({ doctorSlug: SECOND_DOCTOR, slot: '14:30-15:15' }))
       .expect(201);
     const id = booked.body.appointment.id;
 

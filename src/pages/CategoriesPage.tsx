@@ -21,7 +21,7 @@ export const CategoriesPage: React.FC = () => {
           </p>
         </div>
 
-        <CategoriesGrid />
+        <CategoriesGrid showViewAll={false} showHeader={false} />
 
       </div>
     </div>

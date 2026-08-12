@@ -188,10 +188,14 @@ describe('PATCH /api/v1/doctor/appointments/:id', () => {
 });
 
 describe('doctor schedules', () => {
-  it('lists the seeded week', async () => {
+  it('lists the seeded week with HH:MM times (no seconds)', async () => {
     const res = await api.get('/api/v1/doctor/schedules').set('Authorization', `Bearer ${await doctorToken()}`);
     expect(res.status).toBe(200);
     expect(res.body.schedules).toHaveLength(6);
+    for (const s of res.body.schedules) {
+      expect(s.startTime).toMatch(/^\d{2}:\d{2}$/);
+      expect(s.endTime).toMatch(/^\d{2}:\d{2}$/);
+    }
   });
 
   it('replaces the whole week', async () => {

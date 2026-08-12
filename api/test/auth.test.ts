@@ -56,6 +56,49 @@ describe('GET /api/v1/auth/me', () => {
   });
 });
 
+describe('PATCH /api/v1/auth/me', () => {
+  it('updates name and phone for the authenticated user', async () => {
+    const email = 'edit.me@example.com';
+    const res = await api
+      .patch('/api/v1/auth/me')
+      .set('Authorization', `Bearer ${email}`)
+      .send({ name: 'Edited Name', phone: '+91 90000 00000' });
+    expect(res.status).toBe(200);
+    expect(res.body.user).toMatchObject({ email, name: 'Edited Name', phone: '+91 90000 00000' });
+
+    const [row] = await db.select().from(users).where(eq(users.email, email));
+    expect(row?.name).toBe('Edited Name');
+    expect(row?.phone).toBe('+91 90000 00000');
+  });
+
+  it('clears phone when sent as null', async () => {
+    const email = 'clearphone.me@example.com';
+    await api
+      .patch('/api/v1/auth/me')
+      .set('Authorization', `Bearer ${email}`)
+      .send({ phone: '123' });
+    const res = await api
+      .patch('/api/v1/auth/me')
+      .set('Authorization', `Bearer ${email}`)
+      .send({ phone: null });
+    expect(res.status).toBe(200);
+    expect(res.body.user.phone).toBeNull();
+  });
+
+  it('rejects an empty payload', async () => {
+    const res = await api
+      .patch('/api/v1/auth/me')
+      .set('Authorization', 'Bearer empty.me@example.com')
+      .send({});
+    expect(res.status).toBe(400);
+  });
+
+  it('rejects requests without a token', async () => {
+    const res = await api.patch('/api/v1/auth/me').send({ name: 'No Auth' });
+    expect(res.status).toBe(401);
+  });
+});
+
 describe('removed endpoints', () => {
   it('register/login/google/apply-doctor are gone (404)', async () => {
     await api.post('/api/v1/auth/register').send({}).expect(404);

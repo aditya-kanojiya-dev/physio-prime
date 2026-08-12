@@ -49,8 +49,10 @@ export function AppointmentsPage() {
           <button
             key={label}
             onClick={() => setFilter(value)}
-            className={`rounded-full px-3 py-1 text-sm font-medium ${
-              filter === value ? 'bg-teal-600 text-white' : 'bg-white text-slate-500 hover:bg-slate-100'
+            className={`rounded-full px-3 py-1 text-sm font-medium transition-all ${
+              filter === value
+                ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
+                : 'bg-white text-slate-500 hover:bg-slate-100'
             }`}
           >
             {label}
@@ -60,16 +62,19 @@ export function AppointmentsPage() {
       {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
 
       {!data || data.length === 0 ? (
-        <div className="rounded-2xl border border-teal-100 bg-white p-10 text-center text-slate-400">
+        <div className="glass-panel rounded-3xl border border-slate-200 p-10 text-center text-slate-400 shadow-xl">
           No appointments{filter ? ` with status "${filter}"` : ''} yet.
         </div>
       ) : (
         <div className="space-y-3">
           {data.map((a) => (
-            <div key={a.id} className="flex items-center justify-between rounded-2xl border border-teal-100 bg-white p-5">
+            <div
+              key={a.id}
+              className="flex items-center justify-between rounded-3xl border border-slate-200 bg-white p-5 shadow-xl"
+            >
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-semibold text-slate-700">
+                  <span className="text-sm font-bold text-slate-700">
                     {formatDate(a.date)} · {a.timeSlot}
                   </span>
                   <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusStyles[a.status]}`}>
@@ -97,14 +102,14 @@ export function AppointmentsPage() {
                   <button
                     onClick={() => update.mutate({ id: a.id, status: 'completed' })}
                     disabled={update.isPending}
-                    className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+                    className="rounded-xl bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white transition-all hover:bg-emerald-700 disabled:opacity-50"
                   >
                     Completed
                   </button>
                   <button
                     onClick={() => update.mutate({ id: a.id, status: 'no_show' })}
                     disabled={update.isPending}
-                    className="rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-600 disabled:opacity-50"
+                    className="rounded-xl bg-amber-500 px-3 py-1.5 text-xs font-bold text-white transition-all hover:bg-amber-600 disabled:opacity-50"
                   >
                     No show
                   </button>

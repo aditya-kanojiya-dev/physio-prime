@@ -104,6 +104,7 @@ export const BookingModal: React.FC = () => {
   const [patientEmail, setPatientEmail] = useState('');
   const [patientPhone, setPatientPhone] = useState('');
   const [patientGender, setPatientGender] = useState<'male' | 'female' | 'other'>('male');
+  const [patientAge, setPatientAge] = useState('');
   const [patientWeight, setPatientWeight] = useState('');
   const [patientHeight, setPatientHeight] = useState('');
   const [address, setAddress] = useState('');
@@ -149,8 +150,8 @@ export const BookingModal: React.FC = () => {
     setProcessing(false);
     setPaymentError(null);
     setPaymentNotice(null);
-    setSelectedDate(weekDates[0]?.full || '');
-    setSelectedTime('');
+    setSelectedDate(bookingOptions.preSelectedDate || weekDates[0]?.full || '');
+    setSelectedTime(bookingOptions.preSelectedTime || '');
   }, [bookingOptions, weekDates]);
 
   const categoryTitle = category ? categories.find(c => c.slug === category)?.title : null;
@@ -195,12 +196,17 @@ export const BookingModal: React.FC = () => {
         symptom: selectedProblem || symptom || undefined,
         patientName,
         patientPhone,
+        patientEmail,
+        patientGender,
+        patientAge,
+        patientWeight,
+        patientHeight,
         address: mode === 'home' ? address : undefined,
       });
       setCreatedAppointment(appointment);
 
       const key = import.meta.env.VITE_RAZORPAY_KEY_ID;
-      if (!key) {
+      if (!key || !razorpayOrder) {
         setPaymentNotice('Payment gateway is not configured in this environment — your appointment is reserved but unpaid.');
         setStep(5);
         return;
@@ -273,7 +279,8 @@ export const BookingModal: React.FC = () => {
       case 3:
         return !!selectedDate && !!selectedTime;
       case 4:
-        return !!user && !!patientName && !!patientPhone && !!patientEmail && !!patientGender && !!patientWeight && !!patientHeight;
+        const ageNum = parseInt(patientAge);
+        return !!user && !!patientName && !!patientPhone && !!patientEmail && !!patientGender && !!patientWeight && !!patientHeight && !!patientAge && ageNum >= 1 && ageNum <= 100;
       default:
         return true;
     }
@@ -642,6 +649,30 @@ export const BookingModal: React.FC = () => {
                         <option value="female">Female</option>
                         <option value="other">Other</option>
                       </select>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-slate-700">Age *</label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="100"
+                        value={patientAge}
+                        onChange={e => {
+                          const value = e.target.value;
+                          if (value === '' || (parseInt(value) >= 1 && parseInt(value) <= 100)) {
+                            setPatientAge(value);
+                          }
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === '-' || e.key === 'e' || e.key === 'E') {
+                            e.preventDefault();
+                          }
+                        }}
+                        inputMode="numeric"
+                        placeholder="Enter age (1-100)"
+                        className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 shadow-sm"
+                      />
                     </div>
 
                     <div className="space-y-1">

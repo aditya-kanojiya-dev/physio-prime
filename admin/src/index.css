@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+/* Light medical theme: remap blue scale to soft cyan/teal so all
+   existing blue-* utilities across components become the new palette. */
 @theme {
   --color-blue-50: #ECFEFF;
   --color-blue-100: #CFFAFE;
@@ -12,12 +14,88 @@
   --color-blue-800: #155E75;
   --color-blue-900: #164E63;
   --color-blue-950: #083344;
+
+  --animate-float-slow: float 6s ease-in-out infinite;
+  --animate-pulse-glow: pulse-glow 3s ease-in-out infinite;
+
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+  }
+
+  @keyframes pulse-glow {
+    0%, 100% { opacity: 0.4; transform: scale(1); }
+    50% { opacity: 0.8; transform: scale(1.05); }
+  }
 }
 
-body {
+@layer base {
+  html, body {
+    overflow-x: clip;
+  }
+
+  body {
+    background: linear-gradient(180deg, #F4FBF9 0%, #F0FDFA 60%, #E9F6F2 100%);
+    background-attachment: fixed;
+    color: #475569;
+    font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
+  }
+}
+
+/* Glassmorphism Classes */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(214, 239, 234, 0.9);
+}
+
+.glass-nav {
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid rgba(214, 239, 234, 0.95);
+}
+
+/* Gradient Text */
+.text-gradient {
+  background: linear-gradient(135deg, #0891B2 0%, #14B8A6 50%, #22D3EE 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.text-gradient-teal {
+  background: linear-gradient(135deg, #0D9488 0%, #14B8A6 50%, #0891B2 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Gradient Buttons */
+.btn-gradient {
+  background: linear-gradient(135deg, #0891B2 0%, #0E7490 50%, #0F766E 100%);
+  transition: all 0.3s ease;
+}
+
+.btn-gradient:hover {
+  background: linear-gradient(135deg, #0E7490 0%, #155E75 50%, #115E59 100%);
+  box-shadow: 0 10px 25px -5px rgba(14, 116, 144, 0.4);
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}::-webkit-scrollbar-track {
   background: #F0FDFA;
-  color: #334155;
-  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #99D6CC;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #0E7490;
 }
 
 @media (prefers-reduced-motion: no-preference) {

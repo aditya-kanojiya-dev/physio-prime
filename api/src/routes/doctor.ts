@@ -17,6 +17,24 @@ async function requireDoctor(userId: number) {
 
 const noProfile = { status: 403, message: 'Doctor profile not approved yet' } as const;
 
+// Postgres renders time columns as 'HH:MM:SS'; the admin page and the PUT schema
+// expect 'HH:MM', so strip the seconds on every response.
+function hhmm(t: string | null): string | null {
+  return t ? t.slice(0, 5) : t;
+}
+
+function serializeSchedules(
+  rows: Array<{ startTime: string; endTime: string; breakStart: string | null; breakEnd: string | null }>,
+) {
+  return rows.map((r) => ({
+    ...r,
+    startTime: hhmm(r.startTime) ?? '',
+    endTime: hhmm(r.endTime) ?? '',
+    breakStart: hhmm(r.breakStart),
+    breakEnd: hhmm(r.breakEnd),
+  }));
+}
+
 const doctorColumns = {
   id: doctors.id,
   name: doctors.name,
@@ -201,7 +219,7 @@ doctorRouter.get('/schedules', async (req, res, next) => {
       .from(doctorSchedules)
       .where(eq(doctorSchedules.doctorId, doctor.id))
       .orderBy(asc(doctorSchedules.dayOfWeek));
-    res.json({ schedules: rows });
+    res.json({ schedules: serializeSchedules(rows) });
   } catch (err) {
     next(err);
   }
@@ -242,7 +260,7 @@ doctorRouter.put('/schedules', async (req, res, next) => {
       .from(doctorSchedules)
       .where(eq(doctorSchedules.doctorId, doctor.id))
       .orderBy(asc(doctorSchedules.dayOfWeek));
-    res.json({ schedules: rows });
+    res.json({ schedules: serializeSchedules(rows) });
   } catch (err) {
     next(err);
   }

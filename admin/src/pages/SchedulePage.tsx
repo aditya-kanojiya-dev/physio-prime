@@ -5,8 +5,8 @@ import { DAY_NAMES, ScheduleDay } from '../lib/types'
 
 const EMPTY_DAY = (dayOfWeek: number): ScheduleDay => ({
   dayOfWeek,
-  startTime: '09:00',
-  endTime: '17:00',
+  startTime: '07:00',
+  endTime: '21:00',
   breakStart: '13:00',
   breakEnd: '14:00',
   active: false,
@@ -47,11 +47,13 @@ export function SchedulePage() {
   return (
     <div>
       <div className="mb-4 flex items-center justify-between">
-        <h1 className="text-lg font-semibold text-slate-700">Weekly Schedule</h1>
+        <h1 className="text-2xl font-extrabold text-slate-900">
+          Weekly <span className="text-gradient">Schedule</span>
+        </h1>
         <button
           onClick={() => save.mutate()}
           disabled={save.isPending}
-          className="rounded-lg bg-teal-600 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-700 disabled:opacity-50"
+          className="btn-gradient rounded-2xl px-4 py-2 text-sm font-bold text-white shadow-lg disabled:opacity-50"
         >
           {save.isPending ? 'Saving…' : 'Save schedule'}
         </button>
@@ -61,9 +63,12 @@ export function SchedulePage() {
 
       <div className="space-y-3">
         {days.map((d, i) => (
-          <div key={d.dayOfWeek} className={`rounded-2xl border bg-white p-4 ${d.active ? 'border-teal-200' : 'border-slate-200 opacity-70'}`}>
+          <div
+            key={d.dayOfWeek}
+            className={`rounded-3xl border bg-white p-4 shadow-xl ${d.active ? 'border-teal-200' : 'border-slate-200 opacity-70'}`}
+          >
             <div className="flex items-center justify-between">
-              <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+              <label className="flex items-center gap-2 text-sm font-bold text-slate-700">
                 <input
                   type="checkbox"
                   checked={d.active}
@@ -78,28 +83,28 @@ export function SchedulePage() {
                     type="time"
                     value={d.startTime}
                     onChange={(e) => patch(i, { startTime: e.target.value })}
-                    className="rounded-lg border border-slate-200 px-2 py-1 text-xs"
+                    className="rounded-xl border border-slate-200 px-2 py-1 text-xs focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 focus:outline-none"
                   />
                   <span className="text-slate-400">–</span>
                   <input
                     type="time"
                     value={d.endTime}
                     onChange={(e) => patch(i, { endTime: e.target.value })}
-                    className="rounded-lg border border-slate-200 px-2 py-1 text-xs"
+                    className="rounded-xl border border-slate-200 px-2 py-1 text-xs focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 focus:outline-none"
                   />
                   <span className="ml-3 text-xs text-slate-400">Break</span>
                   <input
                     type="time"
                     value={d.breakStart || ''}
                     onChange={(e) => patch(i, { breakStart: e.target.value || null })}
-                    className="rounded-lg border border-slate-200 px-2 py-1 text-xs"
+                    className="rounded-xl border border-slate-200 px-2 py-1 text-xs focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 focus:outline-none"
                   />
                   <span className="text-slate-400">–</span>
                   <input
                     type="time"
                     value={d.breakEnd || ''}
                     onChange={(e) => patch(i, { breakEnd: e.target.value || null })}
-                    className="rounded-lg border border-slate-200 px-2 py-1 text-xs"
+                    className="rounded-xl border border-slate-200 px-2 py-1 text-xs focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 focus:outline-none"
                   />
                 </div>
               ) : (
@@ -110,7 +115,7 @@ export function SchedulePage() {
         ))}
       </div>
       <p className="mt-4 text-xs text-slate-400">
-        Slots are every 30 minutes within working hours, minus the break. Changes take effect immediately after saving.
+        Slots are 45-minute sessions within working hours, minus the break. A 3-hour window fits about 3–4 sessions. Changes take effect immediately after saving.
       </p>
     </div>
   )

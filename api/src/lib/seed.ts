@@ -65,8 +65,8 @@ export async function seed(): Promise<void> {
       Array.from({ length: 6 }, (_, i) => i + 1).map((dayOfWeek) => ({
         doctorId: d.id,
         dayOfWeek,
-        startTime: '09:00',
-        endTime: '17:00',
+        startTime: '07:00',
+        endTime: '21:00',
         breakStart: '13:00',
         breakEnd: '14:00',
         active: true,

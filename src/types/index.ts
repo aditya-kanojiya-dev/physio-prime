@@ -89,6 +89,11 @@ export interface Appointment {
   status: 'upcoming' | 'completed' | 'cancelled';
   patientName: string;
   patientPhone: string;
+  patientEmail?: string;
+  patientGender?: 'male' | 'female' | 'other';
+  patientAge?: string;
+  patientWeight?: string;
+  patientHeight?: string;
   symptom: string;
   fee: number;
   address?: string;

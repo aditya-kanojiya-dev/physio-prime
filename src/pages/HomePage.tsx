@@ -8,6 +8,7 @@ import { WhyChooseUs } from '../components/home/WhyChooseUs';
 import { RecoveryTimeline } from '../components/home/RecoveryTimeline';
 import { PatientStories } from '../components/home/PatientStories';
 import { AppDownload } from '../components/home/AppDownload';
+import { CareerSection } from '../components/home/CareerSection';
 import { ChatbotButton } from '../components/chatbot/ChatbotButton';
 
 export const HomePage: React.FC = () => {
@@ -21,6 +22,7 @@ export const HomePage: React.FC = () => {
       <WhyChooseUs />
       <RecoveryTimeline />
       <PatientStories />
+      <CareerSection />
       <AppDownload />
       <ChatbotButton />
     </main>

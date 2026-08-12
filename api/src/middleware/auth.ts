@@ -17,7 +17,7 @@ declare module 'express-serve-static-core' {
 async function resolveUser(email: string, name?: string | null): Promise<TokenUser | null> {
   const [existing] = await db.select().from(users).where(eq(users.email, email));
   if (existing) {
-    return { id: existing.id, role: existing.role as TokenUser['role'] };
+    return { id: existing.id, role: existing.role as TokenUser['role'], email };
   }
   const [created] = await db
     .insert(users)
@@ -28,7 +28,7 @@ async function resolveUser(email: string, name?: string | null): Promise<TokenUs
       passwordHash: 'supabase-auth',
     })
     .returning({ id: users.id, role: users.role });
-  return created ? { id: created.id, role: created.role as TokenUser['role'] } : null;
+  return created ? { id: created.id, role: created.role as TokenUser['role'], email } : null;
 }
 
 export async function requireAuth(req: Request, res: Response, next: NextFunction) {

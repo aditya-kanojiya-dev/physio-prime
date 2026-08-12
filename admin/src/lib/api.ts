@@ -63,8 +63,11 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   if (!res.ok) {
     let message = `Request failed (${res.status})`;
     try {
-      const body = (await res.json()) as { error?: { message?: string } };
-      message = body?.error?.message || message;
+      const body = (await res.json()) as { error?: { message?: string; issues?: { message?: string }[] } };
+      message =
+        body?.error?.message ||
+        body?.error?.issues?.map(i => i.message).join('; ') ||
+        message;
     } catch {
       // keep default message
     }

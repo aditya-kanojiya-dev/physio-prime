@@ -2,9 +2,17 @@ import React from 'react';
 import { useBooking } from '../../context/BookingContext';
 import { useCategories } from '../../hooks/queries';
 import { motion } from 'framer-motion';
-import { ArrowRight, Stethoscope, Loader2 } from 'lucide-react';
+import { ArrowRight, Stethoscope, Loader2, Layers } from 'lucide-react';
 
-export const CategoriesGrid: React.FC = () => {
+interface CategoriesGridProps {
+  showViewAll?: boolean;
+  showHeader?: boolean;
+}
+
+export const CategoriesGrid: React.FC<CategoriesGridProps> = ({
+  showViewAll = true,
+  showHeader = true,
+}) => {
   const { navigateToCategory, setCurrentPage } = useBooking();
   const { data: categories = [], isLoading } = useCategories();
 
@@ -13,7 +21,20 @@ export const CategoriesGrid: React.FC = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         
         {/* Header */}
-
+        {showHeader && (
+          <div className="text-center max-w-3xl mx-auto space-y-3 mb-12">
+            <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-bold border border-blue-200">
+              <Layers className="w-3.5 h-3.5" />
+              <span>Clinical Specialties</span>
+            </div>
+            <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">
+              Specialized Therapy <span className="text-gradient">Categories</span>
+            </h2>
+            <p className="text-slate-600 text-base">
+              Browse our clinical divisions to find doctors tailored to your exact physical rehabilitation requirements.
+            </p>
+          </div>
+        )}
 
         {/* Categories Grid */}
         {isLoading ? (
@@ -83,15 +104,17 @@ export const CategoriesGrid: React.FC = () => {
         </div>
         )}
 
-        <div className="text-center mt-12">
-          <button
-            onClick={() => setCurrentPage('categories')}
-            className="btn-gradient text-white px-8 py-3.5 rounded-2xl font-extrabold text-sm shadow-xl shadow-blue-500/25 inline-flex items-center gap-2 hover:scale-[1.02] transition-transform"
-          >
-            <span>View All Clinical Specialties</span>
-            <ArrowRight className="w-4 h-4" />
-          </button>
-        </div>
+        {showViewAll && (
+          <div className="text-center mt-12">
+            <button
+              onClick={() => setCurrentPage('categories')}
+              className="btn-gradient text-white px-8 py-3.5 rounded-2xl font-extrabold text-sm shadow-xl shadow-blue-500/25 inline-flex items-center gap-2 hover:scale-[1.02] transition-transform"
+            >
+              <span>View All Clinical Specialties</span>
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          </div>
+        )}
 
       </div>
     </section>

@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useBooking } from '../../context/BookingContext';
 import { useDoctors, useSymptoms } from '../../hooks/queries';
 import { Search, MapPin, Stethoscope, ArrowRight, X, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export const SearchSection: React.FC = () => {
+  const navigate = useNavigate();
   const { navigateToDoctor, navigateToSymptom, setCurrentPage, setSearchQuery } = useBooking();
   const { data: doctors = [] } = useDoctors();
   const { data: symptoms = [] } = useSymptoms();
@@ -29,6 +31,28 @@ export const SearchSection: React.FC = () => {
     e.preventDefault();
     setSearchQuery(query);
     setCurrentPage('doctors');
+    navigate('/doctors');
+  };
+
+  const handleDoctorClick = (doctorId: string) => {
+    setIsFocused(false);
+    setQuery('');
+    navigateToDoctor(doctorId);
+    navigate(`/doctor/${doctorId}`);
+  };
+
+  const handleSymptomClick = (slug: string) => {
+    setIsFocused(false);
+    setQuery('');
+    navigateToSymptom(slug);
+    navigate(`/doctors?category=${slug}`);
+  };
+
+  const handleViewAll = () => {
+    setIsFocused(false);
+    setSearchQuery(query);
+    setCurrentPage('doctors');
+    navigate('/doctors');
   };
 
   return (
@@ -112,11 +136,8 @@ export const SearchSection: React.FC = () => {
                     {filteredDoctors.map(doc => (
                       <div
                         key={doc.id}
-                        onClick={() => {
-                          setIsFocused(false);
-                          navigateToDoctor(doc.id);
-                        }}
-                        className="p-2.5 rounded-xl hover:bg-blue-50 cursor-pointer flex items-center justify-between transition-colors"
+                        onClick={() => handleDoctorClick(doc.id)}
+                        className="p-2.5 rounded-xl hover:bg-blue-50 cursor-pointer flex items-center justify-between transition-colors group"
                       >
                         <div className="flex items-center gap-3">
                           <img src={doc.photo} alt={doc.name} className="w-10 h-10 rounded-full object-cover border border-blue-200" />
@@ -140,10 +161,7 @@ export const SearchSection: React.FC = () => {
                     {filteredSymptoms.map(s => (
                       <div
                         key={s.id}
-                        onClick={() => {
-                          setIsFocused(false);
-                          navigateToSymptom(s.slug);
-                        }}
+                        onClick={() => handleSymptomClick(s.slug)}
                         className="p-2.5 rounded-xl bg-slate-50 hover:bg-teal-50 cursor-pointer flex items-center gap-2.5 transition-colors border border-slate-100"
                       >
                         <Sparkles className="w-4 h-4 text-teal-500 flex-shrink-0" />
@@ -161,10 +179,7 @@ export const SearchSection: React.FC = () => {
               <div className="pt-3 text-center">
                 <button
                   type="button"
-                  onClick={() => {
-                    setIsFocused(false);
-                    setCurrentPage('doctors');
-                  }}
+                  onClick={handleViewAll}
                   className="text-xs font-extrabold text-blue-600 hover:underline inline-flex items-center gap-1"
                 >
                   <span>See all matching results for "{query}"</span>

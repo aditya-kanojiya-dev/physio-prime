@@ -33,6 +33,11 @@ const bookSchema = z.object({
   symptom: z.string().max(2000).optional(),
   patientName: z.string().min(1),
   patientPhone: z.string().min(7).max(20),
+  patientEmail: z.string().email().optional(),
+  patientGender: z.enum(['male', 'female', 'other']).optional(),
+  patientAge: z.coerce.number().int().min(1).max(120).optional(),
+  patientWeight: z.coerce.number().positive().max(500).optional(),
+  patientHeight: z.coerce.number().positive().max(250).optional(),
   address: z.record(z.string(), z.unknown()).optional(),
 });
 
@@ -77,6 +82,11 @@ interface AppointmentView {
   razorpayPaymentId: string | null;
   patientName: string;
   patientPhone: string;
+  patientEmail: string | null;
+  patientGender: string | null;
+  patientAge: number | null;
+  patientWeight: string | null;
+  patientHeight: string | null;
   videoCallLink: string | null;
   cancellationReason: string | null;
   createdAt: Date;
@@ -107,6 +117,11 @@ const appointmentColumns = {
   razorpayPaymentId: appointments.razorpayPaymentId,
   patientName: appointments.patientName,
   patientPhone: appointments.patientPhone,
+  patientEmail: appointments.patientEmail,
+  patientGender: appointments.patientGender,
+  patientAge: appointments.patientAge,
+  patientWeight: appointments.patientWeight,
+  patientHeight: appointments.patientHeight,
   videoCallLink: appointments.videoCallLink,
   cancellationReason: appointments.cancellationReason,
   createdAt: appointments.createdAt,
@@ -148,6 +163,11 @@ function serializeAppointment(row: AppointmentView) {
     razorpayPaymentId: row.razorpayPaymentId,
     patientName: row.patientName,
     patientPhone: row.patientPhone,
+    patientEmail: row.patientEmail,
+    patientGender: row.patientGender,
+    patientAge: row.patientAge,
+    patientWeight: row.patientWeight,
+    patientHeight: row.patientHeight,
     videoCallLink: row.videoCallLink,
     cancellationReason: row.cancellationReason,
     createdAt: row.createdAt,
@@ -232,7 +252,8 @@ async function bookTransaction(
   feePaise: number,
   body: z.infer<typeof bookSchema>,
   userId: number,
-): Promise<{ row: AppointmentView; order: { id: string; amountPaise: number } }> {
+  patientEmail: string,
+): Promise<{ row: AppointmentView; order: { id: string; amountPaise: number } | null }> {
   for (let attempt = 0; attempt < 2; attempt++) {
     const bookingId = randomBookingId();
     try {
@@ -259,12 +280,25 @@ async function bookTransaction(
             paymentStatus: 'pending',
             patientName: body.patientName,
             patientPhone: body.patientPhone,
+            patientEmail: body.patientEmail ?? patientEmail,
+            patientGender: body.patientGender ?? null,
+            patientAge: body.patientAge ?? null,
+            patientWeight: body.patientWeight != null ? String(body.patientWeight) : null,
+            patientHeight: body.patientHeight != null ? String(body.patientHeight) : null,
             videoCallLink: body.mode === 'online' ? `https://meet.physioprime.in/${bookingId}` : null,
           })
           .returning();
-        const order = await createOrder({ amountPaise: feePaise, receipt: bookingId });
-        await tx.update(appointments).set({ razorpayOrderId: order.id }).where(eq(appointments.id, row!.id));
-        return { row: { ...row!, razorpayOrderId: order.id }, order };
+        let order: { id: string; amountPaise: number } | null = null;
+        try {
+          order = await createOrder({ amountPaise: feePaise, receipt: bookingId });
+        } catch (err) {
+          if (!(err instanceof Error) || !err.message.includes('not configured')) throw err;
+          // ponytail: razorpay not configured — trial booking proceeds unpaid
+        }
+        if (order) {
+          await tx.update(appointments).set({ razorpayOrderId: order.id }).where(eq(appointments.id, row!.id));
+        }
+        return { row: { ...row!, razorpayOrderId: order?.id ?? null }, order };
       });
     } catch (err) {
       if (attempt === 0 && isUniqueViolation(err)) continue;
@@ -309,7 +343,7 @@ appointmentsRouter.post('/', async (req, res, next) => {
     }
     const feePaise = Math.round(feeRupees * 100);
 
-    const booked = await bookTransaction(doctor, feePaise, body, req.user!.id);
+    const booked = await bookTransaction(doctor, feePaise, body, req.user!.id, req.user!.email);
     res.status(201).json({
       appointment: serializeAppointment({
         ...booked.row,

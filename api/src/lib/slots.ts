@@ -15,7 +15,10 @@ export interface ScheduleWindow {
   breakEnd: string | null;
 }
 
-const SLOT_MIN = 30;
+// ponytail: one session per bracket slot; doctor controls daily capacity via the
+// window length + break. 3h window -> 4 sessions; shorten the window or add a
+// break if 3 is the target.
+const SLOT_MIN = 45;
 
 function toMinutes(hhmm: string): number {
   const [h, m] = hhmm.split(':').map(Number);
@@ -111,4 +114,19 @@ export async function getAvailableSlots(doctorId: number, dateStr: string): Prom
       ),
     );
   return availableFromSchedules(schedules, booked.map((r) => r.timeSlot.split('-')[0]), dateStr);
+}
+
+export async function getDaySlotCount(doctorId: number, dateStr: string): Promise<number> {
+  const day = dayOfWeek(dateStr);
+  const schedules = await db
+    .select()
+    .from(doctorSchedules)
+    .where(
+      and(
+        eq(doctorSchedules.doctorId, doctorId),
+        eq(doctorSchedules.dayOfWeek, day),
+        eq(doctorSchedules.active, true),
+      ),
+    );
+  return schedules.reduce((n, s) => n + buildSlotList(s).length, 0);
 }

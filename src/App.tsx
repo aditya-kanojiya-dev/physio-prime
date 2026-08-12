@@ -12,6 +12,8 @@ import { CategoriesPage } from './pages/CategoriesPage';
 import { AppointmentsPage } from './pages/AppointmentsPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { AboutPage } from './pages/AboutPage';
+import { Career } from './pages/Career';
+import { BookingSlotsPage } from './pages/BookingSlotsPage';
 import { BookingModal } from './components/booking/BookingModal';
 import { ChatbotButton } from './components/chatbot/ChatbotButton';
 
@@ -43,6 +45,8 @@ export function App() {
                   <Route path="/appointments" element={<AppointmentsPage />} />
                   <Route path="/dashboard" element={<DashboardPage />} />
                   <Route path="/about" element={<AboutPage />} />
+                  <Route path="/career" element={<Career />} />
+                  <Route path="/booking-slots" element={<BookingSlotsPage />} />
                   <Route path="/book/:doctorId" element={<BookingModal />} />
                   <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>

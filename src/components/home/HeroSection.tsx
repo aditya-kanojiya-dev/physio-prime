@@ -1,13 +1,15 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useBooking } from '../../context/BookingContext';
 import { ConsultationMode } from '../../types';
 import { motion } from 'framer-motion';
-import { ShieldCheck, Video, Home, Star, Calendar, Users, MapPin, CheckCircle2, ArrowRight, Sparkles, Award } from 'lucide-react';
-import homepageImg from '../../assets/homepage.jpg';
+import { ShieldCheck, Video, Home, Star, Calendar, Users, MapPin, ArrowRight, Sparkles, Award } from 'lucide-react';
+import homepageVid from '../../assets/homepage.mp4';
 import bottomImg from '../../assets/bottom-img.jpg'; // Import bottom image
 
 export const HeroSection: React.FC = () => {
-  const { openBookingModal, setCurrentPage } = useBooking();
+  const navigate = useNavigate();
+  const { openBookingModal } = useBooking();
   const [selectedMode, setSelectedMode] = useState<ConsultationMode>('home');
 
   return (
@@ -93,10 +95,12 @@ export const HeroSection: React.FC = () => {
               </button>
 
               <button
-                onClick={() => setCurrentPage('doctors')}
-                className="px-8 py-4 rounded-2xl font-bold text-slate-600 bg-white border border-slate-200 hover:border-blue-300 hover:bg-slate-50 transition-all text-base shadow-sm"
+                onClick={() => navigate('/booking-slots')}
+                className="px-8 py-4 rounded-2xl font-bold text-white bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 transition-all text-base shadow-lg shadow-amber-500/30 flex items-center gap-3 hover:scale-[1.02] active:scale-[0.98]"
               >
-                Find Specialists
+                <Calendar className="w-5 h-5" />
+                <span>Check Available Slots</span>
+                <ArrowRight className="w-4 h-4" />
               </button>
             </div>
 
@@ -149,7 +153,7 @@ export const HeroSection: React.FC = () => {
               <div className="relative rounded-3xl overflow-hidden glass-panel border border-slate-200 shadow-2xl p-4 sm:p-6 bg-white">
                 <div className="relative h-[22rem] sm:h-[26rem] rounded-2xl overflow-hidden group">
                   <img
-                    src={homepageImg}
+                    src={homepageVid}
                     alt="Professional physiotherapy care"
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
                   />

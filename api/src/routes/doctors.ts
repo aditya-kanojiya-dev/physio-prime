@@ -3,7 +3,7 @@ import { and, eq, sql, type SQL } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '../db/pool';
 import { doctors, categories, symptoms } from '../db/schema';
-import { getAvailableSlots, isPast, isValidDate } from '../lib/slots';
+import { getAvailableSlots, getDaySlotCount, isPast, isValidDate } from '../lib/slots';
 
 export const doctorsRouter = Router();
 
@@ -203,8 +203,11 @@ doctorsRouter.get('/:slug/slots', async (req, res, next) => {
       res.status(404).json({ error: { message: 'Doctor not found' } });
       return;
     }
-    const slots = await getAvailableSlots(doctor.id, parsed.data);
-    res.json({ date: parsed.data, slots });
+    const [slots, total] = await Promise.all([
+      getAvailableSlots(doctor.id, parsed.data),
+      getDaySlotCount(doctor.id, parsed.data),
+    ]);
+    res.json({ date: parsed.data, slots, total });
   } catch (err) {
     next(err);
   }

@@ -1,11 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useBooking } from '../../context/BookingContext';
-import { Search, UserCheck, CalendarCheck, Home, Activity, Sparkles } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { Search, UserCheck, CalendarCheck, Home, Activity, Sparkles, Play, Pause } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 export const RecoveryTimeline: React.FC = () => {
   const { openBookingModal } = useBooking();
   const [activeStep, setActiveStep] = useState(0);
+  const [isAutoPlaying, setIsAutoPlaying] = useState(true);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const steps = [
     {
@@ -50,6 +52,32 @@ export const RecoveryTimeline: React.FC = () => {
     }
   ];
 
+  useEffect(() => {
+    if (isAutoPlaying) {
+      intervalRef.current = setInterval(() => {
+        setActiveStep((prev) => (prev + 1) % steps.length);
+      }, 3000);
+    } else if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    };
+  }, [isAutoPlaying, steps.length]);
+
+  const handleStepClick = (idx: number) => {
+    setActiveStep(idx);
+    setIsAutoPlaying(false);
+    setTimeout(() => setIsAutoPlaying(true), 5000);
+  };
+
+  const toggleAutoPlay = () => setIsAutoPlaying(!isAutoPlaying);
+
   return (
     <section className="py-20 lg:py-28 relative">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -91,7 +119,7 @@ export const RecoveryTimeline: React.FC = () => {
               return (
                 <motion.div
                   key={idx}
-                  onClick={() => setActiveStep(idx)}
+                  onClick={() => handleStepClick(idx)}
                   whileHover={{ scale: 1.03 }}
                   className={`cursor-pointer p-6 rounded-3xl transition-all duration-300 ${
                     isActive
@@ -130,10 +158,50 @@ export const RecoveryTimeline: React.FC = () => {
             })}
           </div>
 
+          {/* Auto-Play Controls */}
+          <div className="flex justify-center mt-6 gap-3">
+            <button
+              onClick={toggleAutoPlay}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 transition-colors text-xs font-bold text-slate-700 border border-slate-200"
+            >
+              {isAutoPlaying ? (
+                <>
+                  <Pause className="w-3.5 h-3.5" />
+                  <span>Pause Auto-Play</span>
+                </>
+              ) : (
+                <>
+                  <Play className="w-3.5 h-3.5" />
+                  <span>Resume Auto-Play</span>
+                </>
+              )}
+            </button>
+
+            <div className="flex items-center gap-1.5">
+              {steps.map((_, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => handleStepClick(idx)}
+                  className={`h-1.5 rounded-full transition-all duration-300 ${
+                    idx === activeStep ? 'bg-blue-600 w-6' : 'bg-slate-300 w-1.5'
+                  }`}
+                />
+              ))}
+            </div>
+          </div>
+
         </div>
 
         {/* Selected Step Detailed View Card */}
-        <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-lg max-w-3xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-6">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={activeStep}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ duration: 0.4 }}
+            className="bg-white p-8 rounded-3xl border border-slate-200 shadow-lg max-w-3xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-6"
+          >
           <div className="space-y-2">
             <span className="text-xs font-bold text-teal-600 uppercase tracking-wider">
               Step Details ({steps[activeStep].number} of 05)
@@ -152,7 +220,8 @@ export const RecoveryTimeline: React.FC = () => {
           >
             Start Booking Now
           </button>
-        </div>
+          </motion.div>
+        </AnimatePresence>
 
       </div>
     </section>

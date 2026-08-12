@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useBooking, PageView } from '../../context/BookingContext';
 import { useAuth } from '../../context/AuthContext';
-import { Activity, User, Menu, X, ArrowRight, Sparkles, MapPin, LogIn, LogOut } from 'lucide-react';
+import { Activity, User, Menu, X, ArrowRight, Sparkles, MapPin, LogIn, LogOut, Home, Stethoscope, Layers, Calendar, Info, Briefcase, LayoutDashboard, Phone, Mail } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AuthModal } from '../auth/AuthModal';
 
@@ -33,13 +33,15 @@ export const Navbar: React.FC = () => {
     id: PageView; 
     label: string; 
     path: string;
+    icon: React.ReactNode;
     badge?: number;
   }[] = [
-    { id: 'home', label: 'Home', path: '/' },
-    { id: 'doctors', label: 'Find Therapists', path: '/doctors' },
-    { id: 'categories', label: 'Specialties', path: '/categories' },
-    { id: 'appointments', label: 'My Appointments', path: '/appointments', badge: upcomingCount },
-    { id: 'about', label: 'About Us', path: '/about' },
+    { id: 'home', label: 'Home', path: '/', icon: <Home className="w-5 h-5" /> },
+    { id: 'doctors', label: 'Find Therapists', path: '/doctors', icon: <Stethoscope className="w-5 h-5" /> },
+    { id: 'categories', label: 'Specialties', path: '/categories', icon: <Layers className="w-5 h-5" /> },
+    { id: 'appointments', label: 'My Appointments', path: '/appointments', icon: <Calendar className="w-5 h-5" />, badge: upcomingCount },
+    { id: 'about', label: 'About Us', path: '/about', icon: <Info className="w-5 h-5" /> },
+    { id: 'career', label: 'Careers', path: '/career', icon: <Briefcase className="w-5 h-5" /> },
   ];
 
   const handleNavClick = (path: string) => {
@@ -168,81 +170,124 @@ export const Navbar: React.FC = () => {
           </div>
         </div>
 
-        {/* Mobile Drawer - Using Link for routing */}
+        {/* Mobile Drawer - Full Screen */}
         <AnimatePresence>
           {mobileMenuOpen && (
             <motion.div
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
               exit={{ opacity: 0, height: 0 }}
-              className="lg:hidden glass-panel border-b border-slate-200 px-4 pt-3 pb-6 space-y-3 mt-2 shadow-2xl"
+              className="lg:hidden fixed top-[60px] left-0 right-0 bottom-0 bg-white/95 backdrop-blur-lg border-b border-slate-200 overflow-y-auto shadow-2xl"
+              style={{ height: `calc(100vh - 60px)` }}
             >
-              <div className="flex flex-col space-y-1">
-                {navItems.map(item => {
-                  const isActive = isActiveRoute(item.path);
-                  return (
-                    <Link
-                      key={item.id}
-                      to={item.path}
-                      onClick={() => setMobileMenuOpen(false)}
-                      className={`px-4 py-3 rounded-xl text-left font-semibold text-base transition-colors flex items-center justify-between ${
-                        isActive
-                          ? 'bg-blue-600 text-white'
-                          : 'text-slate-700 hover:bg-slate-100'
-                      }`}
-                    >
-                      <span>{item.label}</span>
-                      {item.badge !== undefined && item.badge > 0 && (
-                        <span className="bg-amber-400 text-slate-900 text-xs px-2 py-0.5 rounded-full font-bold">
-                          {item.badge}
-                        </span>
-                      )}
-                    </Link>
-                  );
-                })}
+              <div className="flex flex-col h-full">
+                {/* User Info Card */}
+                <div className="p-4 border-b border-slate-200 bg-gradient-to-r from-blue-50 to-teal-50">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-full bg-gradient-to-r from-blue-600 to-teal-500 flex items-center justify-center text-white text-xl font-bold">
+                      <User className="w-6 h-6" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-bold text-slate-900 text-sm">
+                        {user ? user.name : 'Guest User'}
+                      </h3>
+                      <p className="text-xs text-slate-500">
+                        {user ? user.email : 'Sign in for personalized experience'}
+                      </p>
+                      <div className="mt-1 flex items-center gap-1 text-[10px] text-slate-400">
+                        <Activity className="w-3 h-3 text-teal-500" />
+                        <span className="font-medium">PhysioPrime</span>
+                        <span className="text-slate-300">•</span>
+                        <MapPin className="w-3 h-3 text-teal-500" />
+                        <span>Nagpur & Pan-India</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
 
-                <button
-                  onClick={() => {
-                    setMobileMenuOpen(false);
-                    if (user) {
-                      navigate('/dashboard');
-                    } else {
-                      openAuthModal();
-                    }
-                  }}
-                  className="px-4 py-3 rounded-xl text-left font-semibold text-base text-slate-700 hover:bg-slate-100 flex items-center gap-2"
-                >
-                  <User className="w-5 h-5 text-blue-500" />
-                  <span>My Profile & Settings</span>
-                </button>
-                
-                <button
-                  onClick={() => {
-                    setMobileMenuOpen(false);
-                    if (user) {
-                      logout();
-                    } else {
-                      openAuthModal();
-                    }
-                  }}
-                  className="px-4 py-3 rounded-xl text-left font-semibold text-base text-slate-700 hover:bg-slate-100 flex items-center gap-2 w-full"
-                >
-                  <LogIn className="w-5 h-5 text-teal-500" />
-                  <span>{user ? 'Sign Out' : 'Sign In / Create Account'}</span>
-                </button>
-              </div>
+                {/* Navigation Items */}
+                <div className="flex-1 overflow-y-auto p-3 space-y-1">
+                  {navItems.map(item => {
+                    const isActive = isActiveRoute(item.path);
+                    return (
+                      <Link
+                        key={item.id}
+                        to={item.path}
+                        onClick={() => setMobileMenuOpen(false)}
+                        className={`px-4 py-3 rounded-xl text-left font-semibold text-base transition-colors flex items-center justify-between ${
+                          isActive
+                            ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20'
+                            : 'text-slate-700 hover:bg-slate-100'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className={isActive ? 'text-white' : 'text-blue-500'}>
+                            {item.icon}
+                          </span>
+                          <span>{item.label}</span>
+                        </div>
+                        {item.badge !== undefined && item.badge > 0 && (
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${
+                            isActive ? 'bg-white text-blue-600' : 'bg-blue-600 text-white'
+                          }`}>
+                            {item.badge}
+                          </span>
+                        )}
+                      </Link>
+                    );
+                  })}
 
-              <div className="pt-2">
-                <button
-                  onClick={() => {
-                    setMobileMenuOpen(false);
-                    openBookingModal({ mode: 'home' });
-                  }}
-                  className="w-full btn-gradient text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg"
-                >
-                  <Sparkles className="w-4 h-4 text-teal-300" />
-                  <span>Book Certified Therapist</span>
-                </button>
+                  <Link
+                    to="/dashboard"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="px-4 py-3 rounded-xl text-left font-semibold text-base text-slate-700 hover:bg-slate-100 flex items-center gap-3"
+                  >
+                    <LayoutDashboard className="w-5 h-5 text-blue-500" />
+                    <span>Dashboard</span>
+                  </Link>
+
+                  <button
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      if (user) {
+                        logout();
+                      } else {
+                        openAuthModal();
+                      }
+                    }}
+                    className="px-4 py-3 rounded-xl text-left font-semibold text-base text-slate-700 hover:bg-slate-100 flex items-center gap-3 w-full"
+                  >
+                    <LogIn className="w-5 h-5 text-teal-500" />
+                    <span>{user ? 'Sign Out' : 'Sign In / Create Account'}</span>
+                  </button>
+                </div>
+
+                {/* Bottom Actions */}
+                <div className="p-4 border-t border-slate-200 bg-slate-50/50">
+                  <button
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      openBookingModal({ mode: 'home' });
+                    }}
+                    className="w-full btn-gradient text-white py-3.5 rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-blue-500/25"
+                  >
+                    <Sparkles className="w-5 h-5 text-teal-300" />
+                    <span>Book Certified Therapist</span>
+                    <ArrowRight className="w-5 h-5" />
+                  </button>
+
+                  <div className="mt-3 flex items-center justify-center gap-4 text-xs text-slate-500">
+                    <a href="tel:+919876543210" className="flex items-center gap-1 hover:text-teal-600 transition-colors">
+                      <Phone className="w-3 h-3" />
+                      <span>24/7 Support</span>
+                    </a>
+                    <span className="text-slate-300">|</span>
+                    <a href="mailto:support@physioprime.com" className="flex items-center gap-1 hover:text-teal-600 transition-colors">
+                      <Mail className="w-3 h-3" />
+                      <span>Contact</span>
+                    </a>
+                  </div>
+                </div>
               </div>
             </motion.div>
           )}

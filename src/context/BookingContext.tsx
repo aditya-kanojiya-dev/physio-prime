@@ -5,13 +5,15 @@ import { api } from '../lib/api';
 import { ApiAppointment, toAppointment } from '../lib/adapters';
 import { useAppointments } from '../hooks/queries';
 
-export type PageView = 'home' | 'doctors' | 'doctor-detail' | 'categories' | 'appointments' | 'dashboard' | 'about';
+export type PageView = 'home' | 'doctors' | 'doctor-detail' | 'categories' | 'appointments' | 'dashboard' | 'about' | 'career';
 
 interface BookingModalOptions {
   doctor?: Doctor;
   mode?: ConsultationMode;
   symptom?: string;
   initialStep?: 1 | 2 | 3 | 4 | 5;
+  preSelectedDate?: string;
+  preSelectedTime?: string;
 }
 
 export interface CreateAppointmentParams {
@@ -22,6 +24,11 @@ export interface CreateAppointmentParams {
   symptom?: string;
   patientName: string;
   patientPhone: string;
+  patientEmail?: string;
+  patientGender?: 'male' | 'female' | 'other';
+  patientAge?: string;
+  patientWeight?: string;
+  patientHeight?: string;
   address?: string;
 }
 
@@ -47,7 +54,7 @@ interface BookingContextType {
   appointments: Appointment[];
   createAppointment: (data: CreateAppointmentParams) => Promise<{
     appointment: Appointment;
-    razorpayOrder: { id: string; amountPaise: number };
+    razorpayOrder: { id: string; amountPaise: number } | null;
   }>;
   rescheduleAppointment: (id: string, date: string, slot: string) => Promise<void>;
   cancelAppointment: (id: string, reason?: string) => Promise<void>;
@@ -82,7 +89,7 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
     mutationFn: async (data: CreateAppointmentParams) => {
       const result = await api.post<{
         appointment: ApiAppointment;
-        razorpayOrder: { id: string; amountPaise: number };
+        razorpayOrder: { id: string; amountPaise: number } | null;
       }>('/appointments', {
         doctorSlug: data.doctorSlug,
         mode: data.mode,
@@ -91,6 +98,11 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
         symptom: data.symptom,
         patientName: data.patientName,
         patientPhone: data.patientPhone,
+        patientEmail: data.patientEmail,
+        patientGender: data.patientGender,
+        patientAge: data.patientAge,
+        patientWeight: data.patientWeight,
+        patientHeight: data.patientHeight,
         address: data.address ? { text: data.address } : undefined,
       });
       return { appointment: toAppointment(result.appointment), razorpayOrder: result.razorpayOrder };

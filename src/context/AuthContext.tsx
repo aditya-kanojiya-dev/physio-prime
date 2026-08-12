@@ -1,6 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { api, getStoredUser, saveAuth, clearAuth, setToken } from '../lib/api';
+import { api, getStoredUser, saveAuth, clearAuth, getToken, setToken } from '../lib/api';
 
 export interface AuthUser {
   id: number;
@@ -15,6 +15,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   register: (name: string, email: string, password: string) => Promise<boolean>;
   loginWithGoogle: () => Promise<void>;
+  updateProfile: (patch: { name?: string; phone?: string | null }) => Promise<void>;
   logout: () => void;
   authModalOpen: boolean;
   openAuthModal: () => void;
@@ -85,6 +86,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await supabase.auth.signInWithOAuth({ provider: 'google' });
   }, []);
 
+  const updateProfile = useCallback(async (patch: { name?: string; phone?: string | null }) => {
+    const { user: updated } = await api.patch<{ user: AuthUser }>('/auth/me', patch);
+    setUser(updated);
+    const token = getToken();
+    if (token) saveAuth(token, updated);
+  }, []);
+
   const logout = useCallback(async () => {
     await supabase.auth.signOut();
     clearAuth();
@@ -99,6 +107,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         login,
         register,
         loginWithGoogle,
+        updateProfile,
         logout,
         authModalOpen,
         openAuthModal: () => setAuthModalOpen(true),

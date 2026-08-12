@@ -154,7 +154,7 @@ describe('templates', () => {
 
 describe('booking flow notifications', () => {
   it('creates a bookingConfirmed whatsapp row when a payment is verified', async () => {
-    await bookAndVerify('ntf.confirm@example.com', '10:00-10:30');
+    await bookAndVerify('ntf.confirm@example.com', '10:00-10:45');
     const rows = await db.select().from(notifications);
     const confirmed = rows.filter((r) => r.template === 'confirmed');
     expect(confirmed.length).toBe(1);
@@ -164,11 +164,11 @@ describe('booking flow notifications', () => {
   });
 
   it('creates bookingRescheduled rows on a real change and skips no-op reschedules', async () => {
-    const { token, bookingId } = await bookAndVerify('ntf.resched@example.com', '11:00-11:30');
+    const { token, bookingId } = await bookAndVerify('ntf.resched@example.com', '10:45-11:30');
     await api
       .post(`/api/v1/appointments/${bookingId}/reschedule`)
       .set('Authorization', `Bearer ${token}`)
-      .send({ date: futureWeekday(2), slot: '11:00-11:30' })
+      .send({ date: futureWeekday(2), slot: '10:45-11:30' })
       .expect(200);
     const rows = await db.select().from(notifications);
     const rescheduled = rows.filter((r) => r.template === 'rescheduled');
@@ -179,14 +179,14 @@ describe('booking flow notifications', () => {
     await api
       .post(`/api/v1/appointments/${bookingId}/reschedule`)
       .set('Authorization', `Bearer ${token}`)
-      .send({ date: futureWeekday(2), slot: '11:00-11:30' })
+      .send({ date: futureWeekday(2), slot: '10:45-11:30' })
       .expect(200);
     const after = await db.select().from(notifications);
     expect(after.filter((r) => r.template === 'rescheduled').length).toBe(1);
   });
 
   it('creates a bookingCancelled row (with refund note) after cancel', async () => {
-    const { token, bookingId } = await bookAndVerify('ntf.cancel@example.com', '12:00-12:30');
+    const { token, bookingId } = await bookAndVerify('ntf.cancel@example.com', '11:30-12:15');
     await api
       .post(`/api/v1/appointments/${bookingId}/cancel`)
       .set('Authorization', `Bearer ${token}`)

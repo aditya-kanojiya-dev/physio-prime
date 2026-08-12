@@ -63,17 +63,20 @@ export function ProfilePage() {
 
   if (isLoading) return <div className="text-slate-400">Loading profile…</div>
 
-  const input = 'w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-teal-500 focus:outline-none'
-  const label = 'block text-xs font-medium text-slate-500'
+  const input =
+    'w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm outline-none transition-all focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20'
+  const label = 'block text-xs font-semibold text-slate-500'
 
   return (
     <div className="max-w-xl">
       <div className="mb-4 flex items-center justify-between">
-        <h1 className="text-lg font-semibold text-slate-700">Profile</h1>
+        <h1 className="text-2xl font-extrabold text-slate-900">
+          My <span className="text-gradient">Profile</span>
+        </h1>
         <button
           onClick={() => save.mutate()}
           disabled={save.isPending}
-          className="rounded-lg bg-teal-600 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-700 disabled:opacity-50"
+          className="btn-gradient rounded-2xl px-4 py-2 text-sm font-bold text-white shadow-lg disabled:opacity-50"
         >
           {save.isPending ? 'Saving…' : 'Save profile'}
         </button>
@@ -81,7 +84,7 @@ export function ProfilePage() {
       {message && <p className="mb-4 text-sm text-emerald-600">{message}</p>}
       {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
 
-      <div className="space-y-4 rounded-2xl border border-teal-100 bg-white p-6">
+      <div className="space-y-4 rounded-3xl border border-slate-200 bg-white p-6 shadow-xl">
         <div>
           <label className={label}>Bio</label>
           <textarea
