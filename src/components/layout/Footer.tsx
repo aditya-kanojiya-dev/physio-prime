@@ -1,27 +1,11 @@
-import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React from 'react';
+import { Link } from 'react-router-dom';
 import { useBooking } from '../../context/BookingContext';
-import { Activity, Heart, Send, CheckCircle, Phone, Mail, MapPin, Shield, Star } from 'lucide-react';
+import { Heart, Phone, Mail, MapPin, Shield, Star } from 'lucide-react';
+import logo from '../../assets/logo.png';
 
 export const Footer: React.FC = () => {
-  const navigate = useNavigate();
   const { openBookingModal } = useBooking();
-  const [subscribed, setSubscribed] = useState(false);
-  const [email, setEmail] = useState('');
-
-  const handleSubscribe = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (email) {
-      setSubscribed(true);
-      setEmail('');
-      // You can add API call here to save email
-    }
-  };
-
-  const handleNavigation = (path: string) => {
-    navigate(path);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
 
   return (
     <footer className="relative bg-slate-50 text-slate-600 pt-20 pb-12 overflow-hidden border-t border-slate-200">
@@ -31,50 +15,6 @@ export const Footer: React.FC = () => {
       <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-teal-100/40 rounded-full blur-3xl pointer-events-none" />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-        
-        {/* Newsletter Banner */}
-        <div className="bg-gradient-to-r from-blue-50 via-white to-teal-50 p-8 sm:p-12 rounded-3xl border border-blue-200 shadow-lg mb-16 relative overflow-hidden">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
-            <div className="lg:col-span-7 space-y-3">
-              <span className="text-xs font-bold uppercase tracking-wider text-teal-600 bg-teal-50 px-3 py-1 rounded-full border border-teal-200">
-                Recovery Insights & Ergonomic Tips
-              </span>
-              <h3 className="text-2xl sm:text-3xl font-extrabold text-slate-900">
-                Join 25,000+ Health-Conscious Patients
-              </h3>
-              <p className="text-slate-500 text-sm sm:text-base">
-                Receive weekly physical therapy guides, posture checkups, and exclusive home consultation offers.
-              </p>
-            </div>
-
-            <div className="lg:col-span-5">
-              {subscribed ? (
-                <div className="bg-teal-50 border border-teal-200 p-4 rounded-2xl flex items-center gap-3 text-teal-700">
-                  <CheckCircle className="w-6 h-6 flex-shrink-0" />
-                  <span className="font-semibold text-sm">Thank you! You are subscribed to PhysioPrime health tips.</span>
-                </div>
-              ) : (
-                <form onSubmit={handleSubscribe} className="flex flex-col sm:flex-row gap-3">
-                  <input
-                    type="email"
-                    required
-                    value={email}
-                    onChange={e => setEmail(e.target.value)}
-                    placeholder="Enter your email address..."
-                    className="flex-1 bg-white border border-slate-200 focus:border-blue-500 rounded-xl px-4 py-3 text-sm text-slate-900 placeholder-slate-400 focus:outline-none transition-colors shadow-sm"
-                  />
-                  <button
-                    type="submit"
-                    className="btn-gradient text-white font-bold px-6 py-3 rounded-xl flex items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98] transition-transform whitespace-nowrap"
-                  >
-                    <span>Subscribe</span>
-                    <Send className="w-4 h-4" />
-                  </button>
-                </form>
-              )}
-            </div>
-          </div>
-        </div>
 
         {/* Main Footer Links */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-10 pb-16 border-b border-slate-200">
@@ -82,9 +22,11 @@ export const Footer: React.FC = () => {
           {/* Brand Info */}
           <div className="lg:col-span-2 space-y-4">
             <Link to="/" className="flex items-center gap-3 group">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-teal-400 flex items-center justify-center text-white shadow-md group-hover:scale-105 transition-transform">
-                <Activity className="w-6 h-6" />
-              </div>
+              <img
+                src={logo}
+                alt="PhysioPrime logo"
+                className="h-10 w-auto object-contain group-hover:scale-105 transition-transform"
+              />
               <span className="text-2xl font-extrabold text-slate-900 tracking-tight">
                 Physio<span className="text-gradient">Prime</span>
               </span>
@@ -122,6 +64,9 @@ export const Footer: React.FC = () => {
               </li>
               <li>
                 <Link to="/about" className="hover:text-blue-600 transition-colors block">About Our Mission</Link>
+              </li>
+              <li>
+                <Link to="/career" className="hover:text-blue-600 transition-colors block">Careers</Link>
               </li>
             </ul>
           </div>

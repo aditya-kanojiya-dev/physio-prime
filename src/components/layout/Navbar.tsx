@@ -2,9 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useBooking, PageView } from '../../context/BookingContext';
 import { useAuth } from '../../context/AuthContext';
-import { Activity, User, Menu, X, ArrowRight, Sparkles, MapPin, LogIn, LogOut, Home, Stethoscope, Layers, Calendar, Info, Briefcase, LayoutDashboard, Phone, Mail } from 'lucide-react';
+import { Activity, User, Menu, X, ArrowRight, Sparkles, MapPin, LogIn, LogOut, Home, Stethoscope, Layers, Calendar, Info, LayoutDashboard, Phone, Mail } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AuthModal } from '../auth/AuthModal';
+import { EASE_OUT } from '../../lib/motion';
+import logo from '../../assets/logo.png';
 
 export const Navbar: React.FC = () => {
   const location = useLocation();
@@ -41,13 +43,7 @@ export const Navbar: React.FC = () => {
     { id: 'categories', label: 'Specialties', path: '/categories', icon: <Layers className="w-5 h-5" /> },
     { id: 'appointments', label: 'My Appointments', path: '/appointments', icon: <Calendar className="w-5 h-5" />, badge: upcomingCount },
     { id: 'about', label: 'About Us', path: '/about', icon: <Info className="w-5 h-5" /> },
-    { id: 'career', label: 'Careers', path: '/career', icon: <Briefcase className="w-5 h-5" /> },
   ];
-
-  const handleNavClick = (path: string) => {
-    navigate(path);
-    setMobileMenuOpen(false);
-  };
 
   // Check if current path matches nav item
   const isActiveRoute = (path: string) => {
@@ -71,9 +67,11 @@ export const Navbar: React.FC = () => {
               to="/"
               className="flex items-center gap-3 cursor-pointer group"
             >
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 via-blue-500 to-teal-400 flex items-center justify-center text-white shadow-md shadow-blue-500/30 group-hover:scale-105 transition-transform duration-300">
-                <Activity className="w-6 h-6 animate-pulse" />
-              </div>
+              <img
+                src={logo}
+                alt="PhysioPrime logo"
+                className="h-10 w-auto object-contain group-hover:scale-105 transition-transform duration-300"
+              />
               <div>
                 <div className="flex items-center gap-1.5">
                   <span className="text-xl font-extrabold tracking-tight text-slate-900">
@@ -94,24 +92,33 @@ export const Navbar: React.FC = () => {
                   <Link
                     key={item.id}
                     to={item.path}
-                    className={`relative px-4 py-2 text-sm font-semibold rounded-full transition-all duration-200 flex items-center gap-2 ${
+                    className={`relative px-4 py-2 text-sm font-semibold rounded-full transition-colors duration-200 flex items-center gap-2 ${
                       isActive
-                        ? 'text-white bg-blue-600 shadow-md shadow-blue-500/20'
+                        ? 'text-white'
                         : 'text-slate-600 hover:text-blue-600 hover:bg-slate-100/50'
                     }`}
                   >
-                    {item.label}
-                    {item.badge !== undefined && item.badge > 0 && (
-                      <span
-                        className={`text-[10px] font-extrabold px-1.5 py-0.2 rounded-full ${
-                          isActive
-                            ? 'bg-white text-blue-600'
-                            : 'bg-blue-600 text-white animate-pulse'
-                        }`}
-                      >
-                        {item.badge}
-                      </span>
+                    {isActive && (
+                      <motion.span
+                        layoutId="nav-active-pill"
+                        className="absolute inset-0 rounded-full bg-blue-600 shadow-md shadow-blue-500/20"
+                        transition={{ duration: 0.45, ease: EASE_OUT }}
+                      />
                     )}
+                    <span className="relative z-10 flex items-center gap-2">
+                      {item.label}
+                      {item.badge !== undefined && item.badge > 0 && (
+                        <span
+                          className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded-full ${
+                            isActive
+                              ? 'bg-white text-blue-600'
+                              : 'bg-blue-600 text-white animate-pulse'
+                          }`}
+                        >
+                          {item.badge}
+                        </span>
+                      )}
+                    </span>
                   </Link>
                 );
               })}
@@ -174,11 +181,11 @@ export const Navbar: React.FC = () => {
         <AnimatePresence>
           {mobileMenuOpen && (
             <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
+              initial={{ opacity: 0, x: '100%' }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: '100%' }}
+              transition={{ duration: 0.35, ease: EASE_OUT }}
               className="lg:hidden fixed top-[60px] left-0 right-0 bottom-0 bg-white/95 backdrop-blur-lg border-b border-slate-200 overflow-y-auto shadow-2xl"
-              style={{ height: `calc(100vh - 60px)` }}
             >
               <div className="flex flex-col h-full">
                 {/* User Info Card */}
