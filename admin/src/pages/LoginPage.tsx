@@ -13,6 +13,7 @@ import {
   UserRound,
 } from 'lucide-react'
 import { useAuth } from '../lib/auth'
+import { getStoredUser } from '../lib/api'
 
 const BENEFITS = [
   {
@@ -47,7 +48,7 @@ export function LoginPage() {
   const [fieldError, setFieldError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
-  if (hydrated && user) return <Navigate to="/appointments" replace />
+  if (hydrated && user) return <Navigate to={user.role === 'admin' ? '/admin/dashboard' : '/appointments'} replace />
 
   function switchMode(next: 'login' | 'signup') {
     setMode(next)
@@ -68,7 +69,7 @@ export function LoginPage() {
     try {
       if (mode === 'login') await login(email.trim(), password)
       else await signup(name.trim(), email.trim(), password)
-      navigate('/appointments')
+      navigate(getStoredUser()?.role === 'admin' ? '/admin/dashboard' : '/appointments')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong')
     } finally {
