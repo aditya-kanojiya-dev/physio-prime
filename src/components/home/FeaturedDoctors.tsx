@@ -3,6 +3,7 @@ import { useBooking } from '../../context/BookingContext';
 import { useDoctors } from '../../hooks/queries';
 import { motion } from 'framer-motion';
 import { Star, ShieldCheck, MapPin, Clock, ArrowRight, CheckCircle2, Loader2 } from 'lucide-react';
+import { fadeUp, staggerContainer } from '../../lib/motion';
 
 export const FeaturedDoctors: React.FC = () => {
   const { openBookingModal, navigateToDoctor, setCurrentPage } = useBooking();
@@ -43,14 +44,17 @@ export const FeaturedDoctors: React.FC = () => {
             Loading therapists...
           </div>
         ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {doctors.slice(0, 3).map((doctor, idx) => (
+        <motion.div
+          variants={staggerContainer(0.08, 0.05)}
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, margin: '-40px' }}
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"
+        >
+          {doctors.slice(0, 3).map((doctor) => (
             <motion.div
               key={doctor.id}
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.5, delay: idx * 0.1 }}
+              variants={fadeUp(24)}
               className="group bg-white rounded-3xl overflow-hidden border border-slate-200 hover:border-blue-300 transition-all duration-300 shadow-lg hover:shadow-xl flex flex-col justify-between"
             >
               <div>
@@ -133,7 +137,7 @@ export const FeaturedDoctors: React.FC = () => {
 
             </motion.div>
           ))}
-        </div>
+        </motion.div>
         )}
 
       </div>

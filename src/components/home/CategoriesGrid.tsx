@@ -3,6 +3,7 @@ import { useBooking } from '../../context/BookingContext';
 import { useCategories } from '../../hooks/queries';
 import { motion } from 'framer-motion';
 import { ArrowRight, Stethoscope, Loader2, Layers } from 'lucide-react';
+import { fadeUp, staggerContainer } from '../../lib/motion';
 
 interface CategoriesGridProps {
   showViewAll?: boolean;
@@ -43,14 +44,17 @@ export const CategoriesGrid: React.FC<CategoriesGridProps> = ({
             Loading specialties...
           </div>
         ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {categories.map((cat, index) => (
+        <motion.div
+          variants={staggerContainer(0.06, 0.05)}
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, margin: '-40px' }}
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"
+        >
+          {categories.map((cat) => (
             <motion.div
               key={cat.id}
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.5, delay: index * 0.05 }}
+              variants={fadeUp(24)}
               onClick={() => navigateToCategory(cat.slug)}
               className="group relative rounded-3xl overflow-hidden bg-white border border-slate-200 hover:border-blue-300 transition-all duration-500 shadow-lg hover:shadow-xl cursor-pointer"
             >
@@ -101,7 +105,7 @@ export const CategoriesGrid: React.FC<CategoriesGridProps> = ({
 
             </motion.div>
           ))}
-        </div>
+        </motion.div>
         )}
 
         {showViewAll && (

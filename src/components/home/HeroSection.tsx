@@ -5,6 +5,7 @@ import { ConsultationMode } from '../../types';
 import { motion } from 'framer-motion';
 import { Video, Home, Calendar, ArrowRight, Sparkles, Award } from 'lucide-react';
 import homepageVid from '../../assets/homepage.mp4';
+import { fadeUp, staggerContainer, EASE_OUT } from '../../lib/motion';
 
 export const HeroSection: React.FC = () => {
   const navigate = useNavigate();
@@ -24,24 +25,27 @@ export const HeroSection: React.FC = () => {
           
           {/* Left Hero Column */}
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
+            variants={staggerContainer(0.12, 0.15)}
+            initial="hidden"
+            animate="visible"
             className="lg:col-span-7 space-y-8"
           >
             
             {/* Top Pill Badge */}
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-blue-50 border border-blue-200 shadow-sm text-blue-700 text-xs sm:text-sm font-bold">
+            <motion.div
+              variants={fadeUp(20)}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-blue-50 border border-blue-200 shadow-sm text-blue-700 text-xs sm:text-sm font-bold"
+            >
               <span className="flex h-2 w-2 relative">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-teal-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-teal-500"></span>
               </span>
               <Award className="w-4 h-4 text-teal-500" />
               <span>India's #1 On-Demand Physiotherapy Platform</span>
-            </div>
+            </motion.div>
 
             {/* Headline */}
-            <div className="space-y-4">
+            <motion.div variants={fadeUp(20)} className="space-y-4">
               <h1 className="text-4xl sm:text-6xl lg:text-7xl font-extrabold tracking-tight text-slate-900 leading-[1.1]">
                 Your Trusted Partner in{' '}
                 <span className="text-gradient">Physiotherapy Care.</span>
@@ -49,10 +53,10 @@ export const HeroSection: React.FC = () => {
               <p className="text-lg sm:text-xl text-slate-600 leading-relaxed font-normal max-w-2xl">
                 Book certified physiotherapists for personalized <strong className="text-slate-900 font-semibold">Home Visits</strong> or instant <strong className="text-slate-900 font-semibold">HD Video Consultations</strong>. Recover comfortably at your speed.
               </p>
-            </div>
+            </motion.div>
 
             {/* Mode Selection Toggle Card */}
-            <div className="glass-panel p-2 rounded-2xl border border-slate-200 shadow-xl max-w-xl">
+            <motion.div variants={fadeUp(20)} className="glass-panel p-2 rounded-2xl border border-slate-200 shadow-xl max-w-xl">
               <div className="grid grid-cols-2 gap-2">
                 
                 <button
@@ -80,10 +84,10 @@ export const HeroSection: React.FC = () => {
                 </button>
 
               </div>
-            </div>
+            </motion.div>
 
             {/* CTA Buttons */}
-            <div className="flex flex-wrap items-center gap-4">
+            <motion.div variants={fadeUp(20)} className="flex flex-wrap items-center gap-4">
               <button
                 onClick={() => openBookingModal({ mode: selectedMode })}
                 className="btn-gradient text-white px-8 py-4 rounded-2xl font-extrabold text-base shadow-xl shadow-blue-500/30 flex items-center gap-3 hover:scale-[1.02] active:scale-[0.98] transition-all"
@@ -101,7 +105,7 @@ export const HeroSection: React.FC = () => {
                 <span>Check Available Slots</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
-            </div>
+            </motion.div>
 
           </motion.div>
 
@@ -109,7 +113,7 @@ export const HeroSection: React.FC = () => {
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.7, delay: 0.2 }}
+            transition={{ duration: 0.7, delay: 0.35, ease: EASE_OUT }}
             className="lg:col-span-5 relative"
           >
             <div className="relative mx-auto max-w-md lg:max-w-none">

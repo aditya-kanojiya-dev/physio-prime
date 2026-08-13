@@ -3,6 +3,7 @@ import { useBooking } from '../../context/BookingContext';
 import { useSymptoms } from '../../hooks/queries';
 import { motion } from 'framer-motion';
 import { ArrowUpRight, Sparkles, Clock, ShieldCheck, Loader2 } from 'lucide-react';
+import { fadeUp, staggerContainer } from '../../lib/motion';
 
 export const SymptomsGrid: React.FC = () => {
   const { navigateToSymptom, setCurrentPage } = useBooking();
@@ -43,14 +44,17 @@ export const SymptomsGrid: React.FC = () => {
             Loading conditions...
           </div>
         ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {symptoms.map((symptom, idx) => (
+        <motion.div
+          variants={staggerContainer(0.06, 0.05)}
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, margin: '-40px' }}
+          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6"
+        >
+          {symptoms.map((symptom) => (
             <motion.div
               key={symptom.id}
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.4, delay: idx * 0.05 }}
+              variants={fadeUp(24)}
               onClick={() => navigateToSymptom(symptom.slug)}
               className="group bg-white rounded-3xl overflow-hidden border border-slate-200 hover:border-blue-300 transition-all duration-300 shadow-lg hover:shadow-xl cursor-pointer flex flex-col justify-between"
             >
@@ -101,7 +105,7 @@ export const SymptomsGrid: React.FC = () => {
 
             </motion.div>
           ))}
-        </div>
+        </motion.div>
         )}
 
       </div>

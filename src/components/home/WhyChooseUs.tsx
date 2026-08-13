@@ -1,6 +1,7 @@
 import React from 'react';
 import { ShieldCheck, Home, Video, FileText, Zap, Award, Sparkles } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { fadeUp, staggerContainer } from '../../lib/motion';
 
 export const WhyChooseUs: React.FC = () => {
   const benefits = [
@@ -72,16 +73,19 @@ export const WhyChooseUs: React.FC = () => {
         </div>
 
         {/* Benefits Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {benefits.map((item, idx) => {
+        <motion.div
+          variants={staggerContainer(0.08, 0.05)}
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, margin: '-40px' }}
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"
+        >
+          {benefits.map((item) => {
             const Icon = item.icon;
             return (
               <motion.div
-                key={idx}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.5, delay: idx * 0.08 }}
+                key={item.title}
+                variants={fadeUp(24)}
                 className="group relative p-8 rounded-3xl bg-white border border-slate-200/90 hover:border-blue-300 transition-all duration-300 shadow-lg hover:shadow-xl hover:shadow-blue-100/50 flex flex-col justify-between"
               >
                 <div className="space-y-4">
@@ -104,7 +108,7 @@ export const WhyChooseUs: React.FC = () => {
               </motion.div>
             );
           })}
-        </div>
+        </motion.div>
 
       </div>
     </section>

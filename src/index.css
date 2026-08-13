@@ -108,4 +108,63 @@
   }
 }
 
+@keyframes slow-float {
+  0%, 100% { 
+    transform: translate(0, 0) scale(1); 
+  }
+  33% { 
+    transform: translate(30px, -20px) scale(1.1); 
+  }
+  66% { 
+    transform: translate(-20px, 30px) scale(0.9); 
+  }
+}
 
+@keyframes slow-float-delayed {
+  0%, 100% { 
+    transform: translate(0, 0) scale(1); 
+  }
+  33% { 
+    transform: translate(-30px, 20px) scale(0.9); 
+  }
+  66% { 
+    transform: translate(20px, -30px) scale(1.1); 
+  }
+}
+
+.animate-slow-float {
+  animation: slow-float 20s ease-in-out infinite;
+}
+
+.animate-slow-float-delayed {
+  animation: slow-float-delayed 25s ease-in-out infinite;
+}
+
+/* For browsers that don't support backdrop-blur */
+@supports not (backdrop-filter: blur(12px)) {
+  .backdrop-blur-xl {
+    background-color: rgba(255, 255, 255, 0.95);
+  }
+  .backdrop-blur-sm {
+    background-color: rgba(255, 255, 255, 0.9);
+  }
+}
+
+/* iOS safe area support */
+@supports (padding: max(0px)) {
+  .chatbot-container {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+}
+
+/* Reduce motion preference */
+@media (prefers-reduced-motion: reduce) {
+  .animate-slow-float,
+  .animate-slow-float-delayed {
+    animation: none !important;
+  }
+  
+  .motion-safe\:animate-pulse {
+    animation: none !important;
+  }
+}

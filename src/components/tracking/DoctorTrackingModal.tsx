@@ -1,12 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Appointment } from '../../types';
 import { 
   MapPin, Navigation, Phone, MessageSquare, Clock, 
-  ShieldCheck, X, Car, Compass, Battery, Wifi, 
-  Signal, Cloud, Sun, CloudRain, Wind, AlertTriangle,
-  CheckCircle, Route, Target, Activity, Gauge,
-  Map as MapIcon, Navigation2, Radio, Satellite,
-  ArrowRight, ArrowUp, ArrowDown
+  ShieldCheck, X, Wifi, 
+  Cloud, Sun, CloudRain, Wind, AlertTriangle,
+  CheckCircle, Route, Activity, Gauge,
+  Navigation2, Radio, Satellite
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -37,12 +36,7 @@ export const DoctorTrackingModal: React.FC<TrackingModalProps> = ({ appointment,
   const [trafficCondition, setTrafficCondition] = useState('Moderate');
   const [weatherCondition, setWeatherCondition] = useState('Clear');
   const [isArrived, setIsArrived] = useState(false);
-  const [signalStrength, setSignalStrength] = useState(85);
-  const [batteryLevel, setBatteryLevel] = useState(78);
   const [currentWaypoint, setCurrentWaypoint] = useState(0);
-  const [showStreetView, setShowStreetView] = useState(false);
-  const [mapZoom, setMapZoom] = useState(15);
-  const mapContainerRef = useRef<HTMLDivElement>(null);
 
   // Enhanced notification system
   const triggerNotification = (message: string) => {
@@ -109,9 +103,6 @@ export const DoctorTrackingModal: React.FC<TrackingModalProps> = ({ appointment,
         // Update speed with realistic variation
         const newSpeed = Math.max(8, Math.min(25, 15 + (Math.random() - 0.5) * 10));
         setSpeed(Math.round(newSpeed));
-        
-        // Update signal strength
-        setSignalStrength(Math.min(100, Math.max(60, 80 + (Math.random() - 0.5) * 20)));
         
         // Update waypoint
         const waypointProgress = next / 100;
@@ -580,18 +571,3 @@ export const DoctorTrackingModal: React.FC<TrackingModalProps> = ({ appointment,
     </AnimatePresence>
   );
 };
-
-// Add to your global CSS or tailwind config
-const styles = `
-@keyframes shimmer {
-  0% { transform: translateX(-100%); }
-  100% { transform: translateX(100%); }
-}
-.animate-shimmer {
-  animation: shimmer 2s infinite;
-}
-.glass-panel {
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-}
-`;

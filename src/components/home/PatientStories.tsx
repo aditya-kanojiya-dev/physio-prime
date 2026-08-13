@@ -1,6 +1,7 @@
 import React from 'react';
 import { Star, CheckCircle2, Activity } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { fadeUp, staggerContainer } from '../../lib/motion';
 
 export const PatientStories: React.FC = () => {
   const stories = [
@@ -64,14 +65,17 @@ export const PatientStories: React.FC = () => {
         </div>
 
         {/* Testimonials Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {stories.map((s, idx) => (
+        <motion.div
+          variants={staggerContainer(0.08, 0.05)}
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, margin: '-40px' }}
+          className="grid grid-cols-1 md:grid-cols-3 gap-8"
+        >
+          {stories.map((s) => (
             <motion.div
               key={s.id}
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.5, delay: idx * 0.1 }}
+              variants={fadeUp(24)}
               className="bg-white p-8 rounded-3xl border border-slate-200 shadow-lg hover:shadow-xl hover:border-blue-300 transition-all duration-300 flex flex-col justify-between"
             >
               <div className="space-y-6">
@@ -122,7 +126,7 @@ export const PatientStories: React.FC = () => {
 
             </motion.div>
           ))}
-        </div>
+        </motion.div>
 
       </div>
     </section>
