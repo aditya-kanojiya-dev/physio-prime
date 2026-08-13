@@ -1,38 +1,39 @@
 import { DOCTORS_DATA } from './seed-data/doctors';
 import { getSupabaseAdmin } from './supabase';
 
-// Creates Supabase auth accounts for every seed doctor plus the admin, so they
-// can log into the doctor portal (admin/). Password: physio123. Idempotent —
-// skips emails that already exist in Supabase auth.
+// Creates Supabase auth accounts for every seed doctor, the demo patients, and
+// the admin, so they can log into the patient site (src/) and the portals.
+// Password: physio123. Idempotent — skips emails that already exist in Supabase auth.
 // ponytail: email/password for the demo; real onboarding would send invites or
 // collect phone/OTP. Supabase auto-sends a confirm email, so confirmation may be
 // required before sign-in depending on the project's auth settings.
+const DEMO_ACCOUNTS = [
+  ...DOCTORS_DATA.map((d) => ({ email: d.email, name: d.name })),
+  { email: 'ravi@physio.example', name: 'Ravi Kumar' },
+  { email: 'priya@physio.example', name: 'Priya Sharma' },
+  { email: 'kavita@physio.example', name: 'Kavita Patel' },
+  { email: 'amit@physio.example', name: 'Amit Verma' },
+  { email: 'sneha@physio.example', name: 'Sneha Reddy' },
+  { email: 'mohan@physio.example', name: 'Mohan Gupta' },
+  { email: 'fatima@physio.example', name: 'Fatima Khan' },
+  { email: 'admin@physio.example', name: 'Platform Admin' },
+];
+
 export async function seedSupabaseUsers(): Promise<void> {
   const admin = getSupabaseAdmin();
   const { data: existing } = await admin.auth.admin.listUsers({ perPage: 1000 });
   const existingEmails = new Set((existing?.users ?? []).map((u) => u.email));
 
-  for (const d of DOCTORS_DATA) {
-    if (existingEmails.has(d.email)) continue;
+  for (const account of DEMO_ACCOUNTS) {
+    if (existingEmails.has(account.email)) continue;
     const { error } = await admin.auth.admin.createUser({
-      email: d.email,
+      email: account.email,
       password: 'physio123',
       email_confirm: true,
-      user_metadata: { name: d.name },
+      user_metadata: { name: account.name },
     });
-    if (error) console.error(`skip ${d.email}: ${error.message}`);
-    else console.log(`created ${d.email}`);
-  }
-
-  if (!existingEmails.has('admin@physio.example')) {
-    const { error } = await admin.auth.admin.createUser({
-      email: 'admin@physio.example',
-      password: 'physio123',
-      email_confirm: true,
-      user_metadata: { name: 'Platform Admin' },
-    });
-    if (error) console.error(`skip admin@physio.example: ${error.message}`);
-    else console.log('created admin@physio.example');
+    if (error) console.error(`skip ${account.email}: ${error.message}`);
+    else console.log(`created ${account.email}`);
   }
 }
 

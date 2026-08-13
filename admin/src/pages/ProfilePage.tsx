@@ -110,7 +110,7 @@ export function ProfilePage() {
                 className={`${inputCls} resize-none`}
               />
             </div>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               {(['home', 'online', 'clinic'] as const).map((m) => (
                 <div key={m} className="space-y-1">
                   <label className={labelCls}>Fees – {m} (₹)</label>
@@ -124,7 +124,7 @@ export function ProfilePage() {
                 </div>
               ))}
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1">
                 <label className={labelCls}>Experience (years)</label>
                 <input

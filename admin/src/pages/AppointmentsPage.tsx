@@ -77,7 +77,7 @@ export function AppointmentsPage() {
             <h1 className="text-2xl font-black text-slate-900">Appointments</h1>
             <p className="text-xs text-slate-500">View your patient sessions and mark them completed or no show.</p>
           </div>
-          <div className="flex items-center gap-1.5 p-1 bg-white border border-slate-200 rounded-2xl">
+          <div className="flex flex-wrap items-center gap-1.5 p-1 bg-white border border-slate-200 rounded-2xl">
             {FILTERS.map(({ label, value }) => (
               <button
                 key={label}

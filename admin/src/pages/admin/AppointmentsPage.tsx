@@ -45,7 +45,7 @@ export function AppointmentsPage() {
             <h1 className="text-2xl font-black text-slate-900">Appointments CRM Manager</h1>
             <p className="text-xs text-slate-500">View patient consultations, monitor session status, and revenues.</p>
           </div>
-          <div className="flex items-center gap-1.5 p-1 bg-white border border-slate-200 rounded-2xl">
+          <div className="flex flex-wrap items-center gap-1.5 p-1 bg-white border border-slate-200 rounded-2xl">
             {FILTERS.map((st) => (
               <button
                 key={st}
@@ -172,7 +172,7 @@ export function AppointmentsPage() {
         )}
 
         {data && data.pagination.pages > 1 && (
-          <div className="flex items-center justify-between text-xs font-bold">
+          <div className="flex flex-wrap items-center justify-between gap-3 text-xs font-bold">
             <span className="text-slate-500">
               Page {data.pagination.page} of {data.pagination.pages} · {data.pagination.total} total
             </span>
