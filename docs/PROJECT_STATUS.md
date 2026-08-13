@@ -172,7 +172,13 @@ Routes under `/admin` guarded by `RequireAdmin`:
 
 ## 9. Remaining Work (Phase 10)
 
-1. Write `docs/DEPLOY.md`
-2. Provision Neon Postgres, run `drizzle-kit migrate` + seed prod admin
-3. Deploy API + patient app + admin app to Vercel; set env vars (`DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `VITE_SUPABASE_ANON_KEY`, `RAZORPAY_KEY_ID/SECRET`, `TWILIO_*`, `APP_URL`)
+Deploy-prep completed in the repo:
+- [x] `docs/DEPLOY.md` — deployment runbook (two Vercel projects, env vars, DB, smoke test)
+- [x] `api/index.ts` — Vercel serverless entry for the Express API (root `vercel.json` already rewrites `/api/*` to it)
+- [x] `admin/vercel.json` — SPA fallback for admin/doctor client-side routes
+
+Still to do (actual provisioning/deploy):
+1. Provision Neon/Supabase Postgres, run `drizzle-kit migrate` + seed prod admin
+2. Create the two Vercel projects and set env vars (`DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `RAZORPAY_KEY_ID/SECRET`, `TWILIO_*`, `APP_URL`)
+3. Deploy API + patient app + admin app to Vercel
 4. End-to-end smoke test: register → login → book with Razorpay test card → verify → admin sees booking + insights
