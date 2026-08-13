@@ -29,6 +29,16 @@ export async function seed(): Promise<void> {
     )
     .returning({ id: users.id });
 
+  await db
+    .insert(users)
+    .values({
+      email: 'admin@physio.example',
+      passwordHash,
+      role: 'admin',
+      name: 'Platform Admin',
+    })
+    .returning({ id: users.id });
+
   const insertedDoctors = await db
     .insert(doctors)
     .values(

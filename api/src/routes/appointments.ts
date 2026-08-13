@@ -38,6 +38,7 @@ const bookSchema = z.object({
   patientAge: z.coerce.number().int().min(1).max(120).optional(),
   patientWeight: z.coerce.number().positive().max(500).optional(),
   patientHeight: z.coerce.number().positive().max(250).optional(),
+  patientRelation: z.string().trim().max(50).optional(),
   address: z.record(z.string(), z.unknown()).optional(),
 });
 
@@ -87,6 +88,7 @@ interface AppointmentView {
   patientAge: number | null;
   patientWeight: string | null;
   patientHeight: string | null;
+  patientRelation: string | null;
   videoCallLink: string | null;
   cancellationReason: string | null;
   createdAt: Date;
@@ -122,6 +124,7 @@ const appointmentColumns = {
   patientAge: appointments.patientAge,
   patientWeight: appointments.patientWeight,
   patientHeight: appointments.patientHeight,
+  patientRelation: appointments.patientRelation,
   videoCallLink: appointments.videoCallLink,
   cancellationReason: appointments.cancellationReason,
   createdAt: appointments.createdAt,
@@ -168,6 +171,7 @@ function serializeAppointment(row: AppointmentView) {
     patientAge: row.patientAge,
     patientWeight: row.patientWeight,
     patientHeight: row.patientHeight,
+    patientRelation: row.patientRelation,
     videoCallLink: row.videoCallLink,
     cancellationReason: row.cancellationReason,
     createdAt: row.createdAt,
@@ -285,6 +289,7 @@ async function bookTransaction(
             patientAge: body.patientAge ?? null,
             patientWeight: body.patientWeight != null ? String(body.patientWeight) : null,
             patientHeight: body.patientHeight != null ? String(body.patientHeight) : null,
+            patientRelation: body.patientRelation ?? null,
             videoCallLink: body.mode === 'online' ? `https://meet.physioprime.in/${bookingId}` : null,
           })
           .returning();

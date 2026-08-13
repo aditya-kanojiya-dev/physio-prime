@@ -28,12 +28,13 @@ async function doctorToken(): Promise<string> {
 async function insertAppointment(
   doctorId: number,
   status: 'upcoming' | 'completed' = 'upcoming',
+  patientId = 1,
 ): Promise<{ id: number; bookingId: string }> {
   const [row] = await db
     .insert(appointments)
     .values({
       bookingId: `APT-${String(Math.floor(100000 + Math.random() * 900000))}`,
-      patientId: 1,
+      patientId,
       doctorId,
       mode: 'online',
       date: '2026-08-20',
@@ -183,6 +184,172 @@ describe('PATCH /api/v1/doctor/appointments/:id', () => {
       .patch('/api/v1/doctor/appointments/APT-000000')
       .set('Authorization', `Bearer ${await doctorToken()}`)
       .send({ status: 'completed' });
+    expect(res.status).toBe(404);
+  });
+});
+
+describe('POST /api/v1/doctor/appointments/:id/prescription', () => {
+  it('writes a prescription for a completed appointment', async () => {
+    const [doc] = await db.select().from(doctors).where(eq(doctors.slug, DOCTOR_SLUG));
+    const apt = await insertAppointment(doc.id, 'completed');
+    await db.update(appointments).set({ status: 'completed' }).where(eq(appointments.id, apt.id));
+
+    const res = await api
+      .post(`/api/v1/doctor/appointments/${apt.bookingId}/prescription`)
+      .set('Authorization', `Bearer ${await doctorToken()}`)
+      .send({
+        diagnosis: 'Lower back strain',
+        medicines: [{ name: 'Ibuprofen', dosage: '400mg', frequency: 'twice daily', duration: '7 days' }],
+        advice: 'Rest and light stretching',
+        followUpDate: '2026-09-01',
+      });
+    expect(res.status).toBe(201);
+    expect(res.body.prescription.diagnosis).toBe('Lower back strain');
+    expect(res.body.prescription.medicines[0].name).toBe('Ibuprofen');
+  });
+
+  it('rejects duplicates for the same appointment', async () => {
+    const [doc] = await db.select().from(doctors).where(eq(doctors.slug, DOCTOR_SLUG));
+    const apt = await insertAppointment(doc.id, 'completed');
+    await db.update(appointments).set({ status: 'completed' }).where(eq(appointments.id, apt.id));
+
+    const first = await api
+      .post(`/api/v1/doctor/appointments/${apt.bookingId}/prescription`)
+      .set('Authorization', `Bearer ${await doctorToken()}`)
+      .send({ diagnosis: 'First' });
+    expect(first.status).toBe(201);
+
+    const second = await api
+      .post(`/api/v1/doctor/appointments/${apt.bookingId}/prescription`)
+      .set('Authorization', `Bearer ${await doctorToken()}`)
+      .send({ diagnosis: 'Second' });
+    expect(second.status).toBe(409);
+  });
+
+  it('rejects prescriptions on non-completed appointments', async () => {
+    const [doc] = await db.select().from(doctors).where(eq(doctors.slug, DOCTOR_SLUG));
+    const apt = await insertAppointment(doc.id, 'upcoming');
+
+    const res = await api
+      .post(`/api/v1/doctor/appointments/${apt.bookingId}/prescription`)
+      .set('Authorization', `Bearer ${await doctorToken()}`)
+      .send({ diagnosis: 'Early' });
+    expect(res.status).toBe(400);
+  });
+
+  it('forbids writing for another doctor appointment', async () => {
+    const [other] = await db.select().from(doctors).where(eq(doctors.slug, 'doc-pritam-rathod'));
+    const apt = await insertAppointment(other.id, 'completed');
+    await db.update(appointments).set({ status: 'completed' }).where(eq(appointments.id, apt.id));
+
+    const res = await api
+      .post(`/api/v1/doctor/appointments/${apt.bookingId}/prescription`)
+      .set('Authorization', `Bearer ${await doctorToken()}`)
+      .send({ diagnosis: 'Sneaky' });
+    expect(res.status).toBe(403);
+  });
+});
+
+describe('GET /api/v1/doctor/patients', () => {
+  let patient: { id: number };
+
+  beforeAll(async () => {
+    patient = await registerPatient('doctor.my.patient@example.com');
+  });
+
+  it('lists only patients with completed visits', async () => {
+    const [doc] = await db.select().from(doctors).where(eq(doctors.slug, DOCTOR_SLUG));
+    const done = await insertAppointment(doc.id, 'completed', patient.id);
+    await db.update(appointments).set({ status: 'completed' }).where(eq(appointments.id, done.id));
+    await insertAppointment(doc.id, 'upcoming', patient.id);
+
+    const res = await api.get('/api/v1/doctor/patients').set('Authorization', `Bearer ${await doctorToken()}`);
+    expect(res.status).toBe(200);
+    const found = res.body.patients.find((p: { id: number }) => p.id === patient.id);
+    expect(found).toBeDefined();
+    expect(found.visitCount).toBeGreaterThanOrEqual(1);
+    expect(found.name).toBe('Doctor Test Patient');
+  });
+
+  it('404s for a patient the doctor never completed a visit with', async () => {
+    const res = await api.get('/api/v1/doctor/patients/999999').set('Authorization', `Bearer ${await doctorToken()}`);
+    expect(res.status).toBe(404);
+  });
+});
+
+describe('GET /api/v1/doctor/patients/:id', () => {
+  let patient: { id: number };
+
+  beforeAll(async () => {
+    patient = await registerPatient('doctor.my.patient.detail@example.com');
+  });
+
+  it('returns profile, own appointment history and own prescriptions', async () => {
+    const [doc] = await db.select().from(doctors).where(eq(doctors.slug, DOCTOR_SLUG));
+    const apt = await insertAppointment(doc.id, 'completed', patient.id);
+    await db.update(appointments).set({ status: 'completed' }).where(eq(appointments.id, apt.id));
+    await api
+      .post(`/api/v1/doctor/appointments/${apt.bookingId}/prescription`)
+      .set('Authorization', `Bearer ${await doctorToken()}`)
+      .send({ diagnosis: 'Follow-up strain', medicines: [{ name: 'Paracetamol' }] });
+
+    const res = await api
+      .get(`/api/v1/doctor/patients/${patient.id}`)
+      .set('Authorization', `Bearer ${await doctorToken()}`);
+    expect(res.status).toBe(200);
+    expect(res.body.patient.email).toBeDefined();
+    expect(res.body.appointments.length).toBeGreaterThanOrEqual(1);
+    const rx = res.body.prescriptions.find((p: { diagnosis: string }) => p.diagnosis === 'Follow-up strain');
+    expect(rx).toBeDefined();
+    expect(res.body.summary).toBeUndefined();
+  });
+
+  it('forbids viewing a patient the doctor never treated', async () => {
+    const other = await registerPatient('doctor.not.my.patient@example.com');
+    const [otherDoc] = await db.select().from(doctors).where(eq(doctors.slug, 'doc-pritam-rathod'));
+    const apt = await insertAppointment(otherDoc.id, 'completed', other.id);
+    await db.update(appointments).set({ status: 'completed' }).where(eq(appointments.id, apt.id));
+
+    const res = await api
+      .get(`/api/v1/doctor/patients/${other.id}`)
+      .set('Authorization', `Bearer ${await doctorToken()}`);
+    expect(res.status).toBe(404);
+  });
+});
+
+describe('GET /api/v1/doctor/appointments/:id', () => {
+  it('returns own appointment with prescription', async () => {
+    const [doc] = await db.select().from(doctors).where(eq(doctors.slug, DOCTOR_SLUG));
+    const apt = await insertAppointment(doc.id, 'completed');
+    await db.update(appointments).set({ status: 'completed' }).where(eq(appointments.id, apt.id));
+    await api
+      .post(`/api/v1/doctor/appointments/${apt.bookingId}/prescription`)
+      .set('Authorization', `Bearer ${await doctorToken()}`)
+      .send({ diagnosis: 'Detail view' });
+
+    const res = await api
+      .get(`/api/v1/doctor/appointments/${apt.bookingId}`)
+      .set('Authorization', `Bearer ${await doctorToken()}`);
+    expect(res.status).toBe(200);
+    expect(res.body.appointment.bookingId).toBe(apt.bookingId);
+    expect(res.body.prescription.diagnosis).toBe('Detail view');
+  });
+
+  it('forbids viewing another doctor appointment', async () => {
+    const [other] = await db.select().from(doctors).where(eq(doctors.slug, 'doc-pritam-rathod'));
+    const apt = await insertAppointment(other.id, 'completed');
+    await db.update(appointments).set({ status: 'completed' }).where(eq(appointments.id, apt.id));
+
+    const res = await api
+      .get(`/api/v1/doctor/appointments/${apt.bookingId}`)
+      .set('Authorization', `Bearer ${await doctorToken()}`);
+    expect(res.status).toBe(403);
+  });
+
+  it('404s for unknown booking ids', async () => {
+    const res = await api
+      .get('/api/v1/doctor/appointments/APT-000000')
+      .set('Authorization', `Bearer ${await doctorToken()}`);
     expect(res.status).toBe(404);
   });
 });

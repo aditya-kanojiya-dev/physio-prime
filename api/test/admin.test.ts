@@ -21,19 +21,21 @@ const ADMIN_EMAIL = 'admin.test@example.com';
 const DOCTOR_SLUG = 'doc-tarannum-sayyed';
 
 let adminToken = '';
+let patientId = 0;
 
 beforeAll(async () => {
   await runMigrations();
   await seed();
   const { token } = await registerAdmin(ADMIN_EMAIL);
   adminToken = token;
-  const { id } = await registerPatient('admin.apt.patient@example.com');
+  const patient = await registerPatient('admin.apt.patient@example.com');
+  patientId = patient.id;
   const [doc] = await db.select().from(doctors).where(eq(doctors.slug, DOCTOR_SLUG));
   await db
     .insert(appointments)
     .values({
       bookingId: 'APT-900001',
-      patientId: id,
+      patientId: patientId,
       doctorId: doc.id,
       mode: 'online',
       date: '2026-08-20',
@@ -247,5 +249,58 @@ describe('admin doctor applications', () => {
     expect(res.status).toBe(200);
     expect(res.body.applications.length).toBeGreaterThan(0);
     expect(res.body.applications[0].email).toBeDefined();
+  });
+});
+
+describe('admin insights doctorClients', () => {
+  it('reports per-doctor client counts', async () => {
+    const res = await api.get('/api/v1/admin/insights').set('Authorization', `Bearer ${adminToken}`);
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.doctorClients)).toBe(true);
+    expect(res.body.doctorClients[0].doctorName).toBeDefined();
+    expect(typeof res.body.doctorClients[0].clientCount).toBe('number');
+  });
+});
+
+describe('GET /api/v1/admin/doctors/:id/clients', () => {
+  it('returns the client roster for a doctor', async () => {
+    const [doc] = await db.select().from(doctors).where(eq(doctors.slug, DOCTOR_SLUG));
+    const res = await api.get(`/api/v1/admin/doctors/${doc.id}/clients`).set('Authorization', `Bearer ${adminToken}`);
+    expect(res.status).toBe(200);
+    expect(res.body.doctor.name).toBe(doc.name);
+    expect(Array.isArray(res.body.clients)).toBe(true);
+    expect(res.body.clients[0].appointmentCount).toBeGreaterThan(0);
+  });
+
+  it('404s for unknown doctors', async () => {
+    const res = await api.get('/api/v1/admin/doctors/999999/clients').set('Authorization', `Bearer ${adminToken}`);
+    expect(res.status).toBe(404);
+  });
+});
+
+describe('GET /api/v1/admin/patients/:id', () => {
+  it('returns full patient profile, appointments and prescriptions', async () => {
+    const res = await api.get(`/api/v1/admin/patients/${patientId}`).set('Authorization', `Bearer ${adminToken}`);
+    expect(res.status).toBe(200);
+    expect(res.body.patient.email).toBe('admin.apt.patient@example.com');
+    expect(res.body.patient.gender).toBeDefined();
+    expect(res.body.summary.appointmentCount).toBeGreaterThan(0);
+    expect(Array.isArray(res.body.appointments)).toBe(true);
+    expect(res.body.appointments[0].doctorName).toBeDefined();
+    expect(Array.isArray(res.body.prescriptions)).toBe(true);
+  });
+
+  it('404s for non-patients', async () => {
+    const [doc] = await db.select().from(doctors).where(eq(doctors.slug, DOCTOR_SLUG));
+    const res = await api.get(`/api/v1/admin/patients/${doc.userId}`).set('Authorization', `Bearer ${adminToken}`);
+    expect(res.status).toBe(404);
+  });
+});
+
+describe('GET /api/v1/admin/prescriptions', () => {
+  it('lists all prescriptions with doctor and patient names', async () => {
+    const res = await api.get('/api/v1/admin/prescriptions').set('Authorization', `Bearer ${adminToken}`);
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.prescriptions)).toBe(true);
   });
 });

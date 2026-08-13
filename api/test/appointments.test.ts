@@ -351,6 +351,26 @@ describe('POST /api/v1/appointments/:id/verify', () => {
       .send({ razorpayPaymentId: 'pay_vc', razorpaySignature: 'sig' });
     expect(res.status).toBe(400);
   });
+
+  it('stores patientRelation when booking for someone else', async () => {
+    const { token } = await registerPatient('apt.forother@example.com');
+    const res = await api
+      .post('/api/v1/appointments')
+      .set('Authorization', `Bearer ${token}`)
+      .send(bookPayload({ slot: '17:30-18:15', patientRelation: 'Mother' }));
+    expect(res.status).toBe(201);
+    expect(res.body.appointment.patientRelation).toBe('Mother');
+  });
+
+  it('stores no relation when booking for self', async () => {
+    const { token } = await registerPatient('apt.forself@example.com');
+    const res = await api
+      .post('/api/v1/appointments')
+      .set('Authorization', `Bearer ${token}`)
+      .send(bookPayload({ slot: '18:15-19:00' }));
+    expect(res.status).toBe(201);
+    expect(res.body.appointment.patientRelation).toBeNull();
+  });
 });
 
 describe('POST /api/v1/appointments/:id/reschedule', () => {

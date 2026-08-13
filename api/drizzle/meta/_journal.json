@@ -22,6 +22,20 @@
       "when": 1786531006231,
       "tag": "0002_bent_sentinel",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1786605530407,
+      "tag": "0003_sour_sandman",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1786608905371,
+      "tag": "0004_cultured_jubilee",
+      "breakpoints": true
     }
   ]
 }

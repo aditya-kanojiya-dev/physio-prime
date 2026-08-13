@@ -8,6 +8,9 @@ import {
   contentSections,
   doctorApplications,
   doctors,
+  patientProfiles,
+  prescriptions,
+  reviews,
   symptoms,
   users,
 } from '../db/schema';
@@ -73,6 +76,7 @@ const appointmentColumns = {
   razorpayOrderId: appointments.razorpayOrderId,
   patientName: appointments.patientName,
   patientPhone: appointments.patientPhone,
+  patientRelation: appointments.patientRelation,
   videoCallLink: appointments.videoCallLink,
   cancellationReason: appointments.cancellationReason,
   createdAt: appointments.createdAt,
@@ -150,12 +154,28 @@ adminRouter.get('/insights', async (req, res, next) => {
       .orderBy(desc(count(appointments.id)))
       .limit(5);
 
+    // per-doctor client counts (distinct patients) — scope respects date range
+    const doctorClients = await db
+      .select({
+        doctorId: appointments.doctorId,
+        doctorName: doctors.name,
+        clientCount: sql<number>`count(distinct ${appointments.patientId})`,
+        bookings: count(appointments.id),
+        revenuePaise: sql<number>`coalesce(sum(case when ${appointments.paymentStatus} = 'paid' then ${appointments.feePaise} else 0 end), 0)`,
+      })
+      .from(appointments)
+      .innerJoin(doctors, eq(doctors.id, appointments.doctorId))
+      .where(range)
+      .groupBy(appointments.doctorId, doctors.name)
+      .orderBy(desc(sql`count(distinct ${appointments.patientId})`));
+
     res.json({
       summary: { ...summary, revenuePaise: Number(summary.revenuePaise) },
       bookingsByMode,
       bookingsByDay: bookingsByDay.map((r) => ({ ...r, revenuePaise: Number(r.revenuePaise) })),
       newPatientsByDay,
       topDoctors: topDoctors.map((r) => ({ ...r, revenuePaise: Number(r.revenuePaise) })),
+      doctorClients: doctorClients.map((r) => ({ ...r, clientCount: Number(r.clientCount), revenuePaise: Number(r.revenuePaise) })),
     });
   } catch (err) {
     next(err);
@@ -321,9 +341,155 @@ adminRouter.get('/patients', async (req, res, next) => {
   }
 });
 
+// --- per-doctor client roster ------------------------------------------
+
+adminRouter.get('/doctors/:id/clients', async (req, res, next) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) {
+      res.status(400).json({ error: { message: 'id must be an integer' } });
+      return;
+    }
+    const [doctor] = await db.select({ id: doctors.id, name: doctors.name }).from(doctors).where(eq(doctors.id, id));
+    if (!doctor) {
+      res.status(404).json({ error: { message: 'Doctor not found' } });
+      return;
+    }
+    const clients = await db
+      .select({
+        patientId: appointments.patientId,
+        name: users.name,
+        email: users.email,
+        phone: users.phone,
+        appointmentCount: sql<number>`count(${appointments.id})`,
+        lastVisit: sql<string>`max(${appointments.date})`,
+        totalSpentPaise: sql<number>`coalesce(sum(case when ${appointments.paymentStatus} = 'paid' then ${appointments.feePaise} else 0 end), 0)`,
+      })
+      .from(appointments)
+      .innerJoin(users, eq(users.id, appointments.patientId))
+      .where(eq(appointments.doctorId, id))
+      .groupBy(appointments.patientId, users.name, users.email, users.phone)
+      .orderBy(desc(sql`count(${appointments.id})`));
+    res.json({
+      doctor,
+      clients: clients.map((c) => ({ ...c, appointmentCount: Number(c.appointmentCount), totalSpentPaise: Number(c.totalSpentPaise) })),
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// --- patient detail -----------------------------------------------------
+
+const patientDetailColumns = {
+  id: users.id,
+  email: users.email,
+  name: users.name,
+  phone: users.phone,
+  status: users.status,
+  createdAt: users.createdAt,
+  gender: patientProfiles.gender,
+  dob: patientProfiles.dob,
+  weight: patientProfiles.weight,
+  height: patientProfiles.height,
+  address: patientProfiles.address,
+};
+
+adminRouter.get('/patients/:id', async (req, res, next) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) {
+      res.status(400).json({ error: { message: 'id must be an integer' } });
+      return;
+    }
+    const [patient] = await db
+      .select(patientDetailColumns)
+      .from(users)
+      .leftJoin(patientProfiles, eq(patientProfiles.userId, users.id))
+      .where(and(eq(users.id, id), PATIENT_WHERE));
+    if (!patient) {
+      res.status(404).json({ error: { message: 'Patient not found' } });
+      return;
+    }
+    const appointmentRows = await db
+      .select({ ...appointmentColumns, doctorName: doctors.name, doctorSpecialty: doctors.specialty })
+      .from(appointments)
+      .innerJoin(doctors, eq(doctors.id, appointments.doctorId))
+      .where(eq(appointments.patientId, id))
+      .orderBy(desc(appointments.date), asc(appointments.timeSlot));
+    const prescriptionRows = await db
+      .select({
+        id: prescriptions.id,
+        appointmentId: prescriptions.appointmentId,
+        diagnosis: prescriptions.diagnosis,
+        medicines: prescriptions.medicines,
+        advice: prescriptions.advice,
+        followUpDate: prescriptions.followUpDate,
+        createdAt: prescriptions.createdAt,
+        doctorName: doctors.name,
+        date: appointments.date,
+      })
+      .from(prescriptions)
+      .innerJoin(doctors, eq(doctors.id, prescriptions.doctorId))
+      .innerJoin(appointments, eq(appointments.id, prescriptions.appointmentId))
+      .where(eq(prescriptions.patientId, id))
+      .orderBy(desc(prescriptions.createdAt));
+    const [summary] = await db
+      .select({
+        appointmentCount: count(appointments.id),
+        totalSpentPaise: sql<number>`coalesce(sum(case when ${appointments.paymentStatus} = 'paid' then ${appointments.feePaise} else 0 end), 0)`,
+        paidCount: sql<number>`count(*) filter (where ${appointments.paymentStatus} = 'paid')`,
+      })
+      .from(appointments)
+      .where(eq(appointments.patientId, id));
+    res.json({
+      patient,
+      summary: {
+        ...summary,
+        appointmentCount: Number(summary.appointmentCount),
+        totalSpentPaise: Number(summary.totalSpentPaise),
+        paidCount: Number(summary.paidCount),
+      },
+      appointments: appointmentRows.map((row) => ({ ...row, id: row.bookingId })),
+      prescriptions: prescriptionRows,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// --- prescriptions ------------------------------------------------------
+
+adminRouter.get('/prescriptions', async (_req, res, next) => {
+  try {
+    const rows = await db
+      .select({
+        id: prescriptions.id,
+        appointmentId: prescriptions.appointmentId,
+        bookingId: appointments.bookingId,
+        patientId: prescriptions.patientId,
+        patientName: appointments.patientName,
+        doctorName: doctors.name,
+        diagnosis: prescriptions.diagnosis,
+        medicines: prescriptions.medicines,
+        advice: prescriptions.advice,
+        followUpDate: prescriptions.followUpDate,
+        createdAt: prescriptions.createdAt,
+      })
+      .from(prescriptions)
+      .innerJoin(doctors, eq(doctors.id, prescriptions.doctorId))
+      .innerJoin(appointments, eq(appointments.id, prescriptions.appointmentId))
+      .orderBy(desc(prescriptions.createdAt));
+    res.json({ prescriptions: rows });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // --- appointments ------------------------------------------------------
 
 const ALLOWED_STATUS = ['upcoming', 'completed', 'cancelled', 'no_show'];
+const ALLOWED_PAYMENT_STATUS = ['pending', 'paid', 'failed', 'refunded'];
 
 adminRouter.get('/appointments', async (req, res, next) => {
   try {
@@ -335,6 +501,19 @@ adminRouter.get('/appointments', async (req, res, next) => {
         return;
       }
       filters.push(eq(appointments.status, query.status));
+    }
+    if (typeof query.paymentStatus === 'string' && query.paymentStatus) {
+      if (!ALLOWED_PAYMENT_STATUS.includes(query.paymentStatus)) {
+        res.status(400).json({ error: { message: `paymentStatus must be one of ${ALLOWED_PAYMENT_STATUS.join(', ')}` } });
+        return;
+      }
+      filters.push(eq(appointments.paymentStatus, query.paymentStatus));
+    }
+    if (typeof query.q === 'string' && query.q.trim()) {
+      const q = `%${query.q.trim().toLowerCase()}%`;
+      filters.push(
+        sql`(lower(${appointments.patientName}) like ${q} or lower(${doctors.name}) like ${q} or lower(${appointments.bookingId}) like ${q})`,
+      );
     }
     if (typeof query.mode === 'string' && query.mode) {
       if (!['home', 'online', 'clinic'].includes(query.mode)) {
@@ -364,7 +543,8 @@ adminRouter.get('/appointments', async (req, res, next) => {
       res.status(error.status).json({ error: { message: error.message } });
       return;
     }
-    filters.push(and(from ? sql`${appointments.date} >= ${from}` : undefined, to ? sql`${appointments.date} <= ${to}` : undefined));
+    if (from) filters.push(sql`${appointments.date} >= ${from}`);
+    if (to) filters.push(sql`${appointments.date} <= ${to}`);
 
     const page = Math.max(1, Number(query.page) || 1);
     const pageSize = Math.min(100, Math.max(1, Number(query.pageSize) || 20));
@@ -636,7 +816,7 @@ adminRouter.put('/cms/:page/:key', async (req, res, next) => {
     }
     const body = cmsPutSchema.parse(req.body);
     const [existing] = await db
-      .select({ id: contentSections.id })
+      .select({ id: contentSections.id, sortOrder: contentSections.sortOrder })
       .from(contentSections)
       .where(and(eq(contentSections.page, page), eq(contentSections.key, key)));
     const [saved] = existing

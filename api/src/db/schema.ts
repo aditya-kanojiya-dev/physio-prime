@@ -105,6 +105,7 @@ export const appointments = pgTable('appointments', {
   patientAge: integer('patient_age'),
   patientWeight: numeric('patient_weight'),
   patientHeight: numeric('patient_height'),
+  patientRelation: text('patient_relation'),
   videoCallLink: text('video_call_link'),
   cancellationReason: text('cancellation_reason'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
@@ -116,6 +117,18 @@ export const reviews = pgTable('reviews', {
   doctorId: integer('doctor_id').notNull().references(() => doctors.id),
   rating: integer('rating').notNull(),
   comment: text('comment'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const prescriptions = pgTable('prescriptions', {
+  id: serial('id').primaryKey(),
+  appointmentId: integer('appointment_id').notNull().unique().references(() => appointments.id),
+  doctorId: integer('doctor_id').notNull().references(() => doctors.id),
+  patientId: integer('patient_id').notNull().references(() => users.id),
+  diagnosis: text('diagnosis'),
+  medicines: jsonb('medicines').notNull().default([]),
+  advice: text('advice'),
+  followUpDate: date('follow_up_date'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 

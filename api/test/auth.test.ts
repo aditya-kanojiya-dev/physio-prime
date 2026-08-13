@@ -4,7 +4,7 @@ import express from 'express';
 import { sql, eq } from 'drizzle-orm';
 import { db } from '../src/db/pool';
 import { runMigrations } from '../src/db/migrate';
-import { users } from '../src/db/schema';
+import { users, patientProfiles } from '../src/db/schema';
 import { createApp } from '../src/index';
 import { requireAuth, requireRole } from '../src/middleware/auth';
 
@@ -96,6 +96,47 @@ describe('PATCH /api/v1/auth/me', () => {
   it('rejects requests without a token', async () => {
     const res = await api.patch('/api/v1/auth/me').send({ name: 'No Auth' });
     expect(res.status).toBe(401);
+  });
+});
+
+describe('PATCH /api/v1/auth/me profile fields', () => {
+  it('upserts gender/dob/weight/height/address into patient_profiles', async () => {
+    const email = 'profile.edit@example.com';
+    const res = await api
+      .patch('/api/v1/auth/me')
+      .set('Authorization', `Bearer ${email}`)
+      .send({ gender: 'female', dob: '1990-05-14', weight: 55, height: 162, address: { text: 'Nagpur' } });
+    expect(res.status).toBe(200);
+    expect(res.body.user).toMatchObject({ email, gender: 'female', dob: '1990-05-14', address: { text: 'Nagpur' } });
+
+    const [row] = await db.select().from(patientProfiles).where(eq(patientProfiles.userId, res.body.user.id));
+    expect(row).toBeDefined();
+    expect(row?.gender).toBe('female');
+    expect(String(row?.weight)).toBe('55');
+  });
+
+  it('returns profile fields on GET /me and keeps them across a name-only patch', async () => {
+    const email = 'profile.get@example.com';
+    await api.patch('/api/v1/auth/me').set('Authorization', `Bearer ${email}`).send({ weight: 60 });
+    const res = await api.get('/api/v1/auth/me').set('Authorization', `Bearer ${email}`);
+    expect(res.status).toBe(200);
+    expect(res.body.user.weight).toBe('60');
+
+    await api.patch('/api/v1/auth/me').set('Authorization', `Bearer ${email}`).send({ name: 'Profile Person' });
+    const after = await api.get('/api/v1/auth/me').set('Authorization', `Bearer ${email}`);
+    expect(after.body.user.name).toBe('Profile Person');
+    expect(after.body.user.weight).toBe('60');
+  });
+
+  it('clears a profile field when sent as null', async () => {
+    const email = 'profile.clear@example.com';
+    await api.patch('/api/v1/auth/me').set('Authorization', `Bearer ${email}`).send({ dob: '1995-01-01' });
+    const res = await api
+      .patch('/api/v1/auth/me')
+      .set('Authorization', `Bearer ${email}`)
+      .send({ dob: null });
+    expect(res.status).toBe(200);
+    expect(res.body.user.dob).toBeNull();
   });
 });
 
