@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Sparkles, ChevronUp, Bot } from 'lucide-react';
+import { ChevronUp } from 'lucide-react';
 import { Chatbot } from './Chatbot';
 // If you must use an image, use one with transparent background
 import chatbotImg from '../../assets/chatbot.png';
@@ -66,17 +66,17 @@ export const ChatbotButton: React.FC = () => {
             )}
 
 <motion.button
-  initial={{ scale: 0, opacity: 0 }}
+  initial={{ scale: 0.85, opacity: 0 }}
   animate={{ scale: 1, opacity: 1 }}
-  exit={{ scale: 0, opacity: 0 }}
-  whileHover={{ scale: isMobile ? 1 : 1.1 }}
+  exit={{ scale: 0.8, opacity: 0 }}
+  whileHover={{ scale: isMobile ? 1 : 1.05, y: isMobile ? 0 : -2 }}
   whileTap={{ scale: 0.9 }}
   onClick={handleToggleChat}
-  className={`fixed z-40 shadow-2xl flex items-center justify-center group overflow-hidden cursor-pointer
-    ${isMobile ? 'bottom-4 right-4 w-16 h-16' : 'bottom-6 right-6 w-20 h-20'}
+  className={`fixed z-40 flex items-center justify-center group overflow-hidden cursor-pointer
+    transition-shadow duration-300 shadow-[0_8px_32px_rgba(13,148,136,0.3)] hover:shadow-[0_12px_44px_rgba(13,148,136,0.45)]
+    ${isMobile ? 'bottom-4 right-4 w-14 h-14' : 'bottom-6 right-6 w-16 h-16'}
   `}
   style={{
-    boxShadow: '0 8px 32px rgba(13, 148, 136, 0.3)',
     background: 'transparent',
     borderRadius: '12px',
     padding: '0',
@@ -114,9 +114,9 @@ export const ChatbotButton: React.FC = () => {
       <AnimatePresence>
         {isOpen && isMinimized && (
           <motion.button
-            initial={{ scale: 0, opacity: 0 }}
+            initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0, opacity: 0 }}
+            exit={{ scale: 0.8, opacity: 0 }}
             onClick={() => setIsMinimized(false)}
             className={`fixed z-40 bg-gradient-to-r from-teal-600 to-blue-600 text-white shadow-lg rounded-full flex items-center justify-center
               ${isMobile ? 'bottom-4 right-4 w-12 h-12' : 'bottom-4 right-4 w-14 h-14'}
