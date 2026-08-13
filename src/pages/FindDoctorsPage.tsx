@@ -95,7 +95,7 @@ export const FindDoctorsPage: React.FC = () => {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           
           {/* Left Filter Sidebar */}
-          <div className="lg:col-span-4 space-y-4">
+          <div className="lg:col-span-4 space-y-4 lg:sticky lg:top-28 self-start">
             {/* Mobile Filters Toggle */}
             <button
               onClick={() => setFiltersOpen(o => !o)}

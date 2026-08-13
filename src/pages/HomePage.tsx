@@ -1,6 +1,8 @@
 import React from 'react';
 import { HeroSection } from '../components/home/HeroSection';
 import { SearchSection } from '../components/home/SearchSection';
+import { HeroShowcase } from '../components/home/HeroShowcase';
+import { StatStrip } from '../components/home/StatStrip';
 import { SymptomsGrid } from '../components/home/SymptomsGrid';
 import { CategoriesGrid } from '../components/home/CategoriesGrid';
 import { FeaturedDoctors } from '../components/home/FeaturedDoctors';
@@ -16,6 +18,8 @@ export const HomePage: React.FC = () => {
     <main className="min-h-screen">
       <HeroSection />
       <SearchSection />
+      <HeroShowcase />
+      <StatStrip />
       <SymptomsGrid />
       <CategoriesGrid />
       <FeaturedDoctors />

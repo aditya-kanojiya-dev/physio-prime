@@ -3,9 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { useBooking } from '../../context/BookingContext';
 import { ConsultationMode } from '../../types';
 import { motion } from 'framer-motion';
-import { ShieldCheck, Video, Home, Star, Calendar, Users, MapPin, ArrowRight, Sparkles, Award } from 'lucide-react';
+import { Video, Home, Calendar, ArrowRight, Sparkles, Award } from 'lucide-react';
 import homepageVid from '../../assets/homepage.mp4';
-import bottomImg from '../../assets/bottom-img.jpg'; // Import bottom image
 
 export const HeroSection: React.FC = () => {
   const navigate = useNavigate();
@@ -104,37 +103,6 @@ export const HeroSection: React.FC = () => {
               </button>
             </div>
 
-            {/* Live Key Metrics Bar */}
-            <div className="pt-6 border-t border-slate-200 grid grid-cols-2 sm:grid-cols-4 gap-4">
-              <div className="space-y-0.5">
-                <p className="text-2xl sm:text-3xl font-extrabold text-slate-900">10K+</p>
-                <p className="text-xs font-semibold text-slate-500 flex items-center gap-1">
-                  <Users className="w-3.5 h-3.5 text-blue-500" /> Happy Patients
-                </p>
-              </div>
-
-              <div className="space-y-0.5">
-                <p className="text-2xl sm:text-3xl font-extrabold text-slate-900">100+</p>
-                <p className="text-xs font-semibold text-slate-500 flex items-center gap-1">
-                  <ShieldCheck className="w-3.5 h-3.5 text-teal-500" /> Verified Doctors
-                </p>
-              </div>
-
-              <div className="space-y-0.5">
-                <p className="text-2xl sm:text-3xl font-extrabold text-slate-900">10+</p>
-                <p className="text-xs font-semibold text-slate-500 flex items-center gap-1">
-                  <MapPin className="w-3.5 h-3.5 text-cyan-500" /> Active Cities
-                </p>
-              </div>
-
-              <div className="space-y-0.5">
-                <p className="text-2xl sm:text-3xl font-extrabold text-slate-900">5K+</p>
-                <p className="text-xs font-semibold text-slate-500 flex items-center gap-1">
-                  <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500" /> Recovery Stories
-                </p>
-              </div>
-            </div>
-
           </motion.div>
 
           {/* Right Hero Interactive 3D Graphic / Card */}
@@ -171,48 +139,6 @@ export const HeroSection: React.FC = () => {
             </div>
           </motion.div>
         </div>
-
-        {/* Bottom Full-Width Animated Image Section */}
-        <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.4 }}
-          className="mt-16 lg:mt-20 w-full relative"
-        >
-          {/* Glow effect behind the image */}
-          <div className="absolute -inset-4 bg-gradient-to-r from-blue-100/50 via-teal-100/50 to-blue-100/50 rounded-3xl blur-2xl animate-pulse" />
-          
-          {/* Main Image Container */}
-          <div className="relative rounded-2xl overflow-hidden shadow-2xl border border-slate-200/50 group">
-            {/* Image */}
-            <img
-              src={bottomImg}
-              alt="Physiotherapy care and rehabilitation"
-              className="w-full h-32 sm:h-40 md:h-48 lg:h-56 object-cover transition-transform duration-700 group-hover:scale-105"
-            />
-            
-            {/* Gradient overlays for depth and luxury feel */}
-            <div className="absolute inset-0 bg-gradient-to-r from-blue-900/20 via-transparent to-teal-900/20" />
-            <div className="absolute inset-0 bg-gradient-to-t from-slate-900/10 to-transparent" />
-            
-            {/* Subtle shine effect on hover */}
-            <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-700 bg-gradient-to-r from-transparent via-white/10 to-transparent -skew-x-12" />
-            
-            {/* Decorative top and bottom border lines */}
-            <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-blue-400/30 to-transparent" />
-            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-teal-400/30 to-transparent" />
-            
-            {/* Minimal floating badge overlay */}
-            <motion.div
-              animate={{ x: [0, 10, 0] }}
-              transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
-              className="absolute top-4 right-4 bg-white/90 backdrop-blur-md px-4 py-2 rounded-full shadow-lg border border-white/50 flex items-center gap-2"
-            >
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="text-xs font-bold text-slate-700">Trusted by 10K+ Patients</span>
-            </motion.div>
-          </div>
-        </motion.div>
       </div>
     </section>
   );

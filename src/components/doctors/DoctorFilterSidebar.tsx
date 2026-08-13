@@ -38,7 +38,7 @@ export const DoctorFilterSidebar: React.FC<FilterSidebarProps> = ({
   const { data: categories = [] } = useCategories();
 
   return (
-    <div className="glass-panel p-6 rounded-3xl border border-slate-200 shadow-xl space-y-6 sticky top-28">
+    <div className="glass-panel p-6 rounded-3xl border border-slate-200 shadow-xl space-y-6 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto">
       
       {/* Header */}
       <div className="flex items-center justify-between pb-4 border-b border-slate-200">
