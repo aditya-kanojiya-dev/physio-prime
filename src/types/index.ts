@@ -94,6 +94,7 @@ export interface Appointment {
   patientAge?: string;
   patientWeight?: string;
   patientHeight?: string;
+  patientRelation?: string | null;
   symptom: string;
   fee: number;
   address?: string;

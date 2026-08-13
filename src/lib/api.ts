@@ -2,20 +2,32 @@ const BASE = (import.meta.env.VITE_API_URL as string | undefined) || '/api/v1';
 const TOKEN_KEY = 'physioprime_token';
 const USER_KEY = 'physioprime_user';
 
+export interface StoredUser {
+  id: number;
+  name: string;
+  email?: string;
+  phone?: string | null;
+  gender?: string | null;
+  dob?: string | null;
+  weight?: string | null;
+  height?: string | null;
+  address?: Record<string, unknown> | null;
+}
+
 export function getToken(): string | null {
   return localStorage.getItem(TOKEN_KEY);
 }
 
-export function getStoredUser(): { id: number; name: string; email?: string; phone?: string | null } | null {
+export function getStoredUser(): StoredUser | null {
   try {
     const raw = localStorage.getItem(USER_KEY);
-    return raw ? (JSON.parse(raw) as { id: number; name: string; email?: string; phone?: string | null }) : null;
+    return raw ? (JSON.parse(raw) as StoredUser) : null;
   } catch {
     return null;
   }
 }
 
-export function saveAuth(token: string, user: { id: number; name: string; email?: string; phone?: string | null }): void {
+export function saveAuth(token: string, user: StoredUser): void {
   localStorage.setItem(TOKEN_KEY, token);
   localStorage.setItem(USER_KEY, JSON.stringify(user));
 }

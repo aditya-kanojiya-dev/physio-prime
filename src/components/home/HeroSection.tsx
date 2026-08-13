@@ -152,12 +152,15 @@ export const HeroSection: React.FC = () => {
               {/* Main Illustration Card */}
               <div className="relative rounded-3xl overflow-hidden glass-panel border border-slate-200 shadow-2xl p-4 sm:p-6 bg-white">
                 <div className="relative h-[22rem] sm:h-[26rem] rounded-2xl overflow-hidden group">
-                  <img
+                  <video
                     src={homepageVid}
-                    alt="Professional physiotherapy care"
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+                    autoPlay
+                    muted
+                    loop
+                    playsInline
+                    className="w-full h-full object-cover"
                   />
-                  
+
                   {/* Elegant gradient overlay for depth */}
                   <div className="absolute inset-0 bg-gradient-to-t from-slate-900/30 via-slate-900/5 to-transparent" />
                   

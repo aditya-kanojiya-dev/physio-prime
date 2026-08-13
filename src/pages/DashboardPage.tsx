@@ -108,6 +108,11 @@ function ProfileTab() {
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(user?.name || '');
   const [phone, setPhone] = useState(user?.phone || '');
+  const [gender, setGender] = useState(user?.gender || '');
+  const [dob, setDob] = useState(user?.dob || '');
+  const [weight, setWeight] = useState(user?.weight || '');
+  const [height, setHeight] = useState(user?.height || '');
+  const [address, setAddress] = useState(addressText(user?.address));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -117,6 +122,11 @@ function ProfileTab() {
   const startEdit = () => {
     setName(user.name || '');
     setPhone(user.phone || '');
+    setGender(user.gender || '');
+    setDob(user.dob || '');
+    setWeight(user.weight || '');
+    setHeight(user.height || '');
+    setAddress(addressText(user.address));
     setError(null);
     setSaved(false);
     setEditing(true);
@@ -132,7 +142,15 @@ function ProfileTab() {
     }
     setLoading(true);
     try {
-      await updateProfile({ name: name.trim(), phone: phone.trim() || null });
+      await updateProfile({
+        name: name.trim(),
+        phone: phone.trim() || null,
+        gender: gender || null,
+        dob: dob || null,
+        weight: weight || null,
+        height: height || null,
+        address: address.trim() ? { text: address.trim() } : null,
+      });
       setEditing(false);
       setSaved(true);
     } catch (err) {
@@ -191,6 +209,69 @@ function ProfileTab() {
             />
           </div>
 
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <label className="ml-1 text-xs font-bold text-slate-700">Gender</label>
+              <select
+                value={gender}
+                onChange={(e) => setGender(e.target.value)}
+                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 focus:outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 shadow-sm"
+              >
+                <option value="">Select gender</option>
+                <option value="male">Male</option>
+                <option value="female">Female</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+
+            <div className="space-y-1">
+              <label className="ml-1 text-xs font-bold text-slate-700">Date of Birth</label>
+              <input
+                type="date"
+                value={dob}
+                onChange={(e) => setDob(e.target.value)}
+                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 focus:outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 shadow-sm"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="ml-1 text-xs font-bold text-slate-700">Weight (kg)</label>
+              <input
+                type="number"
+                min="1"
+                max="500"
+                value={weight}
+                onChange={(e) => setWeight(e.target.value)}
+                placeholder="e.g. 65"
+                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 shadow-sm"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="ml-1 text-xs font-bold text-slate-700">Height (cm)</label>
+              <input
+                type="number"
+                min="1"
+                max="250"
+                value={height}
+                onChange={(e) => setHeight(e.target.value)}
+                placeholder="e.g. 168"
+                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 shadow-sm"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-1">
+            <label className="ml-1 text-xs font-bold text-slate-700">Address</label>
+            <textarea
+              rows={2}
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              placeholder="Enter your address"
+              className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 placeholder-slate-400 outline-none transition-all shadow-sm focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20"
+            />
+          </div>
+
           {error && (
             <div className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 text-xs font-semibold text-red-700">
               <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
@@ -239,11 +320,47 @@ function ProfileTab() {
               <span className="text-slate-400 font-semibold">Phone Number</span>
               <p className="font-extrabold text-sm text-slate-900">{user.phone || '—'}</p>
             </div>
+
+            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-1">
+              <span className="text-slate-400 font-semibold">Gender</span>
+              <p className="font-extrabold text-sm capitalize text-slate-900">{user.gender || '—'}</p>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-1">
+              <span className="text-slate-400 font-semibold">Date of Birth</span>
+              <p className="font-extrabold text-sm text-slate-900">{user.dob ? formatDob(user.dob) : '—'}</p>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-1">
+              <span className="text-slate-400 font-semibold">Weight / Height</span>
+              <p className="font-extrabold text-sm text-slate-900">
+                {user.weight ? `${user.weight} kg` : '—'} · {user.height ? `${user.height} cm` : '—'}
+              </p>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-1 sm:col-span-2">
+              <span className="text-slate-400 font-semibold">Address</span>
+              <p className="font-extrabold text-sm text-slate-900">{addressText(user.address) || '—'}</p>
+            </div>
           </div>
         </>
       )}
     </div>
   );
+}
+
+function addressText(address: Record<string, unknown> | null | undefined): string {
+  if (!address || typeof address !== 'object') return '';
+  const primary = address.text ?? address.address ?? address.line1;
+  return typeof primary === 'string' ? primary : '';
+}
+
+function formatDob(dob: string): string {
+  return new Date(`${dob}T00:00:00`).toLocaleDateString('en-US', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
 }
 
 function RecordsTab() {

@@ -5,8 +5,9 @@ import { useBooking } from '../../context/BookingContext';
 import { useDoctors, useCategories, useSymptoms } from '../../hooks/queries';
 import {
   X, Send, User, Bot, Shield,
-  Heart, Mic, MicOff, Minimize2, Maximize2,
+  Mic, MicOff, Minimize2, Maximize2,
 } from 'lucide-react';
+import chatbotImg from '../../assets/chatbot.png';
 
 // Types
 interface Message {
@@ -655,11 +656,11 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, onMinimize })
           <div className="px-3 py-3 sm:px-4 sm:py-3.5 bg-gradient-to-r from-teal-600 to-blue-600 text-white flex items-center justify-between flex-shrink-0">
             <div className="flex items-center gap-2 min-w-0">
               <motion.div 
-                className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0"
+                className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0 overflow-hidden"
                 animate={{ rotate: [0, 10, -10, 0] }}
                 transition={{ duration: 2, repeat: Infinity }}
               >
-                <Heart className="w-4 h-4 sm:w-5 sm:h-5" />
+                <img src={chatbotImg} alt="PhysioPrime Assistant" className="w-full h-full object-cover" />
               </motion.div>
               <div className="min-w-0">
                 <h3 className="font-bold text-sm sm:text-base truncate">PhysioPrime Assistant</h3>

@@ -100,6 +100,8 @@ export const BookingModal: React.FC = () => {
   const [selectedTime, setSelectedTime] = useState('');
 
   // Patient details
+  const [forOther, setForOther] = useState(false);
+  const [relation, setRelation] = useState('');
   const [patientName, setPatientName] = useState('');
   const [patientEmail, setPatientEmail] = useState('');
   const [patientPhone, setPatientPhone] = useState('');
@@ -150,9 +152,31 @@ export const BookingModal: React.FC = () => {
     setProcessing(false);
     setPaymentError(null);
     setPaymentNotice(null);
+    setForOther(false);
+    setRelation('');
     setSelectedDate(bookingOptions.preSelectedDate || weekDates[0]?.full || '');
     setSelectedTime(bookingOptions.preSelectedTime || '');
+    if (user) prefillSelf();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bookingOptions, weekDates]);
+
+  // prefill self details once the user logs in mid-flow
+  useEffect(() => {
+    if (user && !forOther && !patientName) prefillSelf();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
+
+  function prefillSelf() {
+    if (!user) return;
+    setPatientName(user.name || '');
+    setPatientEmail(user.email || '');
+    setPatientPhone(user.phone || '');
+    setPatientGender((user.gender as 'male' | 'female' | 'other') || 'male');
+    setPatientAge(ageFromDob(user.dob));
+    setPatientWeight(user.weight || '');
+    setPatientHeight(user.height || '');
+    setAddress(addressFromUser(user.address));
+  }
 
   const categoryTitle = category ? categories.find(c => c.slug === category)?.title : null;
 
@@ -201,6 +225,7 @@ export const BookingModal: React.FC = () => {
         patientAge,
         patientWeight,
         patientHeight,
+        patientRelation: forOther ? relation : undefined,
         address: mode === 'home' ? address : undefined,
       });
       setCreatedAppointment(appointment);
@@ -280,7 +305,7 @@ export const BookingModal: React.FC = () => {
         return !!selectedDate && !!selectedTime;
       case 4:
         const ageNum = parseInt(patientAge);
-        return !!user && !!patientName && !!patientPhone && !!patientEmail && !!patientGender && !!patientWeight && !!patientHeight && !!patientAge && ageNum >= 1 && ageNum <= 100;
+        return !!user && !!patientName && !!patientPhone && !!patientEmail && !!patientGender && !!patientWeight && !!patientHeight && !!patientAge && ageNum >= 1 && ageNum <= 100 && (!forOther || !!relation);
       default:
         return true;
     }
@@ -603,6 +628,53 @@ export const BookingModal: React.FC = () => {
               ) : (
                 <div className="space-y-4">
 
+                  {/* Book For Toggle */}
+                  <div className="flex items-center gap-1 p-1 bg-slate-100 border border-slate-200 rounded-xl">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setForOther(false);
+                        setRelation('');
+                        prefillSelf();
+                      }}
+                      className={`flex-1 px-4 py-2.5 rounded-lg font-extrabold text-xs transition-all ${
+                        !forOther ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                      }`}
+                    >
+                      For myself
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setForOther(true)}
+                      className={`flex-1 px-4 py-2.5 rounded-lg font-extrabold text-xs transition-all ${
+                        forOther ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                      }`}
+                    >
+                      For someone else
+                    </button>
+                  </div>
+
+                  {forOther && (
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-slate-700">Who is this appointment for? *</label>
+                      <select
+                        value={relation}
+                        onChange={e => setRelation(e.target.value)}
+                        className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 focus:outline-none focus:border-blue-600 shadow-sm"
+                      >
+                        <option value="">Select relation</option>
+                        <option value="Father">Father</option>
+                        <option value="Mother">Mother</option>
+                        <option value="Spouse">Spouse</option>
+                        <option value="Child">Child</option>
+                        <option value="Grandparent">Grandparent</option>
+                        <option value="Sibling">Sibling</option>
+                        <option value="Friend">Friend</option>
+                        <option value="Other">Other</option>
+                      </select>
+                    </div>
+                  )}
+
                   {/* Patient Details Grid */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="space-y-1">
@@ -843,3 +915,16 @@ export const BookingModal: React.FC = () => {
     </AnimatePresence>
   );
 };
+
+function ageFromDob(dob?: string | null): string {
+  if (!dob) return '';
+  const years = (Date.now() - new Date(`${dob}T00:00:00`).getTime()) / (365.25 * 24 * 3600 * 1000);
+  const age = Math.floor(years);
+  return age >= 1 && age <= 100 ? String(age) : '';
+}
+
+function addressFromUser(address: Record<string, unknown> | null | undefined): string {
+  if (!address || typeof address !== 'object') return '';
+  const primary = address.text ?? address.address ?? address.line1;
+  return typeof primary === 'string' ? primary : '';
+}

@@ -96,6 +96,7 @@ export interface ApiAppointment {
   patientAge: number | null;
   patientWeight: string | null;
   patientHeight: string | null;
+  patientRelation: string | null;
   videoCallLink: string | null;
   cancellationReason: string | null;
   createdAt: string;
@@ -261,6 +262,7 @@ export function toAppointment(a: ApiAppointment): Appointment {
     patientAge: a.patientAge != null ? String(a.patientAge) : undefined,
     patientWeight: a.patientWeight || undefined,
     patientHeight: a.patientHeight || undefined,
+    patientRelation: a.patientRelation || undefined,
     symptom: a.symptom || '',
     fee: Math.round(a.feePaise / 100),
     address: addressToText(a.address),

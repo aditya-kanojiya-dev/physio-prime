@@ -29,6 +29,7 @@ export interface CreateAppointmentParams {
   patientAge?: string;
   patientWeight?: string;
   patientHeight?: string;
+  patientRelation?: string;
   address?: string;
 }
 
@@ -103,6 +104,7 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
         patientAge: data.patientAge,
         patientWeight: data.patientWeight,
         patientHeight: data.patientHeight,
+        patientRelation: data.patientRelation,
         address: data.address ? { text: data.address } : undefined,
       });
       return { appointment: toAppointment(result.appointment), razorpayOrder: result.razorpayOrder };

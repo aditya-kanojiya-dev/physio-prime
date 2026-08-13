@@ -1,12 +1,17 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { api, getStoredUser, saveAuth, clearAuth, getToken, setToken } from '../lib/api';
+import { api, getStoredUser, saveAuth, clearAuth, getToken, setToken, type StoredUser } from '../lib/api';
 
-export interface AuthUser {
-  id: number;
-  name: string;
-  email?: string;
+export interface AuthUser extends StoredUser {}
+
+export interface ProfilePatch {
+  name?: string;
   phone?: string | null;
+  gender?: string | null;
+  dob?: string | null;
+  weight?: number | string | null;
+  height?: number | string | null;
+  address?: Record<string, unknown> | null;
 }
 
 interface AuthContextType {
@@ -15,7 +20,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   register: (name: string, email: string, password: string) => Promise<boolean>;
   loginWithGoogle: () => Promise<void>;
-  updateProfile: (patch: { name?: string; phone?: string | null }) => Promise<void>;
+  updateProfile: (patch: ProfilePatch) => Promise<void>;
   logout: () => void;
   authModalOpen: boolean;
   openAuthModal: () => void;
@@ -86,7 +91,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await supabase.auth.signInWithOAuth({ provider: 'google' });
   }, []);
 
-  const updateProfile = useCallback(async (patch: { name?: string; phone?: string | null }) => {
+  const updateProfile = useCallback(async (patch: ProfilePatch) => {
     const { user: updated } = await api.patch<{ user: AuthUser }>('/auth/me', patch);
     setUser(updated);
     const token = getToken();
