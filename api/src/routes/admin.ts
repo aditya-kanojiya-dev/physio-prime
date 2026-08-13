@@ -10,7 +10,6 @@ import {
   doctors,
   patientProfiles,
   prescriptions,
-  reviews,
   symptoms,
   users,
 } from '../db/schema';
