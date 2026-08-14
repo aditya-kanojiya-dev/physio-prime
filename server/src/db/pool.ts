@@ -5,7 +5,8 @@ import pg from 'pg';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import * as schema from './schema';
 
-const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
+const repoRoot =
+  typeof import.meta.url === 'string' ? path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..') : process.cwd();
 loadEnv({ path: path.join(repoRoot, '.env') });
 
 // ponytail: PG_POOL_MAX=1 for the test suite (sequential files, one connection beats
