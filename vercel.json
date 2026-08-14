@@ -1,4 +1,5 @@
 {
+  "buildCommand": "node vercel-build.mjs",
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api" },
     { "source": "/(.*)", "destination": "/index.html" }
