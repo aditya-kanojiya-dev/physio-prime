@@ -19,7 +19,7 @@ execSync('npx esbuild server/index.ts --bundle --platform=node --format=cjs --ta
 const serverPkg = JSON.parse(readFileSync(path.join(root, 'server', 'package.json'), 'utf8'));
 writeFileSync(path.join(func, 'package.json'), JSON.stringify({ dependencies: serverPkg.dependencies }, null, 2));
 writeFileSync(path.join(func, '.vc-config.json'), JSON.stringify({
-  runtime: 'nodejs20.x',
+  runtime: 'nodejs22.x',
   handler: 'index.js',
   launcherType: 'Nodejs',
 }, null, 2));
