@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
+import confetti from 'canvas-confetti';
 import { useBooking } from '../../context/BookingContext';
 import { useAuth } from '../../context/AuthContext';
 import { useDoctors, useCategories, useSlots } from '../../hooks/queries';
@@ -86,6 +88,7 @@ function loadRazorpay(): Promise<void> {
 }
 
 export const BookingModal: React.FC = () => {
+  const navigate = useNavigate();
   const { isBookingOpen, closeBookingModal, bookingOptions, createAppointment, setCurrentPage } = useBooking();
   const { user, openAuthModal } = useAuth();
   const { data: doctors = [] } = useDoctors();
@@ -140,6 +143,13 @@ export const BookingModal: React.FC = () => {
     selectedDoctor?.id ?? null,
     selectedDate || null
   );
+
+  useEffect(() => {
+    if (step === 5) {
+      const burst = setTimeout(() => confetti({ particleCount: 160, spread: 90, origin: { y: 0.35 } }), 250);
+      return () => clearTimeout(burst);
+    }
+  }, [step]);
 
   useEffect(() => {
     setStep((bookingOptions.initialStep || 1) as 1 | 2 | 3 | 4 | 5);
@@ -903,6 +913,7 @@ export const BookingModal: React.FC = () => {
                 onClick={() => {
                   handleClose();
                   setCurrentPage('appointments');
+                  navigate('/appointments');
                 }}
                 className="w-full btn-gradient text-white py-3 rounded-xl font-extrabold text-sm shadow-lg text-center hover:scale-[1.02] active:scale-[0.98] transition-all"
               >

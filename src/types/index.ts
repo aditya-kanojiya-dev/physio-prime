@@ -12,7 +12,6 @@ export interface DoctorReview {
 }
 
 export interface Doctor {
-  phone: string;
   id: string;
   name: string;
   title: string;
@@ -76,7 +75,6 @@ export interface Category {
 }
 
 export interface Appointment {
-  doctorPhone: string;
   id: string;
   doctorId: string;
   doctorName: string;

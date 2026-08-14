@@ -472,7 +472,7 @@ export const DoctorTrackingModal: React.FC<TrackingModalProps> = ({ appointment,
                 <motion.a
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
-                  href={`tel:${appointment.doctorPhone || '+919876543210'}`}
+                  href={`tel:+919876543210`}
                   className="flex-1 px-4 py-3 rounded-xl bg-gradient-to-r from-teal-600 to-blue-600 text-white text-xs font-bold flex items-center justify-center gap-2 shadow-md hover:shadow-lg transition-all"
                 >
                   <Phone className="w-4 h-4" /> Call Doctor

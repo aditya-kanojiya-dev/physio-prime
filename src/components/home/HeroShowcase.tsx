@@ -1,8 +1,11 @@
-import React from 'react';
-import { motion } from 'framer-motion';
+import React, { useRef } from 'react';
+import { motion, useInView } from 'framer-motion';
 import bottomVid from '../../assets/bottom-vid.mp4';
 
 export const HeroShowcase: React.FC = () => {
+  const vidRef = useRef<HTMLVideoElement>(null);
+  const vidInView = useInView(vidRef, { once: true, margin: '200px' });
+
   return (
     <div className="max-w-7xl mx-auto px-0 sm:px-6 lg:px-8 mt-12 lg:mt-16 w-full relative">
       {/* Glow effect behind the image */}
@@ -18,11 +21,13 @@ export const HeroShowcase: React.FC = () => {
       >
         {/* Image */}
         <video
-          src={bottomVid}
+          ref={vidRef}
+          src={vidInView ? bottomVid : undefined}
           autoPlay
           muted
           loop
           playsInline
+          preload="none"
           className="w-full h-56 sm:h-72 md:h-96 lg:h-[26rem] object-cover transition-transform duration-700 group-hover:scale-105"
         />
 

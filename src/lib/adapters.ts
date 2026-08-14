@@ -134,7 +134,6 @@ export function formatNextAvailable(dateStr: string | null): string {
 
 export function toDoctor(d: ApiDoctor): Doctor {
   return {
-    phone: '',
     id: d.id,
     name: d.name,
     title: d.title || d.specialty || 'Physiotherapist',
@@ -242,7 +241,6 @@ function addressToText(address: unknown): string | undefined {
 
 export function toAppointment(a: ApiAppointment): Appointment {
   return {
-    doctorPhone: '',
     id: a.id,
     doctorId: a.doctor?.id || '',
     doctorName: a.doctor?.name || 'Physiotherapist',

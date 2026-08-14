@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useBooking } from '../../context/BookingContext';
 import { ConsultationMode } from '../../types';
-import { motion } from 'framer-motion';
+import { motion, useInView } from 'framer-motion';
 import { Video, Home, Calendar, ArrowRight, Sparkles, Award } from 'lucide-react';
 import homepageVid from '../../assets/homepage.mp4';
 import { fadeUp, staggerContainer, EASE_OUT } from '../../lib/motion';
@@ -11,6 +11,8 @@ export const HeroSection: React.FC = () => {
   const navigate = useNavigate();
   const { openBookingModal } = useBooking();
   const [selectedMode, setSelectedMode] = useState<ConsultationMode>('home');
+  const vidRef = useRef<HTMLVideoElement>(null);
+  const vidInView = useInView(vidRef, { once: true, margin: '200px' });
 
   return (
     <section className="relative pt-32 pb-20 lg:pt-40 lg:pb-32 overflow-hidden">
@@ -125,11 +127,13 @@ export const HeroSection: React.FC = () => {
               <div className="relative rounded-3xl overflow-hidden glass-panel border border-slate-200 shadow-2xl p-4 sm:p-6 bg-white">
                 <div className="relative h-[22rem] sm:h-[26rem] rounded-2xl overflow-hidden group">
                   <video
-                    src={homepageVid}
+                    ref={vidRef}
+                    src={vidInView ? homepageVid : undefined}
                     autoPlay
                     muted
                     loop
                     playsInline
+                    preload="none"
                     className="w-full h-full object-cover"
                   />
 
