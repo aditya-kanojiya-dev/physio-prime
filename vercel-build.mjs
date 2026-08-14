@@ -18,3 +18,11 @@ execSync('npx esbuild server/index.ts --bundle --platform=node --format=esm --ta
 
 const serverPkg = JSON.parse(readFileSync(path.join(root, 'server', 'package.json'), 'utf8'));
 writeFileSync(path.join(func, 'package.json'), JSON.stringify({ type: 'module', dependencies: serverPkg.dependencies }, null, 2));
+
+writeFileSync(path.join(out, 'config.json'), JSON.stringify({
+  version: 3,
+  routes: [
+    { src: '/api/(.*)', dest: '/api' },
+    { src: '/(.*)', dest: '/index.html' },
+  ],
+}, null, 2));
