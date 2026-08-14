@@ -29,5 +29,6 @@ dist-ssr
 
 # local env
 .env
-.vercel/output
+.vercel
 
+.vercel

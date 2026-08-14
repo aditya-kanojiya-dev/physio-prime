@@ -10,11 +10,11 @@ Three artifacts, one repo (npm workspaces):
 |---|---|---|
 | Patient app | repo root (`src/`, `index.html`, `vite.config.ts`) | Vite SPA, project root = repo root |
 | Admin + doctor portal | `admin/` | Vite SPA, project root = `admin/` |
-| Express API | `server/` (`src/index.ts`) | One bundled Vercel Node function (`api.func`) emitted by `vercel-build.mjs` |
+| Express API | `server/` (`src/index.ts`) | One Vercel Node function via `api/index.ts`, which imports the app from `server/` |
 
 Routing glue already in the repo:
 
-- `vercel.json` (root) sets the build command (`node vercel-build.mjs`), rewrites `/api/(.*)` → `/api` (the function) and `/(.*)` → `/index.html` (SPA fallback).
+- `vercel.json` (root) rewrites `/api/(.*)` → `/api` (the function) and `/(.*)` → `/index.html` (SPA fallback).
 - `admin/vercel.json` rewrites `/(.*)` → `/index.html` for the admin app's client-side routes (`/admin/*`, `/doctor/*`).
 
 ## Prerequisites
@@ -37,9 +37,9 @@ When Vercel's monorepo detection offers to create a project per workspace, creat
 ### Project A — patient + API
 - Root directory: `.` (repo root)
 - Framework preset: **Vite**
-- Build command: `node vercel-build.mjs`
-- Output directory: (blank — build emits `.vercel/output` itself)
-- The API is a **single** function bundled by esbuild from `server/index.ts`. Do not use an `api/` folder — Vercel treats every file under `api/` as a separate serverless function (Hobby plan caps at 12), so the server lives in `server/`.
+- Build command: `npm run build -w src`
+- Output directory: `dist`
+- The API is a **single** function: `api/index.ts` (imports the app from `server/`). The full server source lives in `server/` — keep the `api/` folder to just `index.ts` + `package.json`, because Vercel treats every file under `api/` as a separate serverless function (Hobby plan caps at 12).
 
 ### Project B — admin
 - Root directory: `admin`
@@ -112,7 +112,7 @@ If Twilio is configured, a confirmation WhatsApp/SMS fires on payment.
 
 ## 6. Notes & gotchas
 
-- **`server/index.ts`** is not type-checked by `tsc -b` (server `tsconfig.json` only covers `src/`); `vercel-build.mjs` bundles it with esbuild into the single `api.func`. Local API runs stay on `server/src/server.ts` via `npm run dev -w server`.
-- The root `package.json` `build` script builds all three workspaces — used by CI/local; Vercel uses `node vercel-build.mjs` (Project A) so builds stay fast.
+- **`api/index.ts`** is not type-checked by `tsc -b` (server `tsconfig.json` only covers `src/`); Vercel compiles and bundles it (with its imports from `server/`) into a single Node function. Local API runs stay on `server/src/server.ts` via `npm run dev -w server`.
+- The root `package.json` `build` script builds all three workspaces — used by CI/local; Vercel (Project A) builds only `-w src` so builds stay fast.
 - `vercel.json` root rewrite `/(.*) → /index.html` must stay; the SPA routes client-side. Do not add trailing-slash redirects that break `/api/*`.
 - Cold starts: the `pg` pool is created lazily per function instance; keep `PG_POOL_MAX` modest (Neon free tier allows 10 concurrent connections).
