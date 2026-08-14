@@ -28,6 +28,7 @@ writeFileSync(path.join(out, 'config.json'), JSON.stringify({
   version: 3,
   routes: [
     { src: '/api/(.*)', dest: '/api' },
+    { handle: 'filesystem' },
     { src: '/(.*)', dest: '/index.html' },
   ],
 }, null, 2));
