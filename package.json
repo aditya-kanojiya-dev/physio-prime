@@ -3,15 +3,15 @@
   "private": true,
   "type": "module",
   "workspaces": [
-    "api",
+    "server",
     "admin",
     "src"
   ],
   "scripts": {
-    "dev": "concurrently \"npm run dev -w api\" \"npm run dev -w src\" \"npm run dev -w admin\"",
-    "build": "npm run build -w api && npm run build -w src && npm run build -w admin",
-    "lint": "npm run lint -w api && npm run lint -w src && npm run lint -w admin",
-    "test": "npm run test -w api"
+    "dev": "concurrently \"npm run dev -w server\" \"npm run dev -w src\" \"npm run dev -w admin\"",
+    "build": "npm run build -w server && npm run build -w src && npm run build -w admin",
+    "lint": "npm run lint -w server && npm run lint -w src && npm run lint -w admin",
+    "test": "npm run test -w server"
   },
   "devDependencies": {
     "concurrently": "^9.0.0",

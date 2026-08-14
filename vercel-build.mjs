@@ -11,10 +11,10 @@ cpSync(path.join(root, 'dist'), path.join(out, 'static'), { recursive: true });
 
 const func = path.join(out, 'functions', 'api.func');
 mkdirSync(func, { recursive: true });
-execSync('npx esbuild api/index.ts --bundle --platform=node --format=esm --target=node20 --packages=external --outfile=' + path.join(func, 'index.js'), {
+execSync('npx esbuild server/index.ts --bundle --platform=node --format=esm --target=node20 --packages=external --outfile=' + path.join(func, 'index.js'), {
   cwd: root,
   stdio: 'inherit',
 });
 
-const apiPkg = JSON.parse(await (await import('node:fs/promises')).readFile(path.join(root, 'api', 'package.json'), 'utf8'));
+const apiPkg = JSON.parse(await (await import('node:fs/promises')).readFile(path.join(root, 'server', 'package.json'), 'utf8'));
 writeFileSync(path.join(func, 'package.json'), JSON.stringify({ type: 'module', dependencies: apiPkg.dependencies }, null, 2));
