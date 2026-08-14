@@ -40,6 +40,7 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
   try {
     const { data, error } = await getSupabaseAdmin().auth.getUser(header.slice('Bearer '.length));
     if (error || !data.user?.email) {
+      console.error('requireAuth getUser failed:', error?.message);
       res.status(401).json({ error: { message: 'Unauthorized' } });
       return;
     }
@@ -50,7 +51,8 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     }
     req.user = tokenUser;
     next();
-  } catch {
+  } catch (err) {
+    console.error('requireAuth threw:', err);
     res.status(401).json({ error: { message: 'Unauthorized' } });
   }
 }
