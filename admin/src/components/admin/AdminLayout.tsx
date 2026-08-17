@@ -6,6 +6,7 @@ import {
   CalendarCheck,
   CreditCard,
   FileText,
+  LayoutDashboard,
   LogOut,
   Menu,
   ShieldCheck,
@@ -33,6 +34,7 @@ const adminNav = [
 ]
 
 const doctorNav = [
+  { to: '/', label: 'Overview', icon: LayoutDashboard },
   { to: '/appointments', label: 'Appointments', icon: CalendarCheck },
   { to: '/patients', label: 'My Patients', icon: Users },
   { to: '/schedule', label: 'Schedule', icon: Stethoscope },
@@ -135,7 +137,7 @@ function SideNav({
 }) {
   return (
     <>
-      <NavLink to={isDoctor ? '/appointments' : '/admin/dashboard'} onClick={onNavigate} className="flex items-center gap-3 px-2">
+      <NavLink to={isDoctor ? '/' : '/admin/dashboard'} onClick={onNavigate} className="flex items-center gap-3 px-2">
         <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-tr from-blue-600 via-blue-500 to-teal-400 text-white shadow-md shadow-blue-500/30">
           {isDoctor ? <Stethoscope className="h-6 w-6" /> : <ShieldCheck className="h-6 w-6" />}
         </div>

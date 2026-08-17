@@ -21,6 +21,7 @@ import { PatientsPage } from './pages/admin/PatientsPage'
 import { CategoriesPage } from './pages/admin/CategoriesPage'
 import { SymptomsPage } from './pages/admin/SymptomsPage'
 import { InsightsPage } from './pages/admin/InsightsPage'
+import { DoctorOverviewPage } from './pages/DoctorOverviewPage'
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 30_000, refetchOnWindowFocus: false } },
@@ -39,7 +40,6 @@ function RequireDoctor({ children }: { children: React.ReactNode }) {
       </div>
     )
   }
-  if (location.pathname === '/') return <Navigate to="/appointments" replace />
   return <>{children}</>
 }
 
@@ -68,6 +68,7 @@ const router = createBrowserRouter([
       </RequireDoctor>
     ),
     children: [
+      { index: true, element: <DoctorOverviewPage /> },
       { path: 'appointments', element: <AppointmentsPage /> },
       { path: 'patients', element: <DoctorPatientsPage /> },
       { path: 'schedule', element: <SchedulePage /> },
