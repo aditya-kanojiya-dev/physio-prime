@@ -11,6 +11,7 @@ import { EarningsPage } from './pages/EarningsPage'
 import { PatientPaymentsPage } from './pages/PatientPaymentsPage'
 import { PayoutsPage } from './pages/PayoutsPage'
 import { LocationsPage } from './pages/LocationsPage'
+import { MessagesPage } from './pages/MessagesPage'
 import { CommunityPage } from './pages/CommunityPage'
 import { CommunityDetailPage } from './pages/CommunityDetailPage'
 import { DashboardPage } from './pages/admin/DashboardPage'
@@ -75,6 +76,7 @@ const router = createBrowserRouter([
       { path: 'payments', element: <PatientPaymentsPage /> },
       { path: 'payouts', element: <PayoutsPage /> },
       { path: 'locations', element: <LocationsPage /> },
+      { path: 'messages', element: <MessagesPage /> },
       { path: 'community', element: <CommunityPage /> },
       { path: 'community/:id', element: <CommunityDetailPage /> },
     ],

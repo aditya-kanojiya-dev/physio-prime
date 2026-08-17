@@ -17,6 +17,7 @@ import {
   Wallet,
   X,
   MapPin,
+  MessageCircle,
 } from 'lucide-react'
 import { useAuth } from '../../lib/auth'
 
@@ -39,6 +40,7 @@ const doctorNav = [
   { to: '/payments', label: 'Payments', icon: CreditCard },
   { to: '/payouts', label: 'Payouts', icon: Wallet },
   { to: '/locations', label: 'Locations', icon: MapPin },
+  { to: '/messages', label: 'Messages', icon: MessageCircle },
   { to: '/community', label: 'Community', icon: Users },
 ]
 
