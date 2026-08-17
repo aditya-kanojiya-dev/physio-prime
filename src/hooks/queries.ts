@@ -68,7 +68,7 @@ export function useCategories() {
     queryKey: ['categories'],
     queryFn: async (): Promise<Category[]> => {
       const cats = await api.get<{ categories: ApiCategory[] }>('/categories');
-      const doctors = await queryClient.ensureQueryData({ queryKey: ['doctors'], queryFn: fetchDoctors });
+      const doctors = await queryClient.ensureQueryData({ queryKey: ['doctors'], queryFn: () => fetchDoctors() });
       return cats.categories.map((c) => toCategory(c, doctors));
     },
     staleTime: STALE,
