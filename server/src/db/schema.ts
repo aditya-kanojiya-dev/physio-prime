@@ -66,6 +66,8 @@ export const doctors = pgTable('doctors', {
   registration: jsonb('registration').notNull().default({}),
   expertise: text('expertise').array().notNull().default([]),
   treatments: text('treatments').array().notNull().default([]),
+  homeVisitsEnabled: boolean('home_visits_enabled').notNull().default(false),
+  maxRadiusKm: numeric('max_radius_km').notNull().default('10'),
 });
 
 export const doctorSchedules = pgTable(
@@ -184,4 +186,110 @@ export const notifications = pgTable('notifications', {
   error: text('error'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   sentAt: timestamp('sent_at', { withTimezone: true }),
+});
+
+export const doctorLocations = pgTable('doctor_locations', {
+  id: serial('id').primaryKey(),
+  doctorId: integer('doctor_id').notNull().references(() => doctors.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  address: text('address'),
+  area: text('area'),
+  city: text('city'),
+  state: text('state'),
+  pincode: text('pincode'),
+  lat: numeric('lat'),
+  lng: numeric('lng'),
+  radiusKm: numeric('radius_km').notNull().default('10'),
+  isPrimary: boolean('is_primary').notNull().default(false),
+  active: boolean('active').notNull().default(true),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const doctorPayouts = pgTable('doctor_payouts', {
+  id: serial('id').primaryKey(),
+  doctorId: integer('doctor_id').notNull().references(() => doctors.id, { onDelete: 'cascade' }),
+  amountPaise: integer('amount_paise').notNull(),
+  status: text('status').notNull().default('pending'),
+  paymentMethod: text('payment_method'),
+  transactionId: text('transaction_id'),
+  notes: text('notes'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  processedAt: timestamp('processed_at', { withTimezone: true }),
+});
+
+export const communityCategories = pgTable('community_categories', {
+  id: serial('id').primaryKey(),
+  name: text('name').notNull(),
+  slug: text('slug').notNull().unique(),
+  description: text('description'),
+  icon: text('icon'),
+  color: text('color'),
+  sortOrder: integer('sort_order').notNull().default(0),
+  active: boolean('active').notNull().default(true),
+});
+
+export const communityPosts = pgTable('community_posts', {
+  id: serial('id').primaryKey(),
+  doctorId: integer('doctor_id').notNull().references(() => doctors.id, { onDelete: 'cascade' }),
+  categoryId: integer('category_id').references(() => communityCategories.id),
+  title: text('title').notNull(),
+  body: text('body').notNull(),
+  tags: text('tags').array().notNull().default([]),
+  replyCount: integer('reply_count').notNull().default(0),
+  voteCount: integer('vote_count').notNull().default(0),
+  viewCount: integer('view_count').notNull().default(0),
+  pinned: boolean('pinned').notNull().default(false),
+  closed: boolean('closed').notNull().default(false),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const communityReplies = pgTable('community_replies', {
+  id: serial('id').primaryKey(),
+  postId: integer('post_id').notNull().references(() => communityPosts.id, { onDelete: 'cascade' }),
+  doctorId: integer('doctor_id').notNull().references(() => doctors.id, { onDelete: 'cascade' }),
+  parentId: integer('parent_id'),
+  body: text('body').notNull(),
+  voteCount: integer('vote_count').notNull().default(0),
+  accepted: boolean('accepted').notNull().default(false),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const communityVotes = pgTable('community_votes', {
+  id: serial('id').primaryKey(),
+  doctorId: integer('doctor_id').notNull().references(() => doctors.id, { onDelete: 'cascade' }),
+  postId: integer('post_id').references(() => communityPosts.id, { onDelete: 'cascade' }),
+  replyId: integer('reply_id').references(() => communityReplies.id, { onDelete: 'cascade' }),
+  value: integer('value').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [unique().on(t.doctorId, t.postId), unique().on(t.doctorId, t.replyId)]);
+
+export const conversations = pgTable('conversations', {
+  id: serial('id').primaryKey(),
+  doctor1Id: integer('doctor1_id').notNull().references(() => doctors.id, { onDelete: 'cascade' }),
+  doctor2Id: integer('doctor2_id').notNull().references(() => doctors.id, { onDelete: 'cascade' }),
+  lastMessageAt: timestamp('last_message_at', { withTimezone: true }).notNull().defaultNow(),
+  lastMessage: text('last_message'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [unique().on(t.doctor1Id, t.doctor2Id)]);
+
+export const messages = pgTable('messages', {
+  id: serial('id').primaryKey(),
+  conversationId: integer('conversation_id').notNull().references(() => conversations.id, { onDelete: 'cascade' }),
+  senderId: integer('sender_id').notNull().references(() => doctors.id, { onDelete: 'cascade' }),
+  body: text('body').notNull(),
+  read: boolean('read').notNull().default(false),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const doctorNotifications = pgTable('doctor_notifications', {
+  id: serial('id').primaryKey(),
+  doctorId: integer('doctor_id').notNull().references(() => doctors.id, { onDelete: 'cascade' }),
+  type: text('type').notNull(),
+  title: text('title').notNull(),
+  body: text('body'),
+  link: text('link'),
+  read: boolean('read').notNull().default(false),
+  metadata: jsonb('metadata').notNull().default({}),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });

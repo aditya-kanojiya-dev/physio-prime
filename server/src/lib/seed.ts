@@ -2,7 +2,7 @@ import bcrypt from 'bcryptjs';
 import { sql } from 'drizzle-orm';
 import { db, pool } from '../db/pool';
 import { runMigrations } from '../db/migrate';
-import { appointments, categories, doctorApplications, doctors, doctorSchedules, patientProfiles, prescriptions, reviews, symptoms, users } from '../db/schema';
+import { appointments, categories, communityCategories, doctorApplications, doctors, doctorSchedules, patientProfiles, prescriptions, reviews, symptoms, users } from '../db/schema';
 import { CATEGORIES_DATA } from './seed-data/categories';
 import { SYMPTOMS_DATA } from './seed-data/symptoms';
 import { DOCTORS_DATA } from './seed-data/doctors';
@@ -11,7 +11,7 @@ import { DOCTORS_DATA } from './seed-data/doctors';
 // this list once real registrations land in later phases.
 export async function seed(): Promise<void> {
   await db.execute(
-    sql`TRUNCATE users, doctors, doctor_applications, categories, symptoms, patient_profiles, appointments, reviews, prescriptions RESTART IDENTITY CASCADE`,
+    sql`TRUNCATE users, doctors, doctor_applications, categories, symptoms, patient_profiles, appointments, reviews, prescriptions, community_categories RESTART IDENTITY CASCADE`,
   );
 
   const passwordHash = bcrypt.hashSync('physio123', 10);
@@ -95,6 +95,20 @@ export async function seed(): Promise<void> {
 
   await db.insert(categories).values(CATEGORIES_DATA);
   await db.insert(symptoms).values(SYMPTOMS_DATA);
+
+  await db.insert(communityCategories).values([
+    { name: 'General Medicine', slug: 'general-medicine', description: 'General medical discussions', sortOrder: 0 },
+    { name: 'Physiotherapy', slug: 'physiotherapy', description: 'Physiotherapy techniques and cases', sortOrder: 1 },
+    { name: 'Orthopedics', slug: 'orthopedics', description: 'Bone and joint related discussions', sortOrder: 2 },
+    { name: 'Pediatrics', slug: 'pediatrics', description: 'Pediatric physiotherapy', sortOrder: 3 },
+    { name: 'Dermatology', slug: 'dermatology', description: 'Skin-related physiotherapy topics', sortOrder: 4 },
+    { name: 'Mental Health', slug: 'mental-health', description: 'Mental health and physiotherapy', sortOrder: 5 },
+    { name: 'Nutrition', slug: 'nutrition', description: 'Nutrition for recovery and wellness', sortOrder: 6 },
+    { name: 'Clinical Discussions', slug: 'clinical-discussions', description: 'Clinical case discussions', sortOrder: 7 },
+    { name: 'Practice Management', slug: 'practice-management', description: 'Running and growing a practice', sortOrder: 8 },
+    { name: 'Technology', slug: 'technology', description: 'Health tech and tools', sortOrder: 9 },
+    { name: 'General Discussion', slug: 'general-discussion', description: 'Off-topic and casual chat', sortOrder: 10 },
+  ]);
 }
 
 interface DemoPatient {
