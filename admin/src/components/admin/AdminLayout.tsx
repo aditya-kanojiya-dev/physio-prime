@@ -16,6 +16,7 @@ import {
   DollarSign,
   Wallet,
   X,
+  MapPin,
 } from 'lucide-react'
 import { useAuth } from '../../lib/auth'
 
@@ -37,6 +38,7 @@ const doctorNav = [
   { to: '/earnings', label: 'Earnings', icon: DollarSign },
   { to: '/payments', label: 'Payments', icon: CreditCard },
   { to: '/payouts', label: 'Payouts', icon: Wallet },
+  { to: '/locations', label: 'Locations', icon: MapPin },
 ]
 
 export function AdminLayout({ children, portal = 'admin' }: { children: React.ReactNode; portal?: 'admin' | 'doctor' }) {
