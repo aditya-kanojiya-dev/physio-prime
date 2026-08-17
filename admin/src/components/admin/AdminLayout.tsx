@@ -12,6 +12,7 @@ import {
   UserRound,
   Users,
   Layers,
+  DollarSign,
   X,
 } from 'lucide-react'
 import { useAuth } from '../../lib/auth'
@@ -31,6 +32,7 @@ const doctorNav = [
   { to: '/patients', label: 'My Patients', icon: Users },
   { to: '/schedule', label: 'Schedule', icon: Stethoscope },
   { to: '/profile', label: 'Profile', icon: UserRound },
+  { to: '/earnings', label: 'Earnings', icon: DollarSign },
 ]
 
 export function AdminLayout({ children, portal = 'admin' }: { children: React.ReactNode; portal?: 'admin' | 'doctor' }) {
