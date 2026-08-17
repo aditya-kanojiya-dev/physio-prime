@@ -19,6 +19,9 @@ import { adminRouter } from './routes/admin';
 import { communityRouter } from './routes/community';
 import { doctorMessagesRouter } from './routes/messages';
 import { doctorNotificationsRouter } from './routes/doctor-notifications';
+import { blogRouter } from './routes/blog';
+import { doctorBlogRouter } from './routes/doctor-blog';
+import { publicBlogRouter } from './routes/public-blog';
 
 export function createApp() {
   const app = express();
@@ -45,6 +48,9 @@ export function createApp() {
   app.use('/api/v1/community', communityRouter);
   app.use('/api/v1/doctor', doctorMessagesRouter);
   app.use('/api/v1/doctor', doctorNotificationsRouter);
+  app.use('/api/v1/admin/blog', blogRouter);
+  app.use('/api/v1/doctor/blog', doctorBlogRouter);
+  app.use('/api/v1/blog', publicBlogRouter);
   app.use(errorHandler);
   return app;
 }

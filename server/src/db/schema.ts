@@ -10,6 +10,7 @@ import {
   boolean,
   jsonb,
   unique,
+  primaryKey,
 } from 'drizzle-orm/pg-core';
 
 export const users = pgTable('users', {
@@ -292,3 +293,49 @@ export const doctorNotifications = pgTable('doctor_notifications', {
   metadata: jsonb('metadata').notNull().default({}),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
+
+// --- Blog ---
+export const blogCategories = pgTable('blog_categories', {
+  id: serial('id').primaryKey(),
+  name: text('name').notNull(),
+  slug: text('slug').notNull().unique(),
+  description: text('description'),
+  color: text('color'),
+  sortOrder: integer('sort_order').notNull().default(0),
+  active: boolean('active').notNull().default(true),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const blogTags = pgTable('blog_tags', {
+  id: serial('id').primaryKey(),
+  name: text('name').notNull(),
+  slug: text('slug').notNull().unique(),
+  color: text('color'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const blogPosts = pgTable('blog_posts', {
+  id: serial('id').primaryKey(),
+  title: text('title').notNull(),
+  slug: text('slug').notNull().unique(),
+  excerpt: text('excerpt'),
+  content: text('content').notNull(),
+  featuredImage: text('featured_image'),
+  status: text('status').notNull().default('draft'), // 'draft' | 'published'
+  authorType: text('author_type').notNull().default('admin'), // 'admin' | 'doctor'
+  authorId: integer('author_id').notNull(), // references admins.id or doctors.id
+  categoryId: integer('category_id').references(() => blogCategories.id),
+  publishedAt: timestamp('published_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const blogPostTags = pgTable(
+  'blog_post_tags',
+  {
+    postId: integer('post_id').notNull().references(() => blogPosts.id, { onDelete: 'cascade' }),
+    tagId: integer('tag_id').notNull().references(() => blogTags.id, { onDelete: 'cascade' }),
+  },
+  (t) => [primaryKey({ columns: [t.postId, t.tagId] })],
+);
