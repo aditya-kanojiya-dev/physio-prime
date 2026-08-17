@@ -9,6 +9,7 @@ import { SchedulePage } from './pages/SchedulePage'
 import { ProfilePage } from './pages/ProfilePage'
 import { EarningsPage } from './pages/EarningsPage'
 import { PatientPaymentsPage } from './pages/PatientPaymentsPage'
+import { PayoutsPage } from './pages/PayoutsPage'
 import { DashboardPage } from './pages/admin/DashboardPage'
 import { DoctorsPage } from './pages/admin/DoctorsPage'
 import { AppointmentsPage as AdminAppointmentsPage } from './pages/admin/AppointmentsPage'
@@ -69,6 +70,7 @@ const router = createBrowserRouter([
       { path: 'profile', element: <ProfilePage /> },
       { path: 'earnings', element: <EarningsPage /> },
       { path: 'payments', element: <PatientPaymentsPage /> },
+      { path: 'payouts', element: <PayoutsPage /> },
     ],
   },
   {
