@@ -8,6 +8,7 @@ import {
   ApiReview,
   ApiSlot,
   ApiSymptom,
+  ApiTimeWindow,
   mergeDoctorDetail,
   toAppointment,
   toCategory,
@@ -88,9 +89,9 @@ export function useSymptoms() {
 export function useSlots(doctorSlug: string | null, date: string | null) {
   return useQuery({
     queryKey: ['slots', doctorSlug, date],
-    queryFn: async (): Promise<ApiSlot[]> => {
-      const data = await api.get<{ slots: ApiSlot[] }>(`/doctors/${doctorSlug}/slots?date=${date}`);
-      return data.slots;
+    queryFn: async (): Promise<ApiTimeWindow[]> => {
+      const data = await api.get<{ windows: ApiTimeWindow[] }>(`/doctors/${doctorSlug}/slots?date=${date}`);
+      return data.windows;
     },
     enabled: !!doctorSlug && !!date,
     staleTime: 60 * 1000,

@@ -3,7 +3,7 @@ import { and, eq, sql, type SQL } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '../db/pool';
 import { doctors, categories, symptoms, doctorLocations } from '../db/schema';
-import { getAvailableSlots, getDaySlotCount, isPast, isValidDate } from '../lib/slots';
+import { getAvailableWindows, isPast, isValidDate } from '../lib/slots';
 
 export const doctorsRouter = Router();
 
@@ -166,34 +166,28 @@ doctorsRouter.get('/', async (req, res) => {
   });
 
   // Fetch active locations for the returned doctors so the patient app can show area badges.
-  const doctorIds = await db
+  const slugToId = await db
     .select({ id: doctors.id, slug: doctors.slug })
     .from(doctors)
-    .where(sql`${doctors.slug} IN ${sql`VALUES ${sql.join([...seen].map((s) => sql`(${s})`), sql`, `)}`}`);
-  const idToSlug = new Map(doctorIds.map((r) => [r.id, r.slug]));
-  const locRows = doctorIds.length
-    ? await db
-        .select({
-          doctorId: doctorLocations.doctorId,
-          id: doctorLocations.id,
-          name: doctorLocations.name,
-          area: doctorLocations.area,
-          city: doctorLocations.city,
-          active: doctorLocations.active,
-          isPrimary: doctorLocations.isPrimary,
-        })
-        .from(doctorLocations)
-        .where(
-          and(
-            sql`${doctorLocations.doctorId} IN ${sql`VALUES ${sql.join(doctorIds.map((d) => sql`(${d.id})`), sql`, `)}`}`,
-            eq(doctorLocations.active, true),
-          ),
-        )
-    : [];
-  const locsBySlug = new Map<string, typeof locRows>();
-  for (const loc of locRows) {
+    .where(sql`${doctors.slug} IN (SELECT unnest(${sql`ARRAY[${sql.join([...seen].map((s) => sql`${s}`), sql`, `)}]`}))`);
+  const idToSlug = new Map(slugToId.map((r) => [r.id, r.slug]));
+  // ponytail: fetch all active locations then filter in JS — avoids Drizzle VALUES/ARRAY param issues
+  const allLocs = await db
+    .select({
+      doctorId: doctorLocations.doctorId,
+      id: doctorLocations.id,
+      name: doctorLocations.name,
+      area: doctorLocations.area,
+      city: doctorLocations.city,
+      active: doctorLocations.active,
+      isPrimary: doctorLocations.isPrimary,
+    })
+    .from(doctorLocations)
+    .where(eq(doctorLocations.active, true));
+  const locsBySlug = new Map<string, typeof allLocs>();
+  for (const loc of allLocs) {
     const slug = idToSlug.get(loc.doctorId);
-    if (!slug) continue;
+    if (!slug || !seen.has(slug)) continue;
     if (!locsBySlug.has(slug)) locsBySlug.set(slug, []);
     locsBySlug.get(slug)!.push(loc);
   }
@@ -274,11 +268,8 @@ doctorsRouter.get('/:slug/slots', async (req, res, next) => {
       res.status(404).json({ error: { message: 'Doctor not found' } });
       return;
     }
-    const [slots, total] = await Promise.all([
-      getAvailableSlots(doctor.id, parsed.data),
-      getDaySlotCount(doctor.id, parsed.data),
-    ]);
-    res.json({ date: parsed.data, slots, total });
+    const windows = await getAvailableWindows(doctor.id, parsed.data);
+    res.json({ date: parsed.data, windows });
   } catch (err) {
     next(err);
   }

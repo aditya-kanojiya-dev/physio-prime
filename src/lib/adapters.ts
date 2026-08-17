@@ -68,6 +68,37 @@ export interface ApiSlot {
   end: string;
 }
 
+export interface ApiTimeWindow {
+  start: string;
+  end: string;
+  label: string;
+  maxPatients: number;
+  bookedCount: number;
+  available: boolean;
+}
+
+export function windowLabel(w: ApiTimeWindow): string {
+  return `${w.label} • ${formatTime(w.start)} – ${formatTime(w.end)}`;
+}
+
+export function windowCapacityText(w: ApiTimeWindow): string {
+  const remaining = w.maxPatients - w.bookedCount;
+  return `${remaining} of ${w.maxPatients} spots left`;
+}
+
+/** Generate 45-min slot candidates within a window, first free = what gets booked. */
+export function windowFirstSlot(w: ApiTimeWindow): string {
+  const [sh, sm] = w.start.split(':').map(Number);
+  const [eh] = w.end.split(':').map(Number);
+  const startMin = sh * 60 + sm;
+  const endMin = eh * 60;
+  const slotMins = 45;
+  const slotStart = startMin;
+  const slotEnd = Math.min(slotStart + slotMins, endMin);
+  const fmt = (m: number) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+  return `${fmt(slotStart)}-${fmt(slotEnd)}`;
+}
+
 export interface ApiAppointmentDoctor {
   id: string;
   slug: string;
@@ -106,7 +137,7 @@ export interface ApiAppointment {
 
 // ---- formatting helpers ----------------------------------------------------
 
-function formatTime(hhmm: string): string {
+export function formatTime(hhmm: string): string {
   const [h, m] = hhmm.split(':').map(Number);
   const ampm = h >= 12 ? 'PM' : 'AM';
   const hour = h % 12 === 0 ? 12 : h % 12;

@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { db } from '../db/pool';
 import { appointments, doctors, doctorSchedules, patientProfiles, prescriptions, users } from '../db/schema';
 import { requireAuth, requireRole } from '../middleware/auth';
-import { isValidDate } from '../lib/slots';
+import { isValidDate, getNextFreeSlot } from '../lib/slots';
 
 export const doctorRouter = Router();
 
@@ -16,24 +16,6 @@ async function requireDoctor(userId: number) {
 }
 
 const noProfile = { status: 403, message: 'Doctor profile not approved yet' } as const;
-
-// Postgres renders time columns as 'HH:MM:SS'; the admin page and the PUT schema
-// expect 'HH:MM', so strip the seconds on every response.
-function hhmm(t: string | null): string | null {
-  return t ? t.slice(0, 5) : t;
-}
-
-function serializeSchedules(
-  rows: Array<{ startTime: string; endTime: string; breakStart: string | null; breakEnd: string | null }>,
-) {
-  return rows.map((r) => ({
-    ...r,
-    startTime: hhmm(r.startTime) ?? '',
-    endTime: hhmm(r.endTime) ?? '',
-    breakStart: hhmm(r.breakStart),
-    breakEnd: hhmm(r.breakEnd),
-  }));
-}
 
 const doctorColumns = {
   id: doctors.id,
@@ -91,23 +73,22 @@ const profilePatchSchema = z.object({
   experienceYears: z.number().int().nonnegative().optional(),
 });
 
-const scheduleSchema = z.object({
-  schedules: z
-    .array(
-      z
-        .object({
-          dayOfWeek: z.number().int().min(0).max(6),
-          startTime: z.string().regex(/^\d{2}:\d{2}$/, 'startTime must be HH:mm'),
-          endTime: z.string().regex(/^\d{2}:\d{2}$/, 'endTime must be HH:mm'),
-          breakStart: z.string().regex(/^\d{2}:\d{2}$/, 'breakStart must be HH:mm').nullable().optional(),
-          breakEnd: z.string().regex(/^\d{2}:\d{2}$/, 'breakEnd must be HH:mm').nullable().optional(),
-          active: z.boolean().optional(),
-        })
-        .refine((s) => !s.active || s.endTime > s.startTime, 'endTime must be after startTime')
-        .refine((s) => !(s.active && (s.breakStart != null) !== (s.breakEnd != null)), 'break start and end must be set together')
-        .refine((s) => !(s.active && s.breakStart != null && s.breakEnd != null && s.breakEnd > s.endTime), 'break must fit inside working hours'),
-    )
-    .max(7),
+const windowSchema = z.object({
+  dayOfWeek: z.number().int().min(0).max(6),
+  windowStart: z.string(),
+  windowEnd: z.string(),
+  maxPatients: z.number().int().min(1).max(3),
+  active: z.boolean(),
+});
+
+const schedulePutSchema = z.object({
+  windows: z.array(windowSchema),
+});
+
+const rescheduleSchema = z.object({
+  date: z.string(),
+  windowStart: z.string(),
+  windowEnd: z.string(),
 });
 
 doctorRouter.get('/profile', async (req, res, next) => {
@@ -456,8 +437,8 @@ doctorRouter.get('/schedules', async (req, res, next) => {
       .select()
       .from(doctorSchedules)
       .where(eq(doctorSchedules.doctorId, doctor.id))
-      .orderBy(asc(doctorSchedules.dayOfWeek));
-    res.json({ schedules: serializeSchedules(rows) });
+      .orderBy(asc(doctorSchedules.dayOfWeek), asc(doctorSchedules.windowStart));
+    res.json({ schedules: rows });
   } catch (err) {
     next(err);
   }
@@ -465,31 +446,25 @@ doctorRouter.get('/schedules', async (req, res, next) => {
 
 doctorRouter.put('/schedules', async (req, res, next) => {
   try {
-    const body = scheduleSchema.parse(req.body);
+    const { windows } = schedulePutSchema.parse(req.body);
     const doctor = await requireDoctor(req.user!.id);
     if (!doctor) {
       res.status(noProfile.status).json({ error: { message: noProfile.message } });
       return;
     }
-    // a week needs exactly one entry per day; reject duplicates/missing days
-    const days = body.schedules.map((s) => s.dayOfWeek);
-    if (new Set(days).size !== days.length) {
-      res.status(400).json({ error: { message: 'Each day can appear only once' } });
-      return;
-    }
     await db.transaction(async (tx) => {
       await tx.delete(doctorSchedules).where(eq(doctorSchedules.doctorId, doctor.id));
-      if (body.schedules.length > 0) {
+      const activeWindows = windows.filter(w => w.active);
+      if (activeWindows.length > 0) {
         await tx.insert(doctorSchedules).values(
-          body.schedules.map((s) => ({
+          activeWindows.map(w => ({
             doctorId: doctor.id,
-            dayOfWeek: s.dayOfWeek,
-            startTime: s.startTime,
-            endTime: s.endTime,
-            breakStart: s.breakStart ?? null,
-            breakEnd: s.breakEnd ?? null,
-            active: s.active ?? true,
-          })),
+            dayOfWeek: w.dayOfWeek,
+            windowStart: w.windowStart,
+            windowEnd: w.windowEnd,
+            maxPatients: w.maxPatients,
+            active: true,
+          }))
         );
       }
     });
@@ -497,8 +472,49 @@ doctorRouter.put('/schedules', async (req, res, next) => {
       .select()
       .from(doctorSchedules)
       .where(eq(doctorSchedules.doctorId, doctor.id))
-      .orderBy(asc(doctorSchedules.dayOfWeek));
-    res.json({ schedules: serializeSchedules(rows) });
+      .orderBy(asc(doctorSchedules.dayOfWeek), asc(doctorSchedules.windowStart));
+    res.json({ schedules: rows });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// --- PATCH /doctor/appointments/:id/reschedule ---
+
+doctorRouter.patch('/appointments/:id/reschedule', async (req, res, next) => {
+  try {
+    const doctor = await requireDoctor(req.user!.id);
+    if (!doctor) {
+      res.status(noProfile.status).json({ error: { message: noProfile.message } });
+      return;
+    }
+    const { date, windowStart, windowEnd } = rescheduleSchema.parse(req.body);
+
+    const [row] = await db
+      .select({ id: appointments.id, doctorId: appointments.doctorId, status: appointments.status })
+      .from(appointments)
+      .where(eq(appointments.bookingId, req.params.id));
+    if (!row || row.doctorId !== doctor.id) {
+      res.status(404).json({ error: { message: 'Appointment not found' } });
+      return;
+    }
+    if (row.status !== 'upcoming') {
+      res.status(400).json({ error: { message: 'Only upcoming appointments can be rescheduled' } });
+      return;
+    }
+
+    const newSlot = await getNextFreeSlot(doctor.id, date, windowStart, windowEnd);
+    if (!newSlot) {
+      res.status(400).json({ error: { message: 'No available slots in this window' } });
+      return;
+    }
+
+    await db
+      .update(appointments)
+      .set({ date, timeSlot: newSlot })
+      .where(eq(appointments.id, row.id));
+
+    res.json({ success: true, newDate: date, newTimeSlot: newSlot });
   } catch (err) {
     next(err);
   }

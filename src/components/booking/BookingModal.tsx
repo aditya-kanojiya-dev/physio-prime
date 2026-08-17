@@ -5,7 +5,7 @@ import { useBooking } from '../../context/BookingContext';
 import { useAuth } from '../../context/AuthContext';
 import { useDoctors, useCategories, useSlots } from '../../hooks/queries';
 import { api, ApiError } from '../../lib/api';
-import { slotLabel } from '../../lib/adapters';
+import { windowCapacityText, windowFirstSlot } from '../../lib/adapters';
 import { Doctor, ConsultationMode, Appointment } from '../../types';
 import { X, CheckCircle2, Home, Video, ArrowRight, Sparkles, Loader2, ShieldCheck } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -577,31 +577,42 @@ export const BookingModal: React.FC = () => {
 
                 {/* Time Slots from API */}
                 <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-700">Select Time Slot</label>
+                  <label className="text-xs font-bold text-slate-700">Select Time Window</label>
                   {slotsLoading ? (
                     <p className="text-xs text-slate-500 bg-slate-50 border border-slate-200 rounded-xl p-3 flex items-center gap-2">
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading available slots...
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading available windows...
                     </p>
                   ) : slotsError ? (
                     <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-xl p-3">
                       Could not load slots. Please try again.
                     </p>
                   ) : slots && slots.length > 0 ? (
-                    <div className="grid grid-cols-4 gap-2">
-                      {slots.map(s => {
-                        const value = `${s.start}-${s.end}`;
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {slots.map(w => {
+                        const remaining = w.maxPatients - w.bookedCount;
+                        const isFull = remaining <= 0 || !w.available;
+                        const value = windowFirstSlot(w);
                         return (
                           <button
                             type="button"
-                            key={value}
-                            onClick={() => setSelectedTime(value)}
-                            className={`p-2.5 rounded-2xl text-xs font-bold border transition-all ${
-                              selectedTime === value
-                                ? 'bg-teal-600 text-white border-teal-600 shadow-md shadow-teal-500/20'
-                                : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100 hover:border-teal-300'
+                            key={`${w.start}-${w.end}`}
+                            onClick={() => !isFull && setSelectedTime(value)}
+                            disabled={isFull}
+                            className={`p-4 rounded-2xl text-left border transition-all ${
+                              isFull
+                                ? 'bg-slate-50 border-slate-200 opacity-50 cursor-not-allowed'
+                                : selectedTime === value
+                                  ? 'bg-teal-600 text-white border-teal-600 shadow-md shadow-teal-500/20'
+                                  : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100 hover:border-teal-300'
                             }`}
                           >
-                            {slotLabel(s)}
+                            <div className="flex items-center justify-between mb-1">
+                              <span className={`text-sm font-extrabold ${selectedTime === value ? 'text-white' : 'text-slate-900'}`}>{w.label}</span>
+                              {isFull && <span className="text-[10px] font-bold text-red-500 bg-red-50 px-2 py-0.5 rounded-full">FULL</span>}
+                            </div>
+                            <p className={`text-xs font-semibold ${selectedTime === value ? 'text-teal-100' : 'text-slate-500'}`}>
+                              {windowCapacityText(w)}
+                            </p>
                           </button>
                         );
                       })}

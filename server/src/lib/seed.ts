@@ -72,15 +72,13 @@ export async function seed(): Promise<void> {
 
   await db.insert(doctorSchedules).values(
     insertedDoctors.flatMap((d) =>
-      Array.from({ length: 6 }, (_, i) => i + 1).map((dayOfWeek) => ({
-        doctorId: d.id,
-        dayOfWeek,
-        startTime: '07:00',
-        endTime: '21:00',
-        breakStart: '13:00',
-        breakEnd: '14:00',
-        active: true,
-      })),
+      Array.from({ length: 6 }, (_, i) => i + 1).flatMap((dayOfWeek) => [
+        { doctorId: d.id, dayOfWeek, windowStart: '07:00', windowEnd: '09:00', maxPatients: 2, active: true },
+        { doctorId: d.id, dayOfWeek, windowStart: '09:00', windowEnd: '12:00', maxPatients: 3, active: true },
+        { doctorId: d.id, dayOfWeek, windowStart: '12:00', windowEnd: '15:00', maxPatients: 2, active: true },
+        { doctorId: d.id, dayOfWeek, windowStart: '15:00', windowEnd: '18:00', maxPatients: 3, active: true },
+        { doctorId: d.id, dayOfWeek, windowStart: '18:00', windowEnd: '21:00', maxPatients: 1, active: true },
+      ]),
     ),
   );
 

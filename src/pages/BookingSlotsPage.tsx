@@ -4,11 +4,11 @@ import { useQueries } from '@tanstack/react-query';
 import { useDoctors } from '../hooks/queries';
 import { useBooking } from '../context/BookingContext';
 import { api } from '../lib/api';
-import { ApiSlot, slotLabel } from '../lib/adapters';
+import { ApiTimeWindow, formatTime } from '../lib/adapters';
 import { Doctor } from '../types';
 import { 
   Calendar, Clock, MapPin, 
-  CheckCircle, XCircle, ChevronRight,
+  XCircle, ChevronRight,
   Sparkles, ArrowRight, Filter, Search, Star, Loader2
 } from 'lucide-react';
 
@@ -76,8 +76,8 @@ export const BookingSlotsPage: React.FC = () => {
   const slotQueries = useQueries({
     queries: filteredDoctors.map((doctor) => ({
       queryKey: ['slots', doctor.id, selectedDate],
-      queryFn: async (): Promise<{ slots: ApiSlot[]; total: number }> => {
-        const data = await api.get<{ slots: ApiSlot[]; total: number }>(`/doctors/${doctor.id}/slots?date=${selectedDate}`);
+      queryFn: async (): Promise<{ windows: ApiTimeWindow[]; date: string }> => {
+        const data = await api.get<{ windows: ApiTimeWindow[]; date: string }>(`/doctors/${doctor.id}/slots?date=${selectedDate}`);
         return data;
       },
       enabled: !!selectedDate,
@@ -213,12 +213,11 @@ export const BookingSlotsPage: React.FC = () => {
         ) : (
           <div className="space-y-6">
             {filteredDoctors.map((doctor, index) => {
-              const slotData = slotQueries[index]?.data?.slots ?? [];
-              const slotTotal = slotQueries[index]?.data?.total ?? 0;
+              const windows = slotQueries[index]?.data?.windows ?? [];
               const slotsLoading = selectedDate ? slotQueries[index]?.isFetching : false;
-              const availabilityPercentage = slotTotal > 0 ? Math.round((slotData.length / slotTotal) * 100) : 0;
-              const busyCount = Math.max(slotTotal - slotData.length, 0);
-              const isLimited = !slotsLoading && slotData.length > 0 && slotData.length <= 3;
+              const totalCapacity = windows.reduce((acc, w) => acc + w.maxPatients, 0);
+              const totalBooked = windows.reduce((acc, w) => acc + w.bookedCount, 0);
+              const totalAvailable = totalCapacity - totalBooked;
 
               return (
                 <motion.div
@@ -260,12 +259,12 @@ export const BookingSlotsPage: React.FC = () => {
                       {selectedDate && !slotsLoading && (
                         <div className="sm:ml-auto flex items-center gap-4">
                           <div className="text-center">
-                            <div className="text-2xl font-extrabold text-green-600">{slotData.length}</div>
-                            <div className="text-[10px] text-slate-400 font-semibold">Available</div>
+                            <div className="text-2xl font-extrabold text-green-600">{totalAvailable}</div>
+                            <div className="text-[10px] text-slate-400 font-semibold">Spots Left</div>
                           </div>
                           <div className="text-center">
-                            <div className="text-2xl font-extrabold text-red-500">{busyCount}</div>
-                            <div className="text-[10px] text-slate-400 font-semibold">Busy</div>
+                            <div className="text-2xl font-extrabold text-red-500">{totalBooked}</div>
+                            <div className="text-[10px] text-slate-400 font-semibold">Booked</div>
                           </div>
                           <div className="w-16 h-16 relative">
                             <svg className="w-16 h-16 -rotate-90">
@@ -277,12 +276,12 @@ export const BookingSlotsPage: React.FC = () => {
                                 stroke="#10b981"
                                 strokeWidth="6"
                                 fill="none"
-                                strokeDasharray={`${availabilityPercentage * 1.76} 176`}
+                                strokeDasharray={`${totalCapacity > 0 ? (totalAvailable / totalCapacity) * 176 : 0} 176`}
                                 className="transition-all duration-1000"
                               />
                             </svg>
                             <div className="absolute inset-0 flex items-center justify-center">
-                              <span className="text-xs font-extrabold text-slate-700">{availabilityPercentage}%</span>
+                              <span className="text-xs font-extrabold text-slate-700">{totalCapacity > 0 ? Math.round((totalAvailable / totalCapacity) * 100) : 0}%</span>
                             </div>
                           </div>
                         </div>
@@ -305,25 +304,36 @@ export const BookingSlotsPage: React.FC = () => {
                           <div className="flex items-center gap-2 text-xs text-slate-500 py-3">
                             <Loader2 className="w-3.5 h-3.5 animate-spin" /> Checking availability...
                           </div>
-                        ) : slotData.length > 0 ? (
-                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
-                            {slotData.map((slot) => {
-                              const value = `${slot.start}-${slot.end}`;
+                        ) : windows.length > 0 ? (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                            {windows.map((w) => {
+                              const remaining = w.maxPatients - w.bookedCount;
+                              const isFull = remaining <= 0 || !w.available;
                               return (
                                 <motion.button
-                                  key={value}
-                                  whileHover={{ scale: 1.05 }}
-                                  whileTap={{ scale: 0.95 }}
-                                  onClick={() => handleBookSlot(doctor, selectedDate, value, selectedMode !== 'all' ? selectedMode : 'home')}
-                                  className={`relative p-3 rounded-xl text-center transition-all bg-green-50 border border-green-200 hover:bg-green-100 hover:border-green-300 cursor-pointer ${
-                                    isLimited ? 'ring-2 ring-yellow-400 ring-offset-2' : ''
+                                  key={`${w.start}-${w.end}`}
+                                  whileHover={isFull ? undefined : { scale: 1.03 }}
+                                  whileTap={isFull ? undefined : { scale: 0.97 }}
+                                  onClick={() => !isFull && handleBookSlot(doctor, selectedDate, `${w.start}-${w.end}`, selectedMode !== 'all' ? selectedMode : 'home')}
+                                  disabled={isFull}
+                                  className={`relative p-4 rounded-2xl text-left transition-all border ${
+                                    isFull
+                                      ? 'bg-slate-50 border-slate-200 opacity-50 cursor-not-allowed'
+                                      : 'bg-green-50 border-green-200 hover:bg-green-100 hover:border-green-300 cursor-pointer'
                                   }`}
                                 >
-                                  <span className="text-xs font-bold text-green-700">{slotLabel(slot)}</span>
-                                  <div className="mt-1 flex items-center justify-center gap-1">
-                                    <span className="text-[8px] text-green-600 font-semibold">FREE</span>
-                                    <CheckCircle className="w-3 h-3 text-green-500" />
+                                  <div className="flex items-center justify-between mb-1">
+                                    <span className="text-sm font-extrabold text-slate-900">{w.label}</span>
+                                    {isFull ? (
+                                      <span className="text-[10px] font-bold text-red-500 bg-red-50 px-2 py-0.5 rounded-full">FULL</span>
+                                    ) : remaining <= 1 ? (
+                                      <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">LAST SPOT</span>
+                                    ) : null}
                                   </div>
+                                  <p className="text-xs text-slate-500 font-semibold">{formatTime(w.start)} – {formatTime(w.end)}</p>
+                                  <p className={`text-xs font-bold mt-1 ${isFull ? 'text-slate-400' : 'text-green-700'}`}>
+                                    {isFull ? 'Fully booked' : `${remaining} of ${w.maxPatients} spots left`}
+                                  </p>
                                 </motion.button>
                               );
                             })}

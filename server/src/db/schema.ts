@@ -76,13 +76,12 @@ export const doctorSchedules = pgTable(
     id: serial('id').primaryKey(),
     doctorId: integer('doctor_id').notNull().references(() => doctors.id, { onDelete: 'cascade' }),
     dayOfWeek: integer('day_of_week').notNull(),
-    startTime: time('start_time').notNull(),
-    endTime: time('end_time').notNull(),
-    breakStart: time('break_start'),
-    breakEnd: time('break_end'),
+    windowStart: time('window_start').notNull(),
+    windowEnd: time('window_end').notNull(),
+    maxPatients: integer('max_patients').notNull().default(3),
     active: boolean('active').notNull().default(true),
   },
-  (t) => [unique().on(t.doctorId, t.dayOfWeek)],
+  (t) => [unique().on(t.doctorId, t.dayOfWeek, t.windowStart)],
 );
 
 export const appointments = pgTable('appointments', {

@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { Doctor, ConsultationMode } from '../../types';
 import { useBooking } from '../../context/BookingContext';
 import { useSlots } from '../../hooks/queries';
-import { slotLabel } from '../../lib/adapters';
+import { windowFirstSlot, formatTime } from '../../lib/adapters';
 import { Home, Video, Calendar, Clock, Sparkles, Shield, Loader2 } from 'lucide-react';
 
 interface StickyBookingPanelProps {
@@ -102,34 +102,51 @@ export const StickyBookingPanel: React.FC<StickyBookingPanelProps> = ({ doctor }
       <div className="space-y-3">
         <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
           <Clock className="w-4 h-4 text-teal-600" />
-          <span>Select Available Slot</span>
+          <span>Select Available Window</span>
         </label>
 
         <div className="space-y-2">
-          <p className="text-[11px] font-bold text-slate-400 uppercase">Available Slots</p>
+          <p className="text-[11px] font-bold text-slate-400 uppercase">Available Windows</p>
           {isLoading ? (
             <p className="flex items-center gap-2 text-xs text-slate-500 bg-slate-50 border border-slate-200 rounded-xl p-3">
-              <Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading slots...
+              <Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading windows...
             </p>
           ) : error ? (
             <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-xl p-3">
-              Could not load slots.
+              Could not load windows.
             </p>
           ) : slots && slots.length > 0 ? (
-            <div className="grid grid-cols-3 gap-2">
-              {slots.map(s => {
-                const value = `${s.start}-${s.end}`;
+            <div className="space-y-2">
+              {slots.map(w => {
+                const remaining = w.maxPatients - w.bookedCount;
+                const isFull = remaining <= 0 || !w.available;
+                const value = windowFirstSlot(w);
                 return (
                   <button
-                    key={value}
-                    onClick={() => setSelectedSlot(value)}
-                    className={`py-2 rounded-xl text-xs font-bold border transition-all ${
-                      selectedSlot === value
-                        ? 'bg-teal-600 text-white border-teal-600 shadow-md shadow-teal-500/20'
-                        : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100 hover:border-teal-300'
+                    key={`${w.start}-${w.end}`}
+                    onClick={() => !isFull && setSelectedSlot(value)}
+                    disabled={isFull}
+                    className={`w-full p-3 rounded-xl text-left border transition-all ${
+                      isFull
+                        ? 'bg-slate-50 border-slate-200 opacity-50 cursor-not-allowed'
+                        : selectedSlot === value
+                          ? 'bg-teal-600 text-white border-teal-600 shadow-md shadow-teal-500/20'
+                          : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100 hover:border-teal-300'
                     }`}
                   >
-                    {slotLabel(s)}
+                    <div className="flex items-center justify-between">
+                      <span className={`text-xs font-extrabold ${selectedSlot === value ? 'text-white' : 'text-slate-900'}`}>{w.label}</span>
+                      {isFull ? (
+                        <span className="text-[10px] font-bold text-red-500 bg-red-50 px-2 py-0.5 rounded-full">FULL</span>
+                      ) : (
+                        <span className={`text-[10px] font-bold ${selectedSlot === value ? 'text-teal-100' : 'text-green-600'}`}>
+                          {remaining} of {w.maxPatients}
+                        </span>
+                      )}
+                    </div>
+                    <p className={`text-[11px] font-semibold mt-0.5 ${selectedSlot === value ? 'text-teal-100' : 'text-slate-400'}`}>
+                      {formatTime(w.start)} – {formatTime(w.end)}
+                    </p>
                   </button>
                 );
               })}
