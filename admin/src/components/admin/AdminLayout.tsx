@@ -20,6 +20,7 @@ import {
   MessageCircle,
 } from 'lucide-react'
 import { useAuth } from '../../lib/auth'
+import { NotificationsPanel } from '../NotificationsPanel'
 
 const adminNav = [
   { to: '/admin/dashboard', label: 'Dashboard', icon: Activity },
@@ -91,9 +92,12 @@ export function AdminLayout({ children, portal = 'admin' }: { children: React.Re
             </div>
             <span className="text-base font-extrabold tracking-tight text-slate-900">PhysioPrime</span>
           </div>
-          <div className="min-w-0 text-right">
-            <div className="truncate text-xs font-bold text-slate-900">{user?.name || user?.email}</div>
-            <div className="text-[10px] text-slate-500">{user?.role}</div>
+          <div className="flex items-center gap-2">
+            <NotificationsPanel />
+            <div className="min-w-0 text-right">
+              <div className="truncate text-xs font-bold text-slate-900">{user?.name || user?.email}</div>
+              <div className="text-[10px] text-slate-500">{user?.role}</div>
+            </div>
           </div>
         </header>
 
@@ -103,9 +107,12 @@ export function AdminLayout({ children, portal = 'admin' }: { children: React.Re
               <UserRound className="h-4 w-4" />
               {user?.role}
             </div>
-            <div className="text-right">
-              <div className="text-sm font-bold text-slate-900">{user?.name || user?.email}</div>
-              <div className="text-xs text-slate-500">{user?.email}</div>
+            <div className="flex items-center gap-3">
+              <NotificationsPanel />
+              <div className="text-right">
+                <div className="text-sm font-bold text-slate-900">{user?.name || user?.email}</div>
+                <div className="text-xs text-slate-500">{user?.email}</div>
+              </div>
             </div>
           </header>
           {children}
