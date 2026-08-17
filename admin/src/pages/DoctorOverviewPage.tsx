@@ -25,7 +25,7 @@ export function DoctorOverviewPage() {
 
   const { data: appointments } = useQuery<{ appointments: any[] }>({
     queryKey: ['doctor/appointments', 'today'],
-    queryFn: () => api.get('/doctor/appointments?date=today'),
+    queryFn: () => api.get(`/doctor/appointments?date=${new Date().toISOString().slice(0, 10)}`),
   })
 
   const { data: earnings } = useQuery<{ summary: Record<string, any> }>({
@@ -33,7 +33,7 @@ export function DoctorOverviewPage() {
     queryFn: () => api.get('/doctor/earnings/summary?period=month'),
   })
 
-  const { data: chart } = useQuery<{ chart: { date: string; earnings: number }[] }>({
+  const { data: chart } = useQuery<{ dataPoints: { date: string; earningsPaise: number }[] }>({
     queryKey: ['doctor/earnings/chart', 'week'],
     queryFn: () => api.get('/doctor/earnings/chart?period=week'),
   })
@@ -45,7 +45,7 @@ export function DoctorOverviewPage() {
 
   const { data: convData } = useQuery({
     queryKey: ['conversations'],
-    queryFn: () => api.get('/doctor/conversations'),
+    queryFn: () => api.get('/doctor/messages/conversations'),
     select: (data: any) => ({ ...data, conversations: data.conversations?.slice(0, 3) }),
   })
 
@@ -56,7 +56,7 @@ export function DoctorOverviewPage() {
   })
 
   const todayAppts: any[] = appointments?.appointments ?? []
-  const chartData: any[] = chart?.chart ?? []
+  const chartData: any[] = chart?.dataPoints ?? []
   const posts: any[] = community?.posts ?? []
   const conversations: any[] = convData?.conversations ?? []
   const activeLocations: any[] = locations?.locations ?? []
@@ -128,7 +128,7 @@ export function DoctorOverviewPage() {
                       <stop offset="95%" stopColor="#0d9488" stopOpacity={0} />
                     </linearGradient>
                   </defs>
-                  <Area type="monotone" dataKey="earnings" stroke="#0d9488" fill="url(#earnGrad)" strokeWidth={2} />
+                  <Area type="monotone" dataKey="earningsPaise" stroke="#0d9488" fill="url(#earnGrad)" strokeWidth={2} />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
