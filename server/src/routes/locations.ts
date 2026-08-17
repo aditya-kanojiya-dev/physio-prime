@@ -78,6 +78,28 @@ doctorLocationsRouter.post('/locations', async (req, res, next) => {
   }
 });
 
+// --- PATCH /locations/settings ---
+doctorLocationsRouter.patch('/locations/settings', async (req, res, next) => {
+  try {
+    const doctor = await requireDoctor(req.user!.id);
+    if (!doctor) {
+      res.status(403).json({ error: { message: 'Doctor profile not found' } });
+      return;
+    }
+
+    const body = settingsSchema.parse(req.body);
+    const [updated] = await db
+      .update(doctors)
+      .set(body)
+      .where(eq(doctors.id, doctor.id))
+      .returning();
+
+    res.json({ homeVisitsEnabled: updated.homeVisitsEnabled, maxRadiusKm: updated.maxRadiusKm });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // --- PATCH /locations/:id ---
 doctorLocationsRouter.patch('/locations/:id', async (req, res, next) => {
   try {
@@ -173,28 +195,6 @@ doctorLocationsRouter.patch('/locations/:id/primary', async (req, res, next) => 
       .returning();
 
     res.json(updated);
-  } catch (err) {
-    next(err);
-  }
-});
-
-// --- PATCH /locations/settings ---
-doctorLocationsRouter.patch('/locations/settings', async (req, res, next) => {
-  try {
-    const doctor = await requireDoctor(req.user!.id);
-    if (!doctor) {
-      res.status(403).json({ error: { message: 'Doctor profile not found' } });
-      return;
-    }
-
-    const body = settingsSchema.parse(req.body);
-    const [updated] = await db
-      .update(doctors)
-      .set(body)
-      .where(eq(doctors.id, doctor.id))
-      .returning();
-
-    res.json({ homeVisitsEnabled: updated.homeVisitsEnabled, maxRadiusKm: updated.maxRadiusKm });
   } catch (err) {
     next(err);
   }

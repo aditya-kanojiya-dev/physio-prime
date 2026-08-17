@@ -37,7 +37,7 @@ export function createApp() {
   app.use('/api/v1/doctor', doctorRouter);
   app.use('/api/v1/doctor', doctorEarningsRouter);
   app.use('/api/v1/doctor', doctorPayoutsRouter);
-app.use('/api/v1/doctor', doctorLocationsRouter);
+  app.use('/api/v1/doctor', doctorLocationsRouter);
   app.use('/api/v1/admin', adminRouter);
   app.use(errorHandler);
   return app;
