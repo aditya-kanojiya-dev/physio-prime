@@ -2,7 +2,7 @@ import bcrypt from 'bcryptjs';
 import { sql } from 'drizzle-orm';
 import { db, pool } from '../db/pool';
 import { runMigrations } from '../db/migrate';
-import { appointments, categories, communityCategories, doctorApplications, doctors, doctorSchedules, patientProfiles, prescriptions, reviews, symptoms, users } from '../db/schema';
+import { appointments, categories, communityCategories, communityPosts, communityReplies, communityVotes, conversations, doctorApplications, doctorLocations, doctorNotifications, doctorPayouts, doctors, doctorSchedules, messages, patientProfiles, prescriptions, reviews, symptoms, users } from '../db/schema';
 import { CATEGORIES_DATA } from './seed-data/categories';
 import { SYMPTOMS_DATA } from './seed-data/symptoms';
 import { DOCTORS_DATA } from './seed-data/doctors';
@@ -11,7 +11,7 @@ import { DOCTORS_DATA } from './seed-data/doctors';
 // this list once real registrations land in later phases.
 export async function seed(): Promise<void> {
   await db.execute(
-    sql`TRUNCATE users, doctors, doctor_applications, categories, symptoms, patient_profiles, appointments, reviews, prescriptions, community_categories RESTART IDENTITY CASCADE`,
+    sql`TRUNCATE users, doctors, doctor_applications, categories, symptoms, patient_profiles, appointments, reviews, prescriptions, community_categories, doctor_locations, doctor_payouts, community_posts, community_replies, community_votes, conversations, messages, doctor_notifications RESTART IDENTITY CASCADE`,
   );
 
   const passwordHash = bcrypt.hashSync('physio123', 10);
@@ -108,6 +108,184 @@ export async function seed(): Promise<void> {
     { name: 'Practice Management', slug: 'practice-management', description: 'Running and growing a practice', sortOrder: 8 },
     { name: 'Technology', slug: 'technology', description: 'Health tech and tools', sortOrder: 9 },
     { name: 'General Discussion', slug: 'general-discussion', description: 'Off-topic and casual chat', sortOrder: 10 },
+  ]);
+
+  // Seed doctor locations for each doctor
+  const nagpurAreas = ['Dharampeth', 'Wardha Road', 'Civil Lines', 'Sadar', 'Itwari', 'Dhantoli'];
+  await db.insert(doctorLocations).values(
+    insertedDoctors.flatMap((d, i) => [
+      {
+        doctorId: d.id,
+        name: `${d.id <= 3 ? 'Clinic' : 'Home Office'} - Main`,
+        address: `${100 + i * 10}, Main Road`,
+        area: nagpurAreas[i % nagpurAreas.length],
+        city: 'Nagpur',
+        state: 'Maharashtra',
+        pincode: '440001',
+        lat: String(21.14 + (i * 0.01)),
+        lng: String(79.08 + (i * 0.01)),
+        radiusKm: '10',
+        isPrimary: true,
+        active: true,
+      },
+      ...(i < 3 ? [{
+        doctorId: d.id,
+        name: `Satellite Office`,
+        address: `${200 + i * 10}, Ring Road`,
+        area: nagpurAreas[(i + 2) % nagpurAreas.length],
+        city: 'Nagpur',
+        state: 'Maharashtra',
+        pincode: '440002',
+        lat: String(21.12 + (i * 0.01)),
+        lng: String(79.10 + (i * 0.01)),
+        radiusKm: '5',
+        isPrimary: false,
+        active: true,
+      }] : []),
+    ]),
+  );
+
+  // Seed doctor payouts (some completed, some pending)
+  await db.insert(doctorPayouts).values(
+    insertedDoctors.slice(0, 4).flatMap((d) => [
+      {
+        doctorId: d.id,
+        amountPaise: 1500000, // ₹15,000
+        status: 'completed',
+        paymentMethod: 'bank_transfer',
+        transactionId: `TXN${d.id}001`,
+        notes: 'Monthly payout',
+        processedAt: new Date(),
+      },
+      {
+        doctorId: d.id,
+        amountPaise: 800000, // ₹8,000
+        status: 'pending',
+        paymentMethod: 'upi',
+        transactionId: null,
+        notes: 'Pending processing',
+        processedAt: null,
+      },
+    ]),
+  );
+
+  // Seed community posts
+  const insertedPosts = await db.insert(communityPosts).values([
+    {
+      doctorId: insertedDoctors[0].id,
+      categoryId: 1,
+      title: 'Best practices for post-op knee rehab',
+      body: 'I have been seeing patients who undergo ACL reconstruction and I want to share my protocol for early rehabilitation. What are your thoughts on weight-bearing status in the first 2 weeks?',
+      tags: ['physiotherapy', 'rehabilitation', 'knee'],
+      replyCount: 0,
+      voteCount: 12,
+      viewCount: 156,
+      pinned: false,
+      closed: false,
+    },
+    {
+      doctorId: insertedDoctors[1].id,
+      categoryId: 2,
+      title: 'Managing chronic low back pain - evidence update',
+      body: 'Recent systematic reviews suggest that exercise therapy should be first-line treatment for chronic LBP. How do you structure your exercise programs?',
+      tags: ['physiotherapy', 'evidence-based', 'pain'],
+      replyCount: 0,
+      voteCount: 8,
+      viewCount: 89,
+      pinned: false,
+      closed: false,
+    },
+    {
+      doctorId: insertedDoctors[2].id,
+      categoryId: 9,
+      title: 'Tips for growing your physio practice',
+      body: 'After 10 years in practice, here are some things that worked for me: building relationships with referring physicians, offering home visits, and using social media for patient education.',
+      tags: ['practice-management', 'growth'],
+      replyCount: 0,
+      voteCount: 15,
+      viewCount: 203,
+      pinned: true,
+      closed: false,
+    },
+  ]).returning({ id: communityPosts.id });
+
+  // Seed some community replies
+  await db.insert(communityReplies).values([
+    {
+      postId: insertedPosts[0].id,
+      doctorId: insertedDoctors[1].id,
+      body: 'Great topic! I typically allow weight-bearing as tolerated from day 1 with crutches. Early ROM is key.',
+      voteCount: 5,
+      accepted: false,
+      parentId: null,
+    },
+    {
+      postId: insertedPosts[0].id,
+      doctorId: insertedDoctors[2].id,
+      body: 'I agree with the early weight-bearing approach. I also add pool therapy in week 2 for better outcomes.',
+      voteCount: 3,
+      accepted: true,
+      parentId: null,
+    },
+    {
+      postId: insertedPosts[1].id,
+      doctorId: insertedDoctors[0].id,
+      body: 'McKenzie method works well for me. Patient education is crucial for self-management.',
+      voteCount: 7,
+      accepted: false,
+      parentId: null,
+    },
+  ]);
+
+  // Seed a conversation and messages
+  const [conversation] = await db.insert(conversations).values({
+    doctor1Id: insertedDoctors[0].id,
+    doctor2Id: insertedDoctors[1].id,
+    lastMessage: 'Thanks for the referral!',
+    lastMessageAt: new Date(),
+  }).returning({ id: conversations.id });
+
+  await db.insert(messages).values([
+    {
+      conversationId: conversation.id,
+      senderId: insertedDoctors[0].id,
+      body: 'Hi Dr. Sharma, I have a patient who might benefit from your expertise in sports injuries.',
+      read: true,
+    },
+    {
+      conversationId: conversation.id,
+      senderId: insertedDoctors[1].id,
+      body: 'Thanks for the referral! I will take a look at the records.',
+      read: true,
+    },
+  ]);
+
+  // Seed doctor notifications
+  await db.insert(doctorNotifications).values([
+    {
+      doctorId: insertedDoctors[0].id,
+      type: 'payment',
+      title: 'Payment received',
+      body: 'You received ₹500 from patient Ravi Kumar',
+      link: '/payments',
+      read: false,
+    },
+    {
+      doctorId: insertedDoctors[0].id,
+      type: 'community',
+      title: 'New reply on your post',
+      body: 'Dr. Mehta replied to "Best practices for post-op knee rehab"',
+      link: '/community/1',
+      read: false,
+    },
+    {
+      doctorId: insertedDoctors[0].id,
+      type: 'message',
+      title: 'New message from Dr. Sharma',
+      body: 'Thanks for the referral!',
+      link: '/messages',
+      read: true,
+    },
   ]);
 }
 
