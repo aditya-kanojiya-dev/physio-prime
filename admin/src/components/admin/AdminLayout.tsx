@@ -4,6 +4,7 @@ import {
   Activity,
   BarChart3,
   CalendarCheck,
+  CreditCard,
   FileText,
   LogOut,
   Menu,
@@ -33,6 +34,7 @@ const doctorNav = [
   { to: '/schedule', label: 'Schedule', icon: Stethoscope },
   { to: '/profile', label: 'Profile', icon: UserRound },
   { to: '/earnings', label: 'Earnings', icon: DollarSign },
+  { to: '/payments', label: 'Payments', icon: CreditCard },
 ]
 
 export function AdminLayout({ children, portal = 'admin' }: { children: React.ReactNode; portal?: 'admin' | 'doctor' }) {
