@@ -16,6 +16,7 @@ import { doctorEarningsRouter } from './routes/earnings';
 import { doctorPayoutsRouter } from './routes/payouts';
 import { doctorLocationsRouter } from './routes/locations';
 import { adminRouter } from './routes/admin';
+import { communityRouter } from './routes/community';
 
 export function createApp() {
   const app = express();
@@ -39,6 +40,7 @@ export function createApp() {
   app.use('/api/v1/doctor', doctorPayoutsRouter);
   app.use('/api/v1/doctor', doctorLocationsRouter);
   app.use('/api/v1/admin', adminRouter);
+  app.use('/api/v1/community', communityRouter);
   app.use(errorHandler);
   return app;
 }
