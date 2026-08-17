@@ -17,6 +17,8 @@ import { doctorPayoutsRouter } from './routes/payouts';
 import { doctorLocationsRouter } from './routes/locations';
 import { adminRouter } from './routes/admin';
 import { communityRouter } from './routes/community';
+import { doctorMessagesRouter } from './routes/messages';
+import { doctorNotificationsRouter } from './routes/doctor-notifications';
 
 export function createApp() {
   const app = express();
@@ -41,6 +43,8 @@ export function createApp() {
   app.use('/api/v1/doctor', doctorLocationsRouter);
   app.use('/api/v1/admin', adminRouter);
   app.use('/api/v1/community', communityRouter);
+  app.use('/api/v1/doctor', doctorMessagesRouter);
+  app.use('/api/v1/doctor', doctorNotificationsRouter);
   app.use(errorHandler);
   return app;
 }
