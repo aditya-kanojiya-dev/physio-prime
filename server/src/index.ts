@@ -13,6 +13,7 @@ import { notificationsRouter } from './routes/notifications';
 import { reviewsRouter } from './routes/reviews';
 import { doctorRouter } from './routes/doctor';
 import { doctorEarningsRouter } from './routes/earnings';
+import { doctorPayoutsRouter } from './routes/payouts';
 import { adminRouter } from './routes/admin';
 
 export function createApp() {
@@ -34,6 +35,7 @@ export function createApp() {
   app.use('/api/v1', reviewsRouter);
   app.use('/api/v1/doctor', doctorRouter);
   app.use('/api/v1/doctor', doctorEarningsRouter);
+  app.use('/api/v1/doctor', doctorPayoutsRouter);
   app.use('/api/v1/admin', adminRouter);
   app.use(errorHandler);
   return app;
