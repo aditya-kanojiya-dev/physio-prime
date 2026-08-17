@@ -274,3 +274,138 @@ export interface DoctorAppointmentDetail {
     createdAt: string;
   } | null;
 }
+
+// --- Earnings ---
+export interface EarningsSummary {
+  totalEarningsPaise: number;
+  paidEarningsPaise: number;
+  pendingEarningsPaise: number;
+  netEarningsPaise: number;
+  refundTotalPaise: number;
+  appointmentCount: number;
+  completedCount: number;
+  cancelledCount: number;
+  noShowCount: number;
+}
+
+export interface EarningsComparison {
+  previousPeriodEarningsPaise: number;
+  percentChange: number;
+}
+
+export interface EarningsChartPoint {
+  date: string;
+  earningsPaise: number;
+  appointments: number;
+}
+
+export interface PaymentRecord {
+  bookingId: string;
+  patientName: string;
+  mode: string;
+  date: string;
+  feePaise: number;
+  paymentStatus: string;
+  razorpayPaymentId: string | null;
+  createdAt: string;
+}
+
+// --- Payouts ---
+export interface PayoutSummary {
+  availableBalancePaise: number;
+  pendingPayoutPaise: number;
+  totalPaidPaise: number;
+  lastPayoutDate: string | null;
+}
+
+export interface Payout {
+  id: number;
+  amountPaise: number;
+  status: string;
+  paymentMethod: string | null;
+  transactionId: string | null;
+  notes: string | null;
+  createdAt: string;
+  processedAt: string | null;
+}
+
+// --- Locations ---
+export interface DoctorLocation {
+  id: number;
+  name: string;
+  address: string | null;
+  area: string | null;
+  city: string | null;
+  state: string | null;
+  pincode: string | null;
+  lat: string | null;
+  lng: string | null;
+  radiusKm: string;
+  isPrimary: boolean;
+  active: boolean;
+}
+
+// --- Community ---
+export interface CommunityCategory {
+  id: number;
+  name: string;
+  slug: string;
+  description: string | null;
+  icon: string | null;
+  color: string | null;
+}
+
+export interface CommunityPost {
+  id: number;
+  title: string;
+  body: string;
+  tags: string[];
+  category: { name: string; slug: string } | null;
+  doctor: { name: string; specialty: string | null; photo: string | null };
+  replyCount: number;
+  voteCount: number;
+  viewCount: number;
+  pinned: boolean;
+  closed: boolean;
+  createdAt: string;
+}
+
+export interface CommunityReply {
+  id: number;
+  body: string;
+  doctor: { name: string; specialty: string | null; photo: string | null };
+  voteCount: number;
+  accepted: boolean;
+  parentId: number | null;
+  createdAt: string;
+  replies: CommunityReply[];
+}
+
+// --- Messages ---
+export interface Conversation {
+  id: number;
+  otherDoctor: { id: number; name: string; specialty: string | null; photo: string | null };
+  lastMessage: string | null;
+  lastMessageAt: string;
+  unreadCount: number;
+}
+
+export interface Message {
+  id: number;
+  senderId: number;
+  body: string;
+  read: boolean;
+  createdAt: string;
+}
+
+// --- Notifications ---
+export interface DoctorNotification {
+  id: number;
+  type: string;
+  title: string;
+  body: string | null;
+  link: string | null;
+  read: boolean;
+  metadata: Record<string, unknown>;
+  createdAt: string;
+}
