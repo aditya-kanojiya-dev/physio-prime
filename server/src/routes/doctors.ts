@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { and, eq, sql, type SQL } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '../db/pool';
-import { doctors, categories, symptoms } from '../db/schema';
+import { doctors, categories, symptoms, doctorLocations } from '../db/schema';
 import { getAvailableSlots, getDaySlotCount, isPast, isValidDate } from '../lib/slots';
 
 export const doctorsRouter = Router();
@@ -17,6 +17,7 @@ const querySchema = z.object({
   gender: z.enum(['male', 'female']).optional(),
   maxFee: z.coerce.number().int().positive().optional(),
   sort: z.enum(['recommended', 'price_low', 'rating', 'experience']).optional(),
+  area: z.string().max(200).optional(),
 });
 
 // ponytail: ILIKE patterns are escaped against % _ \ so a user's q can't act as a wildcard.
@@ -71,6 +72,7 @@ const summaryColumns = {
   // booking filters can match on expertise/treatments without a detail fetch per doctor.
   expertise: doctors.expertise,
   treatments: doctors.treatments,
+  homeVisitsEnabled: doctors.homeVisitsEnabled,
 };
 
 // Least of the present home/online fees; missing ones are treated as +Infinity so a
@@ -124,6 +126,15 @@ doctorsRouter.get('/', async (req, res) => {
     conditions.push(sql`${leastFeeSql} <= ${query.maxFee}`);
   }
 
+  // Area filter: when specified, inner-join with doctor_locations.
+  if (query.area) {
+    conditions.push(eq(doctorLocations.area, query.area));
+    conditions.push(eq(doctorLocations.active, true));
+    if (query.mode === 'home') {
+      conditions.push(eq(doctors.homeVisitsEnabled, true));
+    }
+  }
+
   let order: SQL;
   switch (query.sort ?? 'recommended') {
     case 'price_low':
@@ -139,17 +150,77 @@ doctorsRouter.get('/', async (req, res) => {
       order = sql`${doctors.featured} DESC, ${doctors.rating} DESC, ${doctors.id} ASC`;
   }
 
-  const rows = await db
-    .select(summaryColumns)
-    .from(doctors)
-    .where(and(...conditions))
-    .orderBy(order);
+  const rows = await (query.area
+    ? db.select(summaryColumns).from(doctors).innerJoin(doctorLocations, eq(doctors.id, doctorLocations.doctorId))
+    : db.select(summaryColumns).from(doctors)
+  ).where(and(...conditions)).orderBy(order);
 
   // ponytail: numeric columns arrive as strings from pg; rating is a number in the API
   // contract. `id` mirrors the app's slug-as-id contract (slug == the app's original doc id).
-  res.json({
-    doctors: rows.map((row) => ({ ...row, id: row.slug, rating: Number(row.rating) })),
+  // Distinct by id in case multiple locations match (area join can duplicate rows).
+  const seen = new Set<string>();
+  const distinct = rows.filter((row) => {
+    if (seen.has(row.slug)) return false;
+    seen.add(row.slug);
+    return true;
   });
+
+  // Fetch active locations for the returned doctors so the patient app can show area badges.
+  const doctorIds = await db
+    .select({ id: doctors.id, slug: doctors.slug })
+    .from(doctors)
+    .where(sql`${doctors.slug} IN ${sql`VALUES ${sql.join([...seen].map((s) => sql`(${s})`), sql`, `)}`}`);
+  const idToSlug = new Map(doctorIds.map((r) => [r.id, r.slug]));
+  const locRows = doctorIds.length
+    ? await db
+        .select({
+          doctorId: doctorLocations.doctorId,
+          id: doctorLocations.id,
+          name: doctorLocations.name,
+          area: doctorLocations.area,
+          city: doctorLocations.city,
+          active: doctorLocations.active,
+          isPrimary: doctorLocations.isPrimary,
+        })
+        .from(doctorLocations)
+        .where(
+          and(
+            sql`${doctorLocations.doctorId} IN ${sql`VALUES ${sql.join(doctorIds.map((d) => sql`(${d.id})`), sql`, `)}`}`,
+            eq(doctorLocations.active, true),
+          ),
+        )
+    : [];
+  const locsBySlug = new Map<string, typeof locRows>();
+  for (const loc of locRows) {
+    const slug = idToSlug.get(loc.doctorId);
+    if (!slug) continue;
+    if (!locsBySlug.has(slug)) locsBySlug.set(slug, []);
+    locsBySlug.get(slug)!.push(loc);
+  }
+
+  res.json({
+    doctors: distinct.map((row) => ({
+      ...row,
+      id: row.slug,
+      rating: Number(row.rating),
+      locations: (locsBySlug.get(row.slug) || []).map((l) => ({
+        id: l.id,
+        name: l.name,
+        area: l.area,
+        city: l.city,
+        active: l.active,
+        isPrimary: l.isPrimary,
+      })),
+    })),
+  });
+});
+
+doctorsRouter.get('/areas', async (_req, res) => {
+  const rows = await db
+    .selectDistinct({ area: doctorLocations.area })
+    .from(doctorLocations)
+    .where(eq(doctorLocations.active, true));
+  res.json({ areas: rows.map((r) => r.area).filter(Boolean) });
 });
 
 doctorsRouter.get('/:slug', async (req, res) => {

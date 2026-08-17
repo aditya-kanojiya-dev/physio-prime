@@ -2,7 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Doctor } from '../../types';
 import { useBooking } from '../../context/BookingContext';
-import { Star, MapPin, Clock, Home, Video, CheckCircle2 } from 'lucide-react';
+import { Star, MapPin, Clock, Home, Video, CheckCircle2, Navigation } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 interface DoctorCardProps {
@@ -82,15 +82,33 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({ doctor }) => {
 
           {/* Consultation Modes & Languages */}
           <div className="space-y-2">
-            <div className="flex items-center gap-2 text-xs font-semibold text-slate-600">
+            <div className="flex items-center gap-2 text-xs font-semibold text-slate-600 flex-wrap">
               <span className="text-slate-400">Available via:</span>
-              <span className="px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-200 font-bold flex items-center gap-1">
-                <Home className="w-3 h-3 text-blue-600" /> Home Visit
-              </span>
-              <span className="px-2 py-0.5 rounded-md bg-teal-50 text-teal-600 border border-teal-200 font-bold flex items-center gap-1">
-                <Video className="w-3 h-3 text-teal-500" /> Video
-              </span>
+              {doctor.fees.home > 0 && (
+                <span className="px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-200 font-bold flex items-center gap-1">
+                  <Home className="w-3 h-3 text-blue-600" /> Home Visit
+                </span>
+              )}
+              {doctor.fees.online > 0 && (
+                <span className="px-2 py-0.5 rounded-md bg-teal-50 text-teal-600 border border-teal-200 font-bold flex items-center gap-1">
+                  <Video className="w-3 h-3 text-teal-500" /> Video
+                </span>
+              )}
             </div>
+
+            {doctor.homeVisitsEnabled && (
+              <div className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
+                <Navigation className="w-3 h-3" />
+                Home Visit Available
+              </div>
+            )}
+
+            {doctor.locations && doctor.locations.length > 0 && (
+              <div className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-500 flex-wrap">
+                <MapPin className="w-3 h-3 text-slate-400 flex-shrink-0" />
+                {doctor.locations.filter(l => l.active).map(l => l.area).filter(Boolean).join(' · ')}
+              </div>
+            )}
 
             <div className="text-xs text-slate-500">
               <strong className="text-slate-600">Languages:</strong> {doctor.languages.join(', ')}

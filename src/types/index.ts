@@ -50,6 +50,17 @@ export interface Doctor {
   treatments: string[];
   reviewsList: DoctorReview[];
   gender: 'male' | 'female';
+  homeVisitsEnabled?: boolean;
+  locations?: DoctorLocation[];
+}
+
+export interface DoctorLocation {
+  id: number;
+  name: string;
+  area: string | null;
+  city: string | null;
+  active: boolean;
+  isPrimary: boolean;
 }
 
 export interface Symptom {

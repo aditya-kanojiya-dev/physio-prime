@@ -23,6 +23,8 @@ export interface ApiDoctor {
   bio: string | null;
   expertise: string[];
   treatments: string[];
+  homeVisitsEnabled?: boolean;
+  locations?: { id: number; name: string; area: string | null; city: string | null; active: boolean; isPrimary: boolean }[];
 }
 
 export interface ApiDoctorDetail extends ApiDoctor {
@@ -165,6 +167,8 @@ export function toDoctor(d: ApiDoctor): Doctor {
     treatments: d.treatments || [],
     reviewsList: [],
     gender: d.gender || 'male',
+    homeVisitsEnabled: d.homeVisitsEnabled || false,
+    locations: d.locations || [],
   };
 }
 
@@ -180,6 +184,8 @@ export function mergeDoctorDetail(base: Doctor, detail: ApiDoctorDetail): Doctor
     expertise: detail.expertise || base.expertise,
     treatments: detail.treatments || base.treatments,
     bio: detail.bio || base.bio,
+    homeVisitsEnabled: detail.homeVisitsEnabled ?? base.homeVisitsEnabled,
+    locations: detail.locations || base.locations,
   };
 }
 

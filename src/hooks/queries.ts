@@ -15,19 +15,31 @@ import {
   toReview,
   toSymptom,
 } from '../lib/adapters';
-import { Appointment, Category, Doctor, Symptom } from '../types';
+import { Appointment, Category, Doctor, DoctorLocation, Symptom } from '../types';
 
 const STALE = 5 * 60 * 1000;
 
-async function fetchDoctors(): Promise<Doctor[]> {
-  const data = await api.get<{ doctors: ApiDoctor[] }>('/doctors');
+async function fetchDoctors(area?: string): Promise<Doctor[]> {
+  const params = area ? `?area=${encodeURIComponent(area)}` : '';
+  const data = await api.get<{ doctors: ApiDoctor[] }>(`/doctors${params}`);
   return data.doctors.map(toDoctor);
 }
 
-export function useDoctors() {
+export function useDoctors(area?: string) {
   return useQuery({
-    queryKey: ['doctors'],
-    queryFn: fetchDoctors,
+    queryKey: ['doctors', area],
+    queryFn: () => fetchDoctors(area),
+    staleTime: STALE,
+  });
+}
+
+export function useDoctorAreas() {
+  return useQuery({
+    queryKey: ['doctorAreas'],
+    queryFn: async (): Promise<string[]> => {
+      const data = await api.get<{ areas: string[] }>('/doctors/areas');
+      return data.areas;
+    },
     staleTime: STALE,
   });
 }

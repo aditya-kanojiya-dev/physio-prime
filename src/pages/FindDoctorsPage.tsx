@@ -1,16 +1,18 @@
 import React, { useState, useMemo } from 'react';
 import { useBooking } from '../context/BookingContext';
-import { useDoctors, useSymptoms, useCategories } from '../hooks/queries';
+import { useDoctors, useSymptoms, useCategories, useDoctorAreas } from '../hooks/queries';
 import { DoctorCard } from '../components/doctors/DoctorCard';
 import { DoctorFilterSidebar } from '../components/doctors/DoctorFilterSidebar';
 import { ConsultationMode } from '../types';
-import { Stethoscope, ArrowUpDown, Filter, ChevronDown, Loader2 } from 'lucide-react';
+import { Stethoscope, ArrowUpDown, Filter, ChevronDown, Loader2, MapPin } from 'lucide-react';
 
 export const FindDoctorsPage: React.FC = () => {
   const { selectedCategorySlug, selectedSymptomSlug, setSelectedCategorySlug, setSelectedSymptomSlug, searchQuery, setSearchQuery } = useBooking();
-  const { data: doctors = [], isLoading: doctorsLoading } = useDoctors();
+  const [selectedArea, setSelectedArea] = useState<string>('');
+  const { data: doctors = [], isLoading: doctorsLoading } = useDoctors(selectedArea || undefined);
   const { data: symptoms = [] } = useSymptoms();
   const { data: categories = [] } = useCategories();
+  const { data: areas = [] } = useDoctorAreas();
 
   const [selectedMode, setSelectedMode] = useState<ConsultationMode | 'all'>('all');
   const [selectedSymptom, setSelectedSymptom] = useState<string | null>(selectedSymptomSlug);
@@ -72,6 +74,7 @@ export const FindDoctorsPage: React.FC = () => {
     setSelectedSymptomSlug(null);
     setMaxPrice(2000);
     setSelectedGender('all');
+    setSelectedArea('');
   };
 
   return (
@@ -133,6 +136,41 @@ export const FindDoctorsPage: React.FC = () => {
           {/* Right Results Grid */}
           <div className="lg:col-span-8 space-y-6">
             
+            {/* Location Filter Bar */}
+            {areas.length > 0 && (
+              <div className="glass-panel p-4 rounded-2xl border border-slate-200 flex flex-col sm:flex-row items-center gap-4">
+                <div className="flex items-center gap-2 text-xs font-bold text-slate-700">
+                  <MapPin className="w-4 h-4 text-blue-500" />
+                  <span>Area:</span>
+                </div>
+                <div className="flex flex-wrap gap-2 flex-1">
+                  <button
+                    onClick={() => setSelectedArea('')}
+                    className={`text-xs font-semibold px-3 py-1.5 rounded-lg border transition-all ${
+                      !selectedArea
+                        ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                        : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                    }`}
+                  >
+                    All Areas
+                  </button>
+                  {areas.map((area) => (
+                    <button
+                      key={area}
+                      onClick={() => setSelectedArea(area)}
+                      className={`text-xs font-semibold px-3 py-1.5 rounded-lg border transition-all ${
+                        selectedArea === area
+                          ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                          : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                      }`}
+                    >
+                      {area}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Controls Bar */}
             <div className="glass-panel p-4 rounded-2xl border border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-4">
               <p className="text-sm font-bold text-slate-900">
