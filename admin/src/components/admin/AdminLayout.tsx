@@ -39,6 +39,7 @@ const doctorNav = [
   { to: '/payments', label: 'Payments', icon: CreditCard },
   { to: '/payouts', label: 'Payouts', icon: Wallet },
   { to: '/locations', label: 'Locations', icon: MapPin },
+  { to: '/community', label: 'Community', icon: Users },
 ]
 
 export function AdminLayout({ children, portal = 'admin' }: { children: React.ReactNode; portal?: 'admin' | 'doctor' }) {
