@@ -20,6 +20,7 @@ import {
 } from 'lucide-react'
 import { api } from '../lib/api'
 import { formatFee, type EarningsSummary, type EarningsComparison, type PaymentRecord } from '../lib/types'
+import { AdminLayout } from '../components/admin/AdminLayout'
 
 type Period = 'weekly' | 'monthly' | 'yearly'
 
@@ -88,10 +89,11 @@ export function EarningsPage() {
   const payments = paymentsResp?.payments ?? []
 
   return (
-    <div
-      className="min-h-screen rounded-3xl space-y-8"
-      style={{ background: 'linear-gradient(180deg, #F4FBF9 0%, #F0FDFA 60%, #E9F6F2 100%)' }}
-    >
+    <AdminLayout portal="doctor">
+      <div
+        className="min-h-screen rounded-3xl space-y-8"
+        style={{ background: 'linear-gradient(180deg, #F4FBF9 0%, #F0FDFA 60%, #E9F6F2 100%)' }}
+      >
       {/* Header + Period selector */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -239,6 +241,7 @@ export function EarningsPage() {
         )}
       </div>
     </div>
+    </AdminLayout>
   )
 }
 

@@ -14,6 +14,7 @@ import {
 import { api } from '../lib/api'
 import { formatFee, type PayoutSummary, type Payout } from '../lib/types'
 import { Modal, inputCls, Field } from './admin/CategoriesPage'
+import { AdminLayout } from '../components/admin/AdminLayout'
 
 const statusStyles: Record<string, string> = {
   completed: 'bg-emerald-100 text-emerald-700 border border-emerald-200',
@@ -66,10 +67,11 @@ export function PayoutsPage() {
   }
 
   return (
-    <div
-      className="min-h-screen rounded-3xl space-y-8"
-      style={{ background: 'linear-gradient(180deg, #F4FBF9 0%, #F0FDFA 60%, #E9F6F2 100%)' }}
-    >
+    <AdminLayout portal="doctor">
+      <div
+        className="min-h-screen rounded-3xl space-y-8"
+        style={{ background: 'linear-gradient(180deg, #F4FBF9 0%, #F0FDFA 60%, #E9F6F2 100%)' }}
+      >
       <div>
         <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">Payouts</h1>
         <p className="text-xs font-semibold text-slate-500 mt-1">Manage your earnings and payout history</p>
@@ -238,5 +240,6 @@ export function PayoutsPage() {
         </Modal>
       )}
     </div>
+    </AdminLayout>
   )
 }
