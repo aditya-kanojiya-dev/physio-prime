@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { and, asc, desc, eq, sql, ilike, count } from 'drizzle-orm';
+import { and, asc, desc, eq, sql, ilike } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '../db/pool';
 import {
@@ -68,11 +68,8 @@ authRouter.get('/posts/mine', async (req, res, next) => {
         viewCount: communityPosts.viewCount,
         pinned: communityPosts.pinned,
         createdAt: communityPosts.createdAt,
-        category: {
-          id: communityCategories.id,
-          name: communityCategories.name,
-          slug: communityCategories.slug,
-        },
+        categoryName: communityCategories.name,
+        categorySlug: communityCategories.slug,
       })
       .from(communityPosts)
       .leftJoin(communityCategories, eq(communityPosts.categoryId, communityCategories.id))
@@ -81,7 +78,15 @@ authRouter.get('/posts/mine', async (req, res, next) => {
 
     res.json({
       posts: rows.map((r) => ({
-        ...r,
+        id: r.id,
+        title: r.title,
+        body: r.body,
+        tags: r.tags,
+        category: r.categoryName ? { name: r.categoryName, slug: r.categorySlug } : null,
+        replyCount: r.replyCount,
+        voteCount: r.voteCount,
+        viewCount: r.viewCount,
+        pinned: r.pinned,
         createdAt: r.createdAt.toISOString(),
       })),
     });
