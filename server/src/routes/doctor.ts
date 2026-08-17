@@ -438,7 +438,13 @@ doctorRouter.get('/schedules', async (req, res, next) => {
       .from(doctorSchedules)
       .where(eq(doctorSchedules.doctorId, doctor.id))
       .orderBy(asc(doctorSchedules.dayOfWeek), asc(doctorSchedules.windowStart));
-    res.json({ schedules: rows });
+    // Strip seconds from time columns (PostgreSQL returns HH:MM:SS)
+    const schedules = rows.map((r) => ({
+      ...r,
+      windowStart: r.windowStart.slice(0, 5),
+      windowEnd: r.windowEnd.slice(0, 5),
+    }));
+    res.json({ schedules });
   } catch (err) {
     next(err);
   }

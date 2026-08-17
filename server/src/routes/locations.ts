@@ -30,7 +30,7 @@ const updateLocationSchema = createLocationSchema.partial();
 
 const settingsSchema = z.object({
   homeVisitsEnabled: z.boolean().optional(),
-  maxRadiusKm: z.string().optional(),
+  maxRadiusKm: z.union([z.string(), z.number()]).optional().transform((v) => (v === undefined ? undefined : String(v))),
 });
 
 // --- GET /locations ---

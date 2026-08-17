@@ -40,8 +40,10 @@ export function SchedulePage() {
       const res = await api.get<{ schedules: { dayOfWeek: number; windowStart: string; maxPatients: number; active: boolean }[] }>('/doctor/schedules')
       const next = emptyState()
       for (const s of res.schedules) {
-        if (next[s.dayOfWeek]?.[s.windowStart]) {
-          next[s.dayOfWeek][s.windowStart] = { active: s.active, maxPatients: s.maxPatients }
+        // ponytail: DB time columns return "HH:MM:SS"; WINDOWS use "HH:MM" — strip seconds
+        const key = s.windowStart.slice(0, 5)
+        if (next[s.dayOfWeek]?.[key]) {
+          next[s.dayOfWeek][key] = { active: s.active, maxPatients: s.maxPatients }
         }
       }
       setState(next)
