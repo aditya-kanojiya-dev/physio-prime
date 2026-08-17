@@ -107,7 +107,7 @@ doctorMessagesRouter.get('/messages/conversations/:id', async (req, res, next) =
       .select()
       .from(messages)
       .where(and(...filters))
-      .orderBy(asc(messages.createdAt))
+      .orderBy(asc(messages.id))
       .limit(limit);
 
     res.json({
