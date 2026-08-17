@@ -166,13 +166,15 @@ doctorsRouter.get('/', async (req, res) => {
   });
 
   // Fetch active locations for the returned doctors so the patient app can show area badges.
-  const slugToId = await db
-    .select({ id: doctors.id, slug: doctors.slug })
-    .from(doctors)
-    .where(sql`${doctors.slug} IN (SELECT unnest(${sql`ARRAY[${sql.join([...seen].map((s) => sql`${s}`), sql`, `)}]`}))`);
+  const slugToId = seen.size
+    ? await db
+        .select({ id: doctors.id, slug: doctors.slug })
+        .from(doctors)
+        .where(sql`${doctors.slug} IN (SELECT unnest(${sql`ARRAY[${sql.join([...seen].map((s) => sql`${s}`), sql`, `)}]`}))`)
+    : [];
   const idToSlug = new Map(slugToId.map((r) => [r.id, r.slug]));
   // ponytail: fetch all active locations then filter in JS — avoids Drizzle VALUES/ARRAY param issues
-  const allLocs = await db
+  const allLocs = seen.size ? await db
     .select({
       doctorId: doctorLocations.doctorId,
       id: doctorLocations.id,
@@ -183,7 +185,8 @@ doctorsRouter.get('/', async (req, res) => {
       isPrimary: doctorLocations.isPrimary,
     })
     .from(doctorLocations)
-    .where(eq(doctorLocations.active, true));
+    .where(eq(doctorLocations.active, true))
+    : [];
   const locsBySlug = new Map<string, typeof allLocs>();
   for (const loc of allLocs) {
     const slug = idToSlug.get(loc.doctorId);
