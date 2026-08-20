@@ -1,6 +1,7 @@
 import React from 'react';
 import { HeroSection } from '../components/home/HeroSection';
 import { SearchSection } from '../components/home/SearchSection';
+import { HeroShowcase } from '../components/home/HeroShowcase';
 import { StatStrip } from '../components/home/StatStrip';
 import { FeaturedDoctors } from '../components/home/FeaturedDoctors';
 import { SymptomsGrid } from '../components/home/SymptomsGrid';
@@ -16,6 +17,7 @@ export const HomePage: React.FC = () => {
       <HeroSection />
       <SearchSection />
       <StatStrip />
+      <HeroShowcase />
       <SymptomsGrid />
       <RecoveryTimeline />
       <FeaturedDoctors />
