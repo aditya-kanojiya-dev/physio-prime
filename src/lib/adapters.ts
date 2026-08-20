@@ -141,7 +141,7 @@ function formatTimeSlot(timeSlot: string): string {
   return formatTime(timeSlot.split('-')[0]);
 }
 
-export function slotLabel(slot: ApiSlot): string {
+export function slotLabel(slot: { start: string; end: string }): string {
   return `${formatTime(slot.start)} – ${formatTime(slot.end)}`;
 }
 

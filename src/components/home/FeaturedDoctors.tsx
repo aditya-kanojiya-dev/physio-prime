@@ -2,6 +2,7 @@ import React, { useRef, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useBooking } from '../../context/BookingContext';
 import { useDoctors } from '../../hooks/queries';
+import { Doctor } from '../../types';
 import { Star, MapPin, Clock, CheckCircle2, ArrowRight, Loader2 } from 'lucide-react';
 
 /**
@@ -28,7 +29,7 @@ function barcodeWidths(seed: string) {
   return widths;
 }
 
-function DoctorCard({ doctor }: { doctor: ReturnType<typeof useDoctors>['data'][number] }) {
+function DoctorCard({ doctor }: { doctor: Doctor }) {
   const { navigateToDoctor } = useBooking();
   const navigate = useNavigate();
   const accent = useMemo(() => accentFor(doctor.specialty || doctor.name), [doctor.specialty, doctor.name]);
