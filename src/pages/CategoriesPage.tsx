@@ -1,43 +1,26 @@
 import React, { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useBooking } from '../context/BookingContext';
-import { useSymptoms, useCategories } from '../hooks/queries';
+import { useSymptoms } from '../hooks/queries';
 import { CategoriesGrid } from '../components/home/CategoriesGrid';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Layers, Search, ArrowUpRight, Clock, Stethoscope, Loader2 } from 'lucide-react';
+import { Layers, Search, X, ArrowUpRight, Clock, Stethoscope, Loader2 } from 'lucide-react';
 import { staggerContainer, fadeUp } from '../lib/motion';
 
 export const CategoriesPage: React.FC = () => {
   const { setSelectedSymptomSlug } = useBooking();
   const { data: symptoms = [], isLoading: symptomsLoading } = useSymptoms();
-  const { data: categories = [] } = useCategories();
   const [search, setSearch] = useState('');
-  const [activeCategory, setActiveCategory] = useState<string | null>(null);
 
   const filteredSymptoms = useMemo(() => {
-    let list = symptoms;
-    if (activeCategory) {
-      list = list.filter((s) => s.popularFor === activeCategory);
-    }
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      list = list.filter(
-        (s) =>
-          s.title.toLowerCase().includes(q) ||
-          (s.description && s.description.toLowerCase().includes(q)),
-      );
-    }
-    return list;
-  }, [symptoms, search, activeCategory]);
-
-  const categoryCounts = useMemo(() => {
-    const counts: Record<string, number> = {};
-    symptoms.forEach((s) => {
-      const cat = typeof s.popularFor === 'string' ? s.popularFor : '';
-      if (cat) counts[cat] = (counts[cat] || 0) + 1;
-    });
-    return counts;
-  }, [symptoms]);
+    if (!search.trim()) return symptoms;
+    const q = search.toLowerCase();
+    return symptoms.filter(
+      (s) =>
+        s.title.toLowerCase().includes(q) ||
+        (s.description && s.description.toLowerCase().includes(q)),
+    );
+  }, [symptoms, search]);
 
   return (
     <div className="pt-28 pb-20 min-h-screen bg-white">
@@ -73,43 +56,25 @@ export const CategoriesPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Search + Category Filter */}
-          <div className="flex flex-col sm:flex-row gap-3 mb-8">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          {/* Search */}
+          <div className="mb-8">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
               <input
                 type="text"
                 placeholder="Search conditions..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
+                className="w-full pl-10 pr-10 py-2.5 rounded-xl border border-slate-200 bg-white text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
               />
-            </div>
-            <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-hide">
-              <button
-                onClick={() => setActiveCategory(null)}
-                className={`shrink-0 px-3 py-2 rounded-lg text-xs font-bold transition-all ${
-                  !activeCategory
-                    ? 'bg-blue-600 text-white shadow-sm'
-                    : 'bg-white text-slate-600 border border-slate-200 hover:border-blue-300 hover:text-blue-600'
-                }`}
-              >
-                All ({symptoms.length})
-              </button>
-              {categories.map((cat) => (
+              {search && (
                 <button
-                  key={cat.slug}
-                  onClick={() => setActiveCategory(activeCategory === cat.slug ? null : cat.slug)}
-                  className={`shrink-0 px-3 py-2 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
-                    activeCategory === cat.slug
-                      ? 'text-white shadow-sm'
-                      : 'bg-white text-slate-600 border border-slate-200 hover:border-blue-300 hover:text-blue-600'
-                  }`}
-                  style={activeCategory === cat.slug ? { backgroundColor: cat.color } : undefined}
+                  onClick={() => setSearch('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full text-slate-400 hover:text-slate-600"
                 >
-                  {cat.title} ({categoryCounts[cat.title] || 0})
+                  <X className="w-4 h-4" />
                 </button>
-              ))}
+              )}
             </div>
           </div>
 
