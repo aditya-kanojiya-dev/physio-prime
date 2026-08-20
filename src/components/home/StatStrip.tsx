@@ -35,7 +35,7 @@ export const StatStrip: React.FC = () => {
   const metricsInView = useInView(metricsRef, { once: true, margin: '-80px' });
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-12 lg:mt-16">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6 lg:mt-8">
       <motion.div
         ref={metricsRef}
         initial={{ opacity: 0, y: 24 }}

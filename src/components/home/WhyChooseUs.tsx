@@ -104,7 +104,7 @@ const cardVariants = {
 
 export const WhyChooseUs: React.FC = () => {
   return (
-    <section className="py-12 lg:py-20 relative overflow-hidden bg-[#EFF8F4]">
+    <section className="py-8 lg:py-12 relative overflow-hidden bg-[#EFF8F4]">
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Caveat:wght@500;700&display=swap');`}</style>
 
       {/* wall behind the board: faint texture so the mounted board reads as an object */}

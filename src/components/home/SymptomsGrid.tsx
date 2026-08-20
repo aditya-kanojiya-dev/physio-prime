@@ -30,7 +30,7 @@ export const SymptomsGrid: React.FC = () => {
   };
 
   return (
-    <section className="py-16 lg:py-24 bg-gradient-to-b from-white to-slate-50/60 relative">
+    <section className="py-10 lg:py-14 bg-gradient-to-b from-white to-slate-50/60 relative">
       {/* Decorative gradient orbs */}
       <div className="absolute top-0 right-0 w-96 h-96 bg-blue-100/30 rounded-full blur-3xl -translate-y-1/2 translate-x-1/4 pointer-events-none" />
       <div className="absolute bottom-0 left-0 w-80 h-80 bg-teal-100/20 rounded-full blur-3xl translate-y-1/2 -translate-x-1/4 pointer-events-none" />

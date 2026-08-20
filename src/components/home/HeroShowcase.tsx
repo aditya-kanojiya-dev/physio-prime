@@ -7,7 +7,7 @@ export const HeroShowcase: React.FC = () => {
   const vidInView = useInView(vidRef, { once: true, margin: '200px' });
 
   return (
-    <div className="max-w-7xl mx-auto px-0 sm:px-6 lg:px-8 mt-12 lg:mt-16 w-full relative">
+    <div className="max-w-7xl mx-auto px-0 sm:px-6 lg:px-8 mt-6 lg:mt-8 w-full relative">
       {/* Glow effect behind the image */}
       <div className="absolute -inset-4 bg-gradient-to-r from-blue-100/50 via-teal-100/50 to-blue-100/50 rounded-3xl blur-2xl animate-pulse" />
 

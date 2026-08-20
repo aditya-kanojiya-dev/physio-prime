@@ -152,7 +152,7 @@ export const FeaturedDoctors: React.FC = () => {
   };
 
   return (
-    <section className="py-20 lg:py-28 relative">
+    <section className="py-10 lg:py-14 relative">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
         <div className="flex flex-col md:flex-row md:items-end justify-between mb-10 gap-4">

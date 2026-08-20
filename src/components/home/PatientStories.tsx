@@ -52,7 +52,7 @@ export const PatientStories: React.FC = () => {
   ];
 
   return (
-    <section className="py-12 lg:py-20 bg-[#EFF8F4] relative border-y border-slate-200">
+    <section className="py-8 lg:py-12 bg-[#EFF8F4] relative border-y border-slate-200">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
         {/* Header */}

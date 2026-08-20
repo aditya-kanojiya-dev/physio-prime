@@ -13,7 +13,7 @@ export const HeroSection: React.FC = () => {
   const vidInView = useInView(vidRef, { once: true, margin: '200px' });
 
   return (
-    <section className="relative pt-32 pb-20 lg:pt-40 lg:pb-32 overflow-hidden">
+    <section className="relative pt-14 pb-10 lg:pt-20 lg:pb-16 overflow-hidden">
       
       {/* Dynamic Background Blobs */}
       <div className="absolute top-20 left-10 w-96 h-96 bg-blue-100/40 rounded-full blur-3xl animate-pulse-glow pointer-events-none" />
