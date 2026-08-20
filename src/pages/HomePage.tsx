@@ -1,6 +1,7 @@
 import React from 'react';
 import { HeroSection } from '../components/home/HeroSection';
 import { SearchSection } from '../components/home/SearchSection';
+import { StatStrip } from '../components/home/StatStrip';
 import { FeaturedDoctors } from '../components/home/FeaturedDoctors';
 import { SymptomsGrid } from '../components/home/SymptomsGrid';
 import { WhyChooseUs } from '../components/home/WhyChooseUs';
@@ -14,6 +15,7 @@ export const HomePage: React.FC = () => {
     <main className="min-h-screen">
       <HeroSection />
       <SearchSection />
+      <StatStrip />
       <SymptomsGrid />
       <RecoveryTimeline />
       <FeaturedDoctors />
