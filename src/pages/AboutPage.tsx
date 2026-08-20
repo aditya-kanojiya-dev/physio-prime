@@ -1,17 +1,41 @@
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ShieldCheck, MapPin, Award, Users, Activity, ArrowRight } from 'lucide-react';
 import { useBooking } from '../context/BookingContext';
-import { motion } from 'framer-motion';
+import { motion, useInView } from 'framer-motion';
 import { fadeUp, staggerContainer } from '../lib/motion';
+
+function CountUp({ target, suffix }: { target: number; suffix: string }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const inView = useInView(ref, { once: true, margin: '-40px' });
+  const [count, setCount] = useState(0);
+
+  useEffect(() => {
+    if (!inView) return;
+    let start = 0;
+    const duration = 1600;
+    const startTime = performance.now();
+    const step = (now: number) => {
+      const elapsed = now - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      // ease-out cubic
+      const eased = 1 - Math.pow(1 - progress, 3);
+      setCount(Math.round(eased * target));
+      if (progress < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  }, [inView, target]);
+
+  return <span ref={ref}>{count.toLocaleString()}{suffix}</span>;
+}
 
 export const AboutPage: React.FC = () => {
   const { setCurrentPage } = useBooking();
 
   const stats = [
-    { value: '10K+', label: 'Happy Patients' },
-    { value: '100+', label: 'Verified Doctors' },
-    { value: '10+', label: 'Active Cities' },
-    { value: '5K+', label: 'Recovery Stories' },
+    { value: '10K+', label: 'Happy Patients', num: 10, suffix: 'K+' },
+    { value: '100+', label: 'Verified Doctors', num: 100, suffix: '+' },
+    { value: '10+', label: 'Active Cities', num: 10, suffix: '+' },
+    { value: '5K+', label: 'Recovery Stories', num: 5, suffix: 'K+' },
   ];
 
   const pillars = [
@@ -75,7 +99,9 @@ export const AboutPage: React.FC = () => {
         >
           {stats.map((s) => (
             <motion.div key={s.label} variants={fadeUp(20)} className="text-center space-y-1">
-              <p className="text-3xl sm:text-4xl font-extrabold text-gradient">{s.value}</p>
+              <p className="text-3xl sm:text-4xl font-extrabold text-gradient">
+                <CountUp target={s.num} suffix={s.suffix} />
+              </p>
               <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">{s.label}</p>
             </motion.div>
           ))}
