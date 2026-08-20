@@ -6,7 +6,6 @@ import {
   ApiDoctor,
   ApiDoctorDetail,
   ApiReview,
-  ApiSlot,
   ApiSymptom,
   ApiTimeWindow,
   mergeDoctorDetail,
@@ -16,7 +15,7 @@ import {
   toReview,
   toSymptom,
 } from '../lib/adapters';
-import { Appointment, Category, Doctor, DoctorLocation, Symptom } from '../types';
+import { Appointment, Category, Doctor, Symptom } from '../types';
 
 const STALE = 5 * 60 * 1000;
 
@@ -30,17 +29,6 @@ export function useDoctors(area?: string) {
   return useQuery({
     queryKey: ['doctors', area],
     queryFn: () => fetchDoctors(area),
-    staleTime: STALE,
-  });
-}
-
-export function useDoctorAreas() {
-  return useQuery({
-    queryKey: ['doctorAreas'],
-    queryFn: async (): Promise<string[]> => {
-      const data = await api.get<{ areas: string[] }>('/doctors/areas');
-      return data.areas;
-    },
     staleTime: STALE,
   });
 }

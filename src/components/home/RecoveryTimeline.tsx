@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useBooking } from '../../context/BookingContext';
 import { Search, UserCheck, CalendarCheck, Home, Activity, Sparkles, Play, Pause } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export const RecoveryTimeline: React.FC = () => {
-  const { openBookingModal } = useBooking();
+  const navigate = useNavigate();
   const [activeStep, setActiveStep] = useState(0);
   const [isAutoPlaying, setIsAutoPlaying] = useState(true);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -215,7 +216,7 @@ export const RecoveryTimeline: React.FC = () => {
           </div>
 
           <button
-            onClick={() => openBookingModal({ mode: 'home' })}
+            onClick={() => navigate('/book')}
             className="btn-gradient text-white px-6 py-3.5 rounded-2xl font-bold text-xs shadow-lg shadow-blue-500/20 whitespace-nowrap hover:scale-[1.02] active:scale-[0.98] transition-transform flex-shrink-0"
           >
             Start Booking Now

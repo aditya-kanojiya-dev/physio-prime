@@ -2,9 +2,7 @@ import React, { createContext, useCallback, useContext, useEffect, useState } fr
 import { supabase } from '../lib/supabase';
 import { api, getStoredUser, saveAuth, clearAuth, getToken, setToken, type StoredUser } from '../lib/api';
 
-export interface AuthUser extends StoredUser {}
-
-export interface ProfilePatch {
+interface ProfilePatch {
   name?: string;
   phone?: string | null;
   gender?: string | null;
@@ -15,7 +13,7 @@ export interface ProfilePatch {
 }
 
 interface AuthContextType {
-  user: AuthUser | null;
+  user: StoredUser | null;
   hydrated: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (name: string, email: string, password: string) => Promise<boolean>;
@@ -38,13 +36,13 @@ async function syncUserFromSession() {
     return null;
   }
   setToken(data.session.access_token);
-  const me = await api.get<{ user: AuthUser }>('/auth/me');
+  const me = await api.get<{ user: StoredUser }>('/auth/me');
   saveAuth(data.session.access_token, me.user);
   return me.user;
 }
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<AuthUser | null>(getStoredUser());
+  const [user, setUser] = useState<StoredUser | null>(getStoredUser());
   const [hydrated, setHydrated] = useState(false);
   const [authModalOpen, setAuthModalOpen] = useState(false);
 
@@ -92,7 +90,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const updateProfile = useCallback(async (patch: ProfilePatch) => {
-    const { user: updated } = await api.patch<{ user: AuthUser }>('/auth/me', patch);
+    const { user: updated } = await api.patch<{ user: StoredUser }>('/auth/me', patch);
     setUser(updated);
     const token = getToken();
     if (token) saveAuth(token, updated);

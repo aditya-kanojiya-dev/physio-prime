@@ -1,15 +1,7 @@
 import { and, eq } from 'drizzle-orm';
 import { db } from '../db/pool';
 import { appointments, doctors, notifications } from '../db/schema';
-
-// Providers are read lazily from env at call time (mirroring lib/razorpay.ts):
-// the API boots and all tests run with empty provider keys in .env, so these
-// are intentionally NOT in the required getConfig() schema.
-function requireEnv(name: string): string {
-  const value = process.env[name];
-  if (!value) throw new Error(`${name} is not configured`);
-  return value;
-}
+import { requireEnv } from './env';
 
 function isNotOnWhatsApp(err: unknown): boolean {
   const msg = err instanceof Error ? err.message : String(err);

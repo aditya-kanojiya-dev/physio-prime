@@ -1,149 +1,131 @@
-import React, { useState, useRef } from 'react';
+import React, { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useBooking } from '../../context/BookingContext';
-import { ConsultationMode } from '../../types';
-import { motion, useInView } from 'framer-motion';
-import { Video, Home, Calendar, ArrowRight, Sparkles, Award } from 'lucide-react';
-import homepageVid from '../../assets/homepage.mp4';
+import { useDoctors } from '../../hooks/queries';
+import { motion } from 'framer-motion';
+import { Calendar, ArrowRight, ShieldCheck, Users, MapPin, Star, Clock } from 'lucide-react';
 import { fadeUp, staggerContainer, EASE_OUT } from '../../lib/motion';
+import heroVid from '../../assets/hero-vid.webm';
+
+const STATS = [
+  { value: '10K+', label: 'Happy Patients', Icon: Users },
+  { value: '100+', label: 'Verified Doctors', Icon: ShieldCheck },
+  { value: '10+', label: 'Cities', Icon: MapPin },
+  { value: '4.9', label: 'Avg Rating', Icon: Star },
+];
 
 export const HeroSection: React.FC = () => {
   const navigate = useNavigate();
-  const { openBookingModal } = useBooking();
-  const [selectedMode, setSelectedMode] = useState<ConsultationMode>('home');
-  const vidRef = useRef<HTMLVideoElement>(null);
-  const vidInView = useInView(vidRef, { once: true, margin: '200px' });
+  const { data: doctors = [] } = useDoctors();
+
+  const urgency = useMemo(() => {
+    if (!doctors.length) return null;
+    const todayDoctors = doctors.filter(d => d.nextAvailable?.toLowerCase().includes('today'));
+    if (todayDoctors.length > 0) {
+      return { count: todayDoctors.length, text: `${todayDoctors.length} doctor${todayDoctors.length > 1 ? 's' : ''} available today` };
+    }
+    const upcoming = doctors.filter(d => d.nextAvailable && !d.nextAvailable.toLowerCase().includes('today'));
+    if (upcoming.length > 0) {
+      return { count: upcoming.length, text: `Next slot: ${upcoming[0].nextAvailable}` };
+    }
+    return null;
+  }, [doctors]);
 
   return (
-    <section className="relative pt-32 pb-20 lg:pt-40 lg:pb-32 overflow-hidden">
-      
-      {/* Dynamic Background Blobs */}
-      <div className="absolute top-20 left-10 w-96 h-96 bg-blue-100/40 rounded-full blur-3xl animate-pulse-glow pointer-events-none" />
-      <div className="absolute top-40 right-10 w-[30rem] h-[30rem] bg-teal-100/40 rounded-full blur-3xl animate-float-slow pointer-events-none" />
-      <div className="absolute bottom-10 left-1/3 w-80 h-80 bg-blue-100/40 rounded-full blur-3xl pointer-events-none" />
-
+    <section className="relative pt-18 pb-16 lg:pt-28 lg:pb-24 overflow-hidden">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8 items-center">
-          
-          {/* Left Hero Column */}
+          {/* Left: Text content */}
           <motion.div
-            variants={staggerContainer(0.12, 0.15)}
+            variants={staggerContainer(0.1, 0.1)}
             initial="hidden"
             animate="visible"
-            className="lg:col-span-7 space-y-8"
+            className="lg:col-span-7"
           >
-            
-            {/* Top Pill Badge */}
-            <motion.div
-              variants={fadeUp(20)}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-blue-50 border border-blue-200 shadow-sm text-blue-700 text-xs sm:text-sm font-bold"
+          {/* Headline */}
+          <motion.h1
+            variants={fadeUp(24)}
+            className="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-slate-900 leading-[1.1]"
+          >
+            Your Trusted Partner in{' '}
+            <span className="text-gradient">Physiotherapy Care</span>
+          </motion.h1>
+
+          {/* Subtext */}
+          <motion.p
+            variants={fadeUp(24, 0.08)}
+            className="mt-5 text-lg sm:text-xl text-slate-600 leading-relaxed max-w-2xl"
+          >
+            Book certified physiotherapists for <strong className="text-slate-900 font-semibold">Home Visits</strong> or instant <strong className="text-slate-900 font-semibold">HD Video Consultations</strong>. Recover comfortably at your speed.
+          </motion.p>
+
+          {/* CTA Buttons */}
+          <motion.div variants={fadeUp(24, 0.16)} className="mt-8 flex flex-wrap items-center gap-4">
+            <button
+              onClick={() => navigate('/doctors')}
+              className="btn-gradient text-white px-7 py-3.5 rounded-xl font-bold text-sm shadow-lg shadow-blue-500/25 flex items-center gap-2.5 hover:scale-[1.02] active:scale-[0.98] transition-all"
             >
-              <span className="flex h-2 w-2 relative">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-teal-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-teal-500"></span>
-              </span>
-              <Award className="w-4 h-4 text-teal-500" />
-              <span>India's #1 On-Demand Physiotherapy Platform</span>
-            </motion.div>
+              Book a Consultation
+              <ArrowRight className="w-4 h-4" />
+            </button>
 
-            {/* Headline */}
-            <motion.div variants={fadeUp(20)} className="space-y-4">
-              <h1 className="text-4xl sm:text-6xl lg:text-7xl font-extrabold tracking-tight text-slate-900 leading-[1.1]">
-                Your Trusted Partner in{' '}
-                <span className="text-gradient">Physiotherapy Care.</span>
-              </h1>
-              <p className="text-lg sm:text-xl text-slate-600 leading-relaxed font-normal max-w-2xl">
-                Book certified physiotherapists for personalized <strong className="text-slate-900 font-semibold">Home Visits</strong> or instant <strong className="text-slate-900 font-semibold">HD Video Consultations</strong>. Recover comfortably at your speed.
-              </p>
-            </motion.div>
-
-            {/* Mode Selection Toggle Card */}
-            <motion.div variants={fadeUp(20)} className="glass-panel p-2 rounded-2xl border border-slate-200 shadow-xl max-w-xl">
-              <div className="grid grid-cols-2 gap-2">
-                
-                <button
-                  onClick={() => setSelectedMode('home')}
-                  className={`p-3.5 rounded-xl font-bold text-xs sm:text-sm transition-all duration-200 flex items-center justify-center gap-2 ${
-                    selectedMode === 'home'
-                      ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
-                      : 'text-slate-600 hover:bg-slate-100'
-                  }`}
-                >
-                  <Home className="w-5 h-5 text-teal-300 flex-shrink-0" />
-                  <span>Home Visit Physio</span>
-                </button>
-
-                <button
-                  onClick={() => setSelectedMode('online')}
-                  className={`p-3.5 rounded-xl font-bold text-xs sm:text-sm transition-all duration-200 flex items-center justify-center gap-2 ${
-                    selectedMode === 'online'
-                      ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
-                      : 'text-slate-600 hover:bg-slate-100'
-                  }`}
-                >
-                  <Video className="w-5 h-5 text-cyan-300 flex-shrink-0" />
-                  <span>Online Video Consult</span>
-                </button>
-
-              </div>
-            </motion.div>
-
-            {/* CTA Buttons */}
-            <motion.div variants={fadeUp(20)} className="flex flex-wrap items-center gap-4">
-              <button
-                onClick={() => openBookingModal({ mode: selectedMode })}
-                className="btn-gradient text-white px-8 py-4 rounded-2xl font-extrabold text-base shadow-xl shadow-blue-500/30 flex items-center gap-3 hover:scale-[1.02] active:scale-[0.98] transition-all"
-              >
-                <Sparkles className="w-5 h-5 text-teal-300" />
-                <span>Book {selectedMode === 'home' ? 'Home Visit' : 'Video Consult'} Now</span>
-                <ArrowRight className="w-5 h-5" />
-              </button>
-
-              <button
-                onClick={() => navigate('/booking-slots')}
-                className="px-8 py-4 rounded-2xl font-bold text-white bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 transition-all text-base shadow-lg shadow-amber-500/30 flex items-center gap-3 hover:scale-[1.02] active:scale-[0.98]"
-              >
-                <Calendar className="w-5 h-5" />
-                <span>Check Available Slots</span>
-                <ArrowRight className="w-4 h-4" />
-              </button>
-            </motion.div>
-
+            <button
+              onClick={() => navigate('/booking-slots')}
+              className="px-7 py-3.5 rounded-xl font-bold text-sm text-slate-700 bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-50 shadow-sm flex items-center gap-2.5 transition-all"
+            >
+              <Calendar className="w-4 h-4 text-teal-500" />
+              Check Available Slots
+            </button>
           </motion.div>
 
-          {/* Right Hero Interactive 3D Graphic / Card */}
+          {/* Urgency Badge */}
+          {urgency && (
+            <motion.div
+              variants={fadeUp(24, 0.2)}
+              className="mt-5 inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold"
+            >
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <Clock className="w-3.5 h-3.5" />
+              <span>{urgency.text}</span>
+            </motion.div>
+          )}
+
+          {/* Inline Stats */}
+          <motion.div
+            variants={fadeUp(24, 0.24)}
+            className="mt-12 flex flex-wrap items-center gap-x-8 gap-y-4"
+          >
+            {STATS.map(({ value, label, Icon }) => (
+              <div key={label} className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-lg bg-blue-50 flex items-center justify-center">
+                  <Icon className="w-4 h-4 text-blue-600" />
+                </div>
+                <div>
+                  <p className="text-lg font-extrabold text-slate-900 leading-tight">{value}</p>
+                  <p className="text-xs text-slate-500 font-medium">{label}</p>
+                </div>
+              </div>
+            ))}
+          </motion.div>
+          </motion.div>
+
+          {/* Right: Hero video */}
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.7, delay: 0.35, ease: EASE_OUT }}
-            className="lg:col-span-5 relative"
+            transition={{ duration: 0.7, delay: 0.3, ease: EASE_OUT }}
+            className="lg:col-span-5"
           >
-            <div className="relative mx-auto max-w-md lg:max-w-none">
-              
-              {/* Glowing Outer Ring */}
-              <div className="absolute -inset-4 rounded-3xl bg-gradient-to-r from-blue-100 to-teal-100 opacity-60 blur-xl animate-pulse" />
-
-              {/* Main Illustration Card */}
-              <div className="relative rounded-3xl overflow-hidden glass-panel border border-slate-200 shadow-2xl p-4 sm:p-6 bg-white">
-                <div className="relative h-[22rem] sm:h-[26rem] rounded-2xl overflow-hidden group">
-                  <video
-                    ref={vidRef}
-                    src={vidInView ? homepageVid : undefined}
-                    autoPlay
-                    muted
-                    loop
-                    playsInline
-                    preload="none"
-                    className="w-full h-full object-cover"
-                  />
-
-                  {/* Elegant gradient overlay for depth */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-slate-900/30 via-slate-900/5 to-transparent" />
-                  
-                  {/* Subtle decorative border glow */}
-                  <div className="absolute inset-0 ring-1 ring-white/20 ring-inset rounded-2xl" />
-                </div>
-              </div>
+            <div className="relative rounded-2xl overflow-hidden">
+              <video
+                src={heroVid}
+                autoPlay
+                muted
+                loop
+                playsInline
+                preload="metadata"
+                className="w-full h-full aspect-[4/5] "
+              />
+              <div className="absolute inset-0 pointer-events-none" />
             </div>
           </motion.div>
         </div>

@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Doctor, ConsultationMode } from '../../types';
-import { useBooking } from '../../context/BookingContext';
 import { useSlots } from '../../hooks/queries';
 import { windowFirstSlot, formatTime } from '../../lib/adapters';
 import { Home, Video, Calendar, Clock, Sparkles, Shield, Loader2 } from 'lucide-react';
@@ -10,7 +10,7 @@ interface StickyBookingPanelProps {
 }
 
 export const StickyBookingPanel: React.FC<StickyBookingPanelProps> = ({ doctor }) => {
-  const { openBookingModal } = useBooking();
+  const navigate = useNavigate();
   const [selectedMode, setSelectedMode] = useState<ConsultationMode>('home');
 
   const dates = useMemo(() => {
@@ -177,7 +177,7 @@ export const StickyBookingPanel: React.FC<StickyBookingPanelProps> = ({ doctor }
 
       {/* Proceed CTA Button */}
       <button
-        onClick={() => openBookingModal({ doctor, mode: selectedMode })}
+        onClick={() => navigate('/book', { state: { doctor, mode: selectedMode } })}
         className="w-full btn-gradient text-white py-4 rounded-2xl font-extrabold text-sm shadow-xl shadow-blue-500/25 flex items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98] transition-all"
       >
         <Sparkles className="w-4 h-4 text-teal-200" />

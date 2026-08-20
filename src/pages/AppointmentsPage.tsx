@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useBooking } from '../context/BookingContext';
 import { useSlots } from '../hooks/queries';
 import { slotLabel } from '../lib/adapters';
@@ -8,7 +9,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { DoctorTrackingModal } from '../components/tracking/DoctorTrackingModal';
 
 export const AppointmentsPage: React.FC = () => {
-  const { appointments, openBookingModal, rescheduleAppointment, cancelAppointment } = useBooking();
+  const { appointments, rescheduleAppointment, cancelAppointment } = useBooking();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'upcoming' | 'completed' | 'cancelled'>('upcoming');
   const [trackingApt, setTrackingApt] = useState<Appointment | null>(null);
 
@@ -68,7 +70,7 @@ export const AppointmentsPage: React.FC = () => {
           </div>
 
           <button
-            onClick={() => openBookingModal({ mode: 'home' })}
+            onClick={() => navigate('/book')}
             className="btn-gradient text-white px-6 py-3 rounded-2xl font-extrabold text-xs shadow-lg flex items-center justify-center gap-2"
           >
             <Sparkles className="w-4 h-4 text-teal-300" />
@@ -325,7 +327,7 @@ export const AppointmentsPage: React.FC = () => {
             </div>
 
             <button
-              onClick={() => openBookingModal({ mode: 'home' })}
+              onClick={() => navigate('/book')}
               className="btn-gradient text-white px-8 py-3.5 rounded-2xl font-extrabold text-sm shadow-xl inline-flex items-center gap-2"
             >
               <Sparkles className="w-4 h-4 text-teal-300" />

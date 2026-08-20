@@ -1,5 +1,5 @@
 import React from 'react'
-import { Navigate, Outlet, RouterProvider, createBrowserRouter, useLocation } from 'react-router-dom'
+import { Navigate, Outlet, RouterProvider, createBrowserRouter } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AuthProvider, useAuth } from './lib/auth'
 import { LoginPage } from './pages/LoginPage'
@@ -21,36 +21,30 @@ import { PatientsPage } from './pages/admin/PatientsPage'
 import { CategoriesPage } from './pages/admin/CategoriesPage'
 import { SymptomsPage } from './pages/admin/SymptomsPage'
 import { InsightsPage } from './pages/admin/InsightsPage'
+import { BlogsPage } from './pages/admin/BlogsPage'
+import { BlogFormPage } from './pages/admin/BlogFormPage'
+import { TestimonialsPage } from './pages/admin/TestimonialsPage'
+import { MediaLibraryPage } from './pages/admin/MediaLibraryPage'
+import { SettingsPage } from './pages/admin/SettingsPage'
+import { AdminProfilePage } from './pages/admin/AdminProfilePage'
+import { PaymentsPage } from './pages/admin/PaymentsPage'
+import { DoctorPayoutsPage } from './pages/admin/DoctorPayoutsPage'
+import { DoctorBlogsPage } from './pages/DoctorBlogsPage'
+import { DoctorBlogFormPage } from './pages/DoctorBlogFormPage'
 import { DoctorOverviewPage } from './pages/DoctorOverviewPage'
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 30_000, refetchOnWindowFocus: false } },
 })
 
-function RequireDoctor({ children }: { children: React.ReactNode }) {
-  const { user, hydrated } = useAuth()
-  const location = useLocation()
-  if (!hydrated) return <div className="flex h-screen items-center justify-center text-slate-400">Loading…</div>
-  if (!user) return <Navigate to="/login" replace />
-  if (user.role !== 'doctor') {
-    return (
-      <div className="flex h-screen flex-col items-center justify-center gap-3 text-slate-600">
-        <p className="text-lg font-semibold">This portal is for doctors only.</p>
-        <p className="text-sm text-slate-400">Logged in as {user.email} ({user.role}).</p>
-      </div>
-    )
-  }
-  return <>{children}</>
-}
-
-function RequireAdmin({ children }: { children: React.ReactNode }) {
+function RequireRole({ role, children }: { role: string; children: React.ReactNode }) {
   const { user, hydrated } = useAuth()
   if (!hydrated) return <div className="flex h-screen items-center justify-center text-slate-400">Loading…</div>
   if (!user) return <Navigate to="/login" replace />
-  if (user.role !== 'admin') {
+  if (user.role !== role) {
     return (
       <div className="flex h-screen flex-col items-center justify-center gap-3 text-slate-600">
-        <p className="text-lg font-semibold">This portal is for admins only.</p>
+        <p className="text-lg font-semibold">This portal is for {role}s only.</p>
         <p className="text-sm text-slate-400">Logged in as {user.email} ({user.role}).</p>
       </div>
     )
@@ -63,9 +57,9 @@ const router = createBrowserRouter([
   {
     path: '/',
     element: (
-      <RequireDoctor>
+      <RequireRole role="doctor">
         <Outlet />
-      </RequireDoctor>
+      </RequireRole>
     ),
     children: [
       { index: true, element: <DoctorOverviewPage /> },
@@ -80,14 +74,16 @@ const router = createBrowserRouter([
       { path: 'messages', element: <MessagesPage /> },
       { path: 'community', element: <CommunityPage /> },
       { path: 'community/:id', element: <CommunityDetailPage /> },
+      { path: 'blogs', element: <DoctorBlogsPage /> },
+      { path: 'blogs/:id', element: <DoctorBlogFormPage /> },
     ],
   },
   {
     path: '/admin',
     element: (
-      <RequireAdmin>
+      <RequireRole role="admin">
         <Outlet />
-      </RequireAdmin>
+      </RequireRole>
     ),
     children: [
       { index: true, element: <Navigate to="/admin/dashboard" replace /> },
@@ -98,6 +94,14 @@ const router = createBrowserRouter([
       { path: 'categories', element: <CategoriesPage /> },
       { path: 'symptoms', element: <SymptomsPage /> },
       { path: 'insights', element: <InsightsPage /> },
+      { path: 'blogs', element: <BlogsPage /> },
+      { path: 'blogs/:id', element: <BlogFormPage /> },
+      { path: 'testimonials', element: <TestimonialsPage /> },
+      { path: 'payments', element: <PaymentsPage /> },
+      { path: 'payouts', element: <DoctorPayoutsPage /> },
+      { path: 'media', element: <MediaLibraryPage /> },
+      { path: 'settings', element: <SettingsPage /> },
+      { path: 'profile', element: <AdminProfilePage /> },
     ],
   },
 ])

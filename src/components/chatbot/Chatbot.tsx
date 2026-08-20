@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence, type Variants } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { useBooking } from '../../context/BookingContext';
 import { useDoctors, useCategories, useSymptoms } from '../../hooks/queries';
 import { Doctor } from '../../types';
 import { DoctorChatCard } from './DoctorChatCard';
@@ -453,7 +452,6 @@ interface ChatbotProps {
 
 export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, onMinimize }) => {
   const navigate = useNavigate();
-  const { openBookingModal } = useBooking();
   const { data: doctors = [] } = useDoctors();
   const { data: categories = [] } = useCategories();
   const { data: symptoms = [] } = useSymptoms();
@@ -463,7 +461,7 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, onMinimize })
       id: s.id,
       label: s.title,
       icon: symptomIcon(s.iconName),
-      conditions: s.popularFor.split(', '),
+      conditions: typeof s.popularFor === 'string' ? s.popularFor.split(', ') : [],
       severity: ['Little pain', 'More pain', 'Strong pain'],
       description: s.description,
       recoveryEstimate: s.recoveryEstimate,
@@ -898,12 +896,7 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, onMinimize })
       const doctor = chatState.selectedDoctor;
       const mode = chatState.appointmentType === 'video' ? 'online' : 'home';
       
-      openBookingModal({
-        doctor: doctor,
-        mode: mode,
-        symptom: chatState.symptomDetails?.label || 'General Consultation',
-        initialStep: 3
-      });
+      navigate('/book', { state: { doctor, mode } });
       
       onClose();
       return;
@@ -942,7 +935,7 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, onMinimize })
       );
       setTimeout(() => onClose(), 3000);
     }
-  }, [addUserMessage, simulateTyping, addBotMessage, addMessage, askDuration, askTreatment, askSummary, SYMPTOMS, SPECIALTIES, chatState, doctors, navigate, onClose, openBookingModal]);
+  }, [addUserMessage, simulateTyping, addBotMessage, addMessage, askDuration, askTreatment, askSummary, SYMPTOMS, SPECIALTIES, chatState, doctors, navigate, onClose]);
 
   // Expose handleQuickReply globally for button clicks
   useEffect(() => {

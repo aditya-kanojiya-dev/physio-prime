@@ -69,6 +69,11 @@ export const doctors = pgTable('doctors', {
   treatments: text('treatments').array().notNull().default([]),
   homeVisitsEnabled: boolean('home_visits_enabled').notNull().default(false),
   maxRadiusKm: numeric('max_radius_km').notNull().default('10'),
+  phone: text('phone'),
+  designation: text('designation'),
+  employeeId: text('employee_id'),
+  department: text('department'),
+  address: jsonb('address').notNull().default({}),
 });
 
 export const doctorSchedules = pgTable(
@@ -119,6 +124,8 @@ export const reviews = pgTable('reviews', {
   doctorId: integer('doctor_id').notNull().references(() => doctors.id),
   rating: integer('rating').notNull(),
   comment: text('comment'),
+  featured: boolean('featured').notNull().default(false),
+  status: text('status').notNull().default('approved'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -152,6 +159,8 @@ export const symptoms = pgTable('symptoms', {
   slug: text('slug').notNull().unique(),
   iconName: text('icon_name'),
   description: text('description'),
+  symptomsList: text('symptoms_list'),
+  treatment: text('treatment'),
   popularFor: jsonb('popular_for').notNull().default({}),
   recoveryEstimate: text('recovery_estimate'),
   image: text('image'),

@@ -41,6 +41,11 @@ const doctorColumns = {
   registration: doctors.registration,
   expertise: doctors.expertise,
   treatments: doctors.treatments,
+  phone: doctors.phone,
+  designation: doctors.designation,
+  employeeId: doctors.employeeId,
+  department: doctors.department,
+  address: doctors.address,
 };
 
 const appointmentColumns = {
@@ -71,6 +76,11 @@ const profilePatchSchema = z.object({
   photo: z.string().url().optional(),
   languages: z.array(z.string().max(50)).optional(),
   experienceYears: z.number().int().nonnegative().optional(),
+  phone: z.string().max(20).nullable().optional(),
+  designation: z.string().max(100).nullable().optional(),
+  employeeId: z.string().max(50).nullable().optional(),
+  department: z.string().max(100).nullable().optional(),
+  address: z.record(z.string(), z.unknown()).nullable().optional(),
 });
 
 const windowSchema = z.object({

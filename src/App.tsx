@@ -15,7 +15,9 @@ import { DashboardPage } from './pages/DashboardPage';
 import { AboutPage } from './pages/AboutPage';
 import { Career } from './pages/Career';
 import { BookingSlotsPage } from './pages/BookingSlotsPage';
-import { BookingModal } from './components/booking/BookingModal';
+import { BookingPage } from './pages/BookingPage';
+import { BlogListingPage } from './pages/BlogListingPage';
+import { BlogDetailPage } from './pages/BlogDetailPage';
 import { ChatbotButton } from './components/chatbot/ChatbotButton';
 import { pageVariants } from './lib/motion';
 
@@ -52,7 +54,9 @@ function AnimatedRoutes() {
             <Route path="/about" element={<AboutPage />} />
             <Route path="/career" element={<Career />} />
             <Route path="/booking-slots" element={<BookingSlotsPage />} />
-            <Route path="/book/:doctorId" element={<BookingModal />} />
+            <Route path="/book" element={<BookingPage />} />
+            <Route path="/blog" element={<BlogListingPage />} />
+            <Route path="/blog/:slug" element={<BlogDetailPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </motion.div>
@@ -71,7 +75,6 @@ export function App() {
               <div className="min-h-screen flex flex-col">
                 <Navbar />
                 <AnimatedRoutes />
-                <BookingModal />
                 <ChatbotButton />
                 <Footer />
               </div>

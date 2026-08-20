@@ -1,15 +1,7 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
+import { requireEnv } from './env';
 
 const BASE_URL = 'https://api.razorpay.com/v1';
-
-// Keys are read lazily from env at call time: the API must boot (and all tests
-// run) with empty RAZORPAY_* vars in .env, so these are intentionally NOT in the
-// required getConfig() schema.
-function requireEnv(name: string): string {
-  const value = process.env[name];
-  if (!value) throw new Error(`Razorpay ${name} is not configured`);
-  return value;
-}
 
 function authHeader(): string {
   return `Basic ${Buffer.from(`${requireEnv('RAZORPAY_KEY_ID')}:${requireEnv('RAZORPAY_KEY_SECRET')}`).toString('base64')}`;

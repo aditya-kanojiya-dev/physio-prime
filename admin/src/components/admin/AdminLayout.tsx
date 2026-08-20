@@ -19,6 +19,11 @@ import {
   X,
   MapPin,
   MessageCircle,
+  BookOpen,
+  Star,
+  Image,
+  Settings,
+  Receipt,
 } from 'lucide-react'
 import { useAuth } from '../../lib/auth'
 import { NotificationsPanel } from '../NotificationsPanel'
@@ -30,6 +35,13 @@ const adminNav = [
   { to: '/admin/patients', label: 'Patients', icon: Users },
   { to: '/admin/categories', label: 'Categories', icon: Layers },
   { to: '/admin/symptoms', label: 'Symptoms', icon: FileText },
+  { to: '/admin/blogs', label: 'Blogs', icon: BookOpen },
+  { to: '/admin/testimonials', label: 'Testimonials', icon: Star },
+  { to: '/admin/payments', label: 'Payments', icon: Receipt },
+  { to: '/admin/payouts', label: 'Doctor Payouts', icon: Wallet },
+  { to: '/admin/media', label: 'Media', icon: Image },
+  { to: '/admin/settings', label: 'Settings', icon: Settings },
+  { to: '/admin/profile', label: 'Profile', icon: UserRound },
   { to: '/admin/insights', label: 'Insights', icon: BarChart3 },
 ]
 
@@ -45,6 +57,7 @@ const doctorNav = [
   { to: '/locations', label: 'Locations', icon: MapPin },
   { to: '/messages', label: 'Messages', icon: MessageCircle },
   { to: '/community', label: 'Community', icon: Users },
+  { to: '/blogs', label: 'Blogs', icon: BookOpen },
 ]
 
 export function AdminLayout({ children, portal = 'admin' }: { children: React.ReactNode; portal?: 'admin' | 'doctor' }) {

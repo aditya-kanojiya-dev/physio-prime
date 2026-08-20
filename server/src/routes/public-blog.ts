@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { and, asc, count, desc, eq, ilike, or, sql, type SQL } from 'drizzle-orm';
+import { and, asc, count, desc, eq, getTableColumns, ilike, or, sql, type SQL } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '../db/pool';
 import {
@@ -33,7 +33,7 @@ async function getPublicPostWithRelations(slug: string) {
     [category] = await db.select().from(blogCategories).where(eq(blogCategories.id, post.categoryId));
   }
   const postTags = await db
-    .select({ ...blogTags })
+    .select({ ...getTableColumns(blogTags) })
     .from(blogPostTags)
     .innerJoin(blogTags, eq(blogPostTags.tagId, blogTags.id))
     .where(eq(blogPostTags.postId, post.id));
@@ -56,29 +56,29 @@ async function getPublicPostsWithRelations(filters: SQL[], order: SQL, page: num
     .limit(pageSize)
     .offset((page - 1) * pageSize);
 
-  const postIds = rows.map((r) => r.id);
+  const postIds = rows.map((r: typeof blogPosts.$inferSelect) => r.id);
   let categoriesMap: Record<number, typeof blogCategories.$inferSelect> = {};
-  let tagsMap: Record<number, typeof blogTags.$inferSelect[]> = {};
+  let tagsMap: Record<number, (typeof blogTags.$inferSelect)[]> = {};
 
   if (postIds.length > 0) {
     const categories = await db
       .select()
       .from(blogCategories)
-      .where(sql`${blogCategories.id} IN (${sql.join(rows.filter(r => r.categoryId).map(r => sql`${r.categoryId}`), sql`, `)})`);
+      .where(sql`${blogCategories.id} IN (${sql.join(rows.filter((r: typeof blogPosts.$inferSelect) => r.categoryId).map((r: typeof blogPosts.$inferSelect) => sql`${r.categoryId}`), sql`, `)})`);
     for (const c of categories) categoriesMap[c.id] = c;
 
     const postTags = await db
-      .select({ postId: blogPostTags.postId, ...blogTags })
+      .select({ postId: blogPostTags.postId, ...getTableColumns(blogTags) })
       .from(blogPostTags)
       .innerJoin(blogTags, eq(blogPostTags.tagId, blogTags.id))
       .where(sql`${blogPostTags.postId} IN (${sql.join(postIds.map((id) => sql`${id}`), sql`, `)})`);
     for (const pt of postTags) {
       if (!tagsMap[pt.postId]) tagsMap[pt.postId] = [];
-      tagsMap[pt.postId].push(pt);
+      tagsMap[pt.postId].push(pt as typeof blogTags.$inferSelect);
     }
   }
 
-  const posts = rows.map((r) => ({
+  const posts = rows.map((r: typeof blogPosts.$inferSelect) => ({
     ...r,
     category: r.categoryId ? categoriesMap[r.categoryId] : null,
     tags: tagsMap[r.id] || [],

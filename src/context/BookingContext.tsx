@@ -5,22 +5,13 @@ import { api } from '../lib/api';
 import { ApiAppointment, toAppointment } from '../lib/adapters';
 import { useAppointments } from '../hooks/queries';
 
-export type PageView = 'home' | 'doctors' | 'doctor-detail' | 'categories' | 'appointments' | 'dashboard' | 'about' | 'career';
-
-interface BookingModalOptions {
-  doctor?: Doctor;
-  mode?: ConsultationMode;
-  symptom?: string;
-  initialStep?: 1 | 2 | 3 | 4 | 5;
-  preSelectedDate?: string;
-  preSelectedTime?: string;
-}
+export type PageView = 'home' | 'doctors' | 'doctor-detail' | 'categories' | 'appointments' | 'dashboard' | 'about' | 'career' | 'blog';
 
 export interface CreateAppointmentParams {
   doctorSlug: string;
   mode: ConsultationMode;
   date: string;
-  slot: string; // "HH:mm-HH:mm"
+  slot: string;
   symptom?: string;
   patientName: string;
   patientPhone: string;
@@ -45,12 +36,6 @@ interface BookingContextType {
   searchQuery: string;
   setSearchQuery: (q: string) => void;
 
-  // Booking modal
-  isBookingOpen: boolean;
-  bookingOptions: BookingModalOptions;
-  openBookingModal: (options?: BookingModalOptions) => void;
-  closeBookingModal: () => void;
-
   // Appointments store (API-backed)
   appointments: Appointment[];
   createAppointment: (data: CreateAppointmentParams) => Promise<{
@@ -74,9 +59,6 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [selectedCategorySlug, setSelectedCategorySlug] = useState<string | null>(null);
   const [selectedSymptomSlug, setSelectedSymptomSlug] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-
-  const [isBookingOpen, setIsBookingOpen] = useState(false);
-  const [bookingOptions, setBookingOptions] = useState<BookingModalOptions>({});
 
   const queryClient = useQueryClient();
   const { data: apiAppointments } = useAppointments();
@@ -131,16 +113,6 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const openBookingModal = (options: BookingModalOptions = {}) => {
-    setBookingOptions(options);
-    setIsBookingOpen(true);
-  };
-
-  const closeBookingModal = () => {
-    setIsBookingOpen(false);
-    setBookingOptions({});
-  };
-
   const createAppointment = (data: CreateAppointmentParams) => createMutation.mutateAsync(data);
 
   const rescheduleAppointment = (id: string, date: string, slot: string) =>
@@ -177,10 +149,6 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
         setSelectedSymptomSlug,
         searchQuery,
         setSearchQuery,
-        isBookingOpen,
-        bookingOptions,
-        openBookingModal,
-        closeBookingModal,
         appointments,
         createAppointment,
         rescheduleAppointment,

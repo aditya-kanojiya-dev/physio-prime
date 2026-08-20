@@ -7,9 +7,11 @@ import {
   categories,
   contentSections,
   doctorApplications,
+  doctorPayouts,
   doctors,
   patientProfiles,
   prescriptions,
+  reviews,
   symptoms,
   users,
 } from '../db/schema';
@@ -57,6 +59,11 @@ const doctorColumns = {
   registration: doctors.registration,
   expertise: doctors.expertise,
   treatments: doctors.treatments,
+  phone: doctors.phone,
+  designation: doctors.designation,
+  employeeId: doctors.employeeId,
+  department: doctors.department,
+  address: doctors.address,
 };
 
 const appointmentColumns = {
@@ -718,6 +725,8 @@ const symptomSchema = z.object({
   slug: z.string().regex(/^[a-z0-9-]+$/),
   iconName: z.string().max(100).nullable().optional(),
   description: z.string().max(1000).nullable().optional(),
+  symptomsList: z.string().max(2000).nullable().optional(),
+  treatment: z.string().max(2000).nullable().optional(),
   popularFor: z.record(z.string(), z.unknown()).optional(),
   recoveryEstimate: z.string().max(200).nullable().optional(),
   image: z.string().url().nullable().optional(),
@@ -845,6 +854,239 @@ adminRouter.delete('/cms/:page/:key', async (req, res, next) => {
       return;
     }
     res.status(204).end();
+  } catch (err) {
+    next(err);
+  }
+});
+
+// --- admin profile -------------------------------------------------------
+
+adminRouter.get('/profile', async (req, res, next) => {
+  try {
+    const [user] = await db
+      .select({ id: users.id, email: users.email, name: users.name, phone: users.phone, role: users.role })
+      .from(users)
+      .where(eq(users.id, req.user!.id));
+    if (!user) {
+      res.status(404).json({ error: { message: 'User not found' } });
+      return;
+    }
+    res.json({ user });
+  } catch (err) {
+    next(err);
+  }
+});
+
+adminRouter.patch('/profile', async (req, res, next) => {
+  try {
+    const body = z.object({
+      name: z.string().min(1).max(100).optional(),
+      phone: z.string().max(20).nullable().optional(),
+    }).parse(req.body);
+    if (Object.keys(body).length === 0) {
+      res.status(400).json({ error: { message: 'Nothing to update' } });
+      return;
+    }
+    const [updated] = await db
+      .update(users)
+      .set(body)
+      .where(eq(users.id, req.user!.id))
+      .returning({ id: users.id, email: users.email, name: users.name, phone: users.phone, role: users.role });
+    res.json({ user: updated });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// --- reviews moderation ---------------------------------------------------
+
+adminRouter.get('/reviews', async (req, res, next) => {
+  try {
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const pageSize = Math.min(100, Math.max(1, Number(req.query.pageSize) || 20));
+    const statusFilter = typeof req.query.status === 'string' ? req.query.status : undefined;
+
+    const filters: SQL[] = [];
+    if (statusFilter) filters.push(eq(reviews.status, statusFilter));
+
+    const [{ total }] = await db
+      .select({ total: count(reviews.id) })
+      .from(reviews)
+      .where(filters.length ? and(...filters) : undefined);
+
+    const rows = await db
+      .select({
+        id: reviews.id,
+        appointmentId: reviews.appointmentId,
+        doctorId: reviews.doctorId,
+        rating: reviews.rating,
+        comment: reviews.comment,
+        featured: reviews.featured,
+        status: reviews.status,
+        createdAt: reviews.createdAt,
+        doctorName: doctors.name,
+        doctorSlug: doctors.slug,
+        patientName: appointments.patientName,
+        patientEmail: appointments.patientEmail,
+      })
+      .from(reviews)
+      .innerJoin(doctors, eq(doctors.id, reviews.doctorId))
+      .innerJoin(appointments, eq(appointments.id, reviews.appointmentId))
+      .where(filters.length ? and(...filters) : undefined)
+      .orderBy(desc(reviews.createdAt))
+      .limit(pageSize)
+      .offset((page - 1) * pageSize);
+
+    res.json({ reviews: rows, pagination: { page, pageSize, total, pages: Math.ceil(total / pageSize) } });
+  } catch (err) {
+    next(err);
+  }
+});
+
+adminRouter.patch('/reviews/:id', async (req, res, next) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) {
+      res.status(400).json({ error: { message: 'id must be an integer' } });
+      return;
+    }
+    const body = z.object({
+      featured: z.boolean().optional(),
+      status: z.enum(['approved', 'rejected', 'pending']).optional(),
+    }).parse(req.body);
+    if (Object.keys(body).length === 0) {
+      res.status(400).json({ error: { message: 'Nothing to update' } });
+      return;
+    }
+    const [updated] = await db.update(reviews).set(body).where(eq(reviews.id, id)).returning();
+    if (!updated) {
+      res.status(404).json({ error: { message: 'Review not found' } });
+      return;
+    }
+    res.json({ review: updated });
+  } catch (err) {
+    next(err);
+  }
+});
+
+adminRouter.delete('/reviews/:id', async (req, res, next) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) {
+      res.status(400).json({ error: { message: 'id must be an integer' } });
+      return;
+    }
+    const deleted = await db.delete(reviews).where(eq(reviews.id, id)).returning({ id: reviews.id });
+    if (deleted.length === 0) {
+      res.status(404).json({ error: { message: 'Review not found' } });
+      return;
+    }
+    res.status(204).end();
+  } catch (err) {
+    next(err);
+  }
+});
+
+// --- doctor payouts (admin) ----------------------------------------------
+
+adminRouter.get('/payouts', async (req, res, next) => {
+  try {
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const pageSize = Math.min(100, Math.max(1, Number(req.query.pageSize) || 20));
+    const statusFilter = typeof req.query.status === 'string' ? req.query.status : undefined;
+
+    const filters: SQL[] = [];
+    if (statusFilter) filters.push(eq(doctorPayouts.status, statusFilter));
+
+    const [{ total }] = await db
+      .select({ total: count(doctorPayouts.id) })
+      .from(doctorPayouts)
+      .where(filters.length ? and(...filters) : undefined);
+
+    const rows = await db
+      .select({
+        id: doctorPayouts.id,
+        amountPaise: doctorPayouts.amountPaise,
+        status: doctorPayouts.status,
+        paymentMethod: doctorPayouts.paymentMethod,
+        transactionId: doctorPayouts.transactionId,
+        notes: doctorPayouts.notes,
+        createdAt: doctorPayouts.createdAt,
+        processedAt: doctorPayouts.processedAt,
+        doctorId: doctors.id,
+        doctorName: doctors.name,
+        doctorSlug: doctors.slug,
+      })
+      .from(doctorPayouts)
+      .innerJoin(doctors, eq(doctors.id, doctorPayouts.doctorId))
+      .where(filters.length ? and(...filters) : undefined)
+      .orderBy(sql`${doctorPayouts.createdAt} desc`)
+      .limit(pageSize)
+      .offset((page - 1) * pageSize);
+
+    res.json({
+      payouts: rows.map((r) => ({
+        ...r,
+        createdAt: r.createdAt.toISOString(),
+        processedAt: r.processedAt?.toISOString() ?? null,
+      })),
+      pagination: { page, pageSize, total, pages: Math.ceil(total / pageSize) },
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+adminRouter.patch('/payouts/:id', async (req, res, next) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) {
+      res.status(400).json({ error: { message: 'id must be an integer' } });
+      return;
+    }
+    const body = z.object({
+      status: z.enum(['processing', 'completed', 'failed']),
+      transactionId: z.string().nullable().optional(),
+      notes: z.string().nullable().optional(),
+    }).parse(req.body);
+    if (Object.keys(body).length === 0) {
+      res.status(400).json({ error: { message: 'Nothing to update' } });
+      return;
+    }
+    const update: Record<string, unknown> = { ...body };
+    if (body.status === 'completed' || body.status === 'failed') {
+      update.processedAt = new Date();
+    }
+    const [updated] = await db.update(doctorPayouts).set(update).where(eq(doctorPayouts.id, id)).returning();
+    if (!updated) {
+      res.status(404).json({ error: { message: 'Payout not found' } });
+      return;
+    }
+    res.json({ payout: { ...updated, createdAt: updated.createdAt.toISOString(), processedAt: updated.processedAt?.toISOString() ?? null } });
+  } catch (err) {
+    next(err);
+  }
+});
+
+adminRouter.get('/payouts/summary', async (req, res, next) => {
+  try {
+    const [totalPaid] = await db
+      .select({ total: sql<number>`coalesce(sum(case when ${doctorPayouts.status} = 'completed' then ${doctorPayouts.amountPaise} else 0 end), 0)` })
+      .from(doctorPayouts);
+
+    const [totalPending] = await db
+      .select({ total: sql<number>`coalesce(sum(case when ${doctorPayouts.status} in ('pending','processing') then ${doctorPayouts.amountPaise} else 0 end), 0)` })
+      .from(doctorPayouts);
+
+    const [totalRevenue] = await db
+      .select({ total: sql<number>`coalesce(sum(case when ${appointments.paymentStatus} = 'paid' then ${appointments.feePaise} else 0 end), 0)` })
+      .from(appointments);
+
+    res.json({
+      totalPaidPaise: Number(totalPaid?.total ?? 0),
+      totalPendingPaise: Number(totalPending?.total ?? 0),
+      totalRevenuePaise: Number(totalRevenue?.total ?? 0),
+    });
   } catch (err) {
     next(err);
   }

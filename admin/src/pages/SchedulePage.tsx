@@ -115,6 +115,17 @@ export function SchedulePage() {
     })
   }
 
+  function toggleDay(day: number) {
+    const anyActive = WINDOWS.some(w => state[day][w.start].active)
+    setState((prev) => {
+      const next = { ...prev }
+      for (const w of WINDOWS) {
+        next[day][w.start] = { active: !anyActive, maxPatients: prev[day][w.start].maxPatients || 3 }
+      }
+      return next
+    })
+  }
+
   return (
     <AdminLayout portal="doctor">
       <div className="space-y-6">
@@ -159,11 +170,23 @@ export function SchedulePage() {
             <div className="min-w-[700px] grid grid-cols-[140px_repeat(7,1fr)] gap-1">
               {/* Header row */}
               <div className="p-2" />
-              {DAY_NAMES.map((name, i) => (
-                <div key={name} className="rounded-2xl bg-slate-100 p-3 text-center text-xs font-bold text-slate-600">
-                  {name}
-                </div>
-              ))}
+              {DAY_NAMES.map((name, i) => {
+                const day = DAY_ORDER[i]
+                const anyActive = WINDOWS.some(w => state[day][w.start].active)
+                return (
+                  <button
+                    key={name}
+                    onClick={() => toggleDay(day)}
+                    className={`rounded-2xl p-3 text-center text-xs font-bold transition-all ${
+                      anyActive
+                        ? 'bg-teal-100 text-teal-700 border border-teal-200 shadow-sm'
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    {name}
+                  </button>
+                )
+              })}
 
               {/* Window rows */}
               {WINDOWS.map((w) => (

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useBooking, PageView } from '../../context/BookingContext';
 import { useAuth } from '../../context/AuthContext';
-import { Activity, User, Menu, X, ArrowRight, Sparkles, MapPin, LogIn, LogOut, Home, Stethoscope, Layers, Calendar, Info, LayoutDashboard, Phone, Mail } from 'lucide-react';
+import { Activity, User, Menu, X, ArrowRight, Sparkles, MapPin, LogIn, LogOut, Home, Stethoscope, Layers, Calendar, Info, LayoutDashboard, Phone, Mail, BookOpen } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AuthModal } from '../auth/AuthModal';
 import { EASE_OUT } from '../../lib/motion';
@@ -11,7 +11,7 @@ import logo from '../../assets/logo.png';
 export const Navbar: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { openBookingModal, appointments } = useBooking();
+  const { appointments } = useBooking();
   const { user, logout, authModalOpen, openAuthModal, closeAuthModal } = useAuth();
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -156,7 +156,7 @@ export const Navbar: React.FC = () => {
 
               {/* Quick Book Home Visit CTA */}
               <button
-                onClick={() => openBookingModal({ mode: 'home' })}
+                onClick={() => navigate('/book')}
                 className="btn-gradient text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-blue-500/25 flex items-center gap-2 hover:scale-[1.02] active:scale-[0.98] transition-all"
               >
                 <Sparkles className="w-4 h-4 text-teal-300 animate-spin" style={{ animationDuration: '6s' }} />
@@ -274,7 +274,7 @@ export const Navbar: React.FC = () => {
                   <button
                     onClick={() => {
                       setMobileMenuOpen(false);
-                      openBookingModal({ mode: 'home' });
+                      navigate('/book');
                     }}
                     className="w-full btn-gradient text-white py-3.5 rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-blue-500/25"
                   >

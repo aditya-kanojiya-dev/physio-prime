@@ -1,7 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Doctor } from '../../types';
-import { useBooking } from '../../context/BookingContext';
 import { Star, MapPin, Clock, Home, Video, CheckCircle2, Navigation } from 'lucide-react';
 import { motion } from 'framer-motion';
 
@@ -11,7 +10,6 @@ interface DoctorCardProps {
 
 export const DoctorCard: React.FC<DoctorCardProps> = ({ doctor }) => {
   const navigate = useNavigate();
-  const { openBookingModal } = useBooking();
 
   const handleViewProfile = () => {
     navigate(`/doctor/${doctor.id}`);
@@ -134,7 +132,7 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({ doctor }) => {
         </button>
 
         <button
-          onClick={() => openBookingModal({ doctor, mode: 'home' })}
+          onClick={() => navigate('/book', { state: { doctor, mode: 'home' } })}
           className="w-full btn-gradient text-white py-3 px-4 rounded-xl font-extrabold text-xs shadow-md shadow-blue-500/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
         >
           BOOK NOW

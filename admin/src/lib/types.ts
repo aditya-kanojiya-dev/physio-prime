@@ -22,6 +22,11 @@ export interface DoctorProfile {
   registration?: Record<string, string> | null;
   expertise?: string[] | null;
   treatments?: string[] | null;
+  phone?: string | null;
+  designation?: string | null;
+  employeeId?: string | null;
+  department?: string | null;
+  address?: Record<string, unknown> | null;
 }
 
 export type AppointmentStatus = 'upcoming' | 'completed' | 'cancelled' | 'no_show';
@@ -44,18 +49,6 @@ export interface Appointment {
   cancellationReason?: string | null;
   createdAt?: string | null;
 }
-
-export interface ScheduleDay {
-  id?: number;
-  dayOfWeek: number;
-  startTime: string;
-  endTime: string;
-  breakStart: string | null;
-  breakEnd: string | null;
-  active: boolean;
-}
-
-export const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 export function formatDate(dateStr: string): string {
   const [y, m, d] = dateStr.split('-').map(Number);
@@ -91,6 +84,11 @@ export interface AdminDoctor {
   bio: string | null;
   expertise: string[];
   treatments: string[];
+  phone: string | null;
+  designation: string | null;
+  employeeId: string | null;
+  department: string | null;
+  address: Record<string, unknown>;
 }
 
 export interface AdminApplication {
@@ -160,20 +158,6 @@ export interface AdminSection {
   data: Record<string, unknown>;
   sortOrder: number;
   active: boolean;
-}
-
-export interface AdminPrescription {
-  id: number;
-  appointmentId: number;
-  bookingId: string;
-  patientId: number;
-  patientName: string;
-  doctorName: string;
-  diagnosis: string | null;
-  medicines: { name: string; dosage?: string; frequency?: string; duration?: string }[];
-  advice: string | null;
-  followUpDate: string | null;
-  createdAt: string;
 }
 
 export interface AdminClient {
@@ -293,12 +277,6 @@ export interface EarningsComparison {
   percentChange: number;
 }
 
-export interface EarningsChartPoint {
-  date: string;
-  earningsPaise: number;
-  appointments: number;
-}
-
 export interface PaymentRecord {
   bookingId: string;
   patientName: string;
@@ -396,6 +374,75 @@ export interface Message {
   body: string;
   read: boolean;
   createdAt: string;
+}
+
+// --- Blog ---
+export interface BlogCategory {
+  id: number;
+  name: string;
+  slug: string;
+  description: string | null;
+  color: string | null;
+  sortOrder: number;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BlogTag {
+  id: number;
+  name: string;
+  slug: string;
+  color: string | null;
+  createdAt: string;
+}
+
+export interface BlogPost {
+  id: number;
+  title: string;
+  slug: string;
+  excerpt: string | null;
+  content: string;
+  featuredImage: string | null;
+  status: 'draft' | 'published';
+  authorType: 'admin' | 'doctor';
+  authorId: number;
+  categoryId: number | null;
+  publishedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  category?: BlogCategory | null;
+  tags?: BlogTag[];
+}
+
+export interface BlogPostsResponse {
+  posts: BlogPost[];
+  pagination: { page: number; pageSize: number; total: number; pages: number };
+}
+
+// --- Reviews ---
+export interface AdminReview {
+  id: number;
+  appointmentId: number;
+  doctorId: number;
+  rating: number;
+  comment: string | null;
+  featured: boolean;
+  status: string;
+  createdAt: string;
+  doctorName: string;
+  doctorSlug: string;
+  patientName: string;
+  patientEmail: string | null;
+}
+
+// --- Admin Profile ---
+export interface AdminProfile {
+  id: number;
+  email: string;
+  name: string;
+  phone: string | null;
+  role: string;
 }
 
 // --- Notifications ---

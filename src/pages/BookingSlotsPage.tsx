@@ -1,8 +1,8 @@
 import React, { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useQueries } from '@tanstack/react-query';
 import { useDoctors } from '../hooks/queries';
-import { useBooking } from '../context/BookingContext';
 import { api } from '../lib/api';
 import { ApiTimeWindow, formatTime } from '../lib/adapters';
 import { Doctor } from '../types';
@@ -24,7 +24,7 @@ interface BookingSlot {
 }
 
 export const BookingSlotsPage: React.FC = () => {
-  const { openBookingModal } = useBooking();
+  const navigate = useNavigate();
   const { data: doctors = [], isLoading: doctorsLoading } = useDoctors();
 
   const [selectedDate, setSelectedDate] = useState<string>('');
@@ -105,14 +105,7 @@ export const BookingSlotsPage: React.FC = () => {
     const doctor = doctors.find(d => d.id === selectedSlot.doctorId);
     if (!doctor) return;
     setShowBookingModal(false);
-    openBookingModal({
-      doctor,
-      mode: selectedSlot.mode,
-      symptom: 'General Consultation',
-      initialStep: 4,
-      preSelectedDate: selectedSlot.date,
-      preSelectedTime: selectedSlot.time,
-    });
+    navigate('/book', { state: { doctor, mode: selectedSlot.mode, date: selectedSlot.date, time: selectedSlot.time } });
   };
 
   return (
@@ -370,7 +363,7 @@ export const BookingSlotsPage: React.FC = () => {
         {/* Quick Booking Button */}
         <div className="text-center mt-10">
           <button
-            onClick={() => openBookingModal({ mode: 'home' })}
+            onClick={() => navigate('/book')}
             className="btn-gradient text-white px-8 py-3.5 rounded-2xl font-extrabold text-sm shadow-xl shadow-blue-500/25 inline-flex items-center gap-2 hover:scale-[1.02] transition-transform"
           >
             <Sparkles className="w-4 h-4 text-teal-300" />

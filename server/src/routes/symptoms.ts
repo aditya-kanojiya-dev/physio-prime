@@ -19,6 +19,8 @@ symptomsRouter.get('/', async (_req, res) => {
       slug: row.slug,
       iconName: row.iconName,
       description: row.description,
+      symptomsList: row.symptomsList,
+      treatment: row.treatment,
       popularFor: row.popularFor,
       recoveryEstimate: row.recoveryEstimate,
       image: row.image,

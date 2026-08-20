@@ -1,11 +1,11 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useBooking } from '../../context/BookingContext';
 import { Heart, Phone, Mail, MapPin, Shield, Star } from 'lucide-react';
 import logo from '../../assets/logo.png';
 
 export const Footer: React.FC = () => {
-  const { openBookingModal } = useBooking();
+  const navigate = useNavigate();
 
   return (
     <footer className="relative bg-slate-50 text-slate-600 pt-20 pb-12 overflow-hidden border-t border-slate-200">
@@ -68,6 +68,9 @@ export const Footer: React.FC = () => {
               <li>
                 <Link to="/career" className="hover:text-blue-600 transition-colors block">Careers</Link>
               </li>
+              <li>
+                <Link to="/blog" className="hover:text-blue-600 transition-colors block">Blog</Link>
+              </li>
             </ul>
           </div>
 
@@ -120,7 +123,7 @@ export const Footer: React.FC = () => {
             
             {/* Quick Action Button */}
             <button
-              onClick={() => openBookingModal({ mode: 'home' })}
+              onClick={() => navigate('/book')}
               className="mt-3 w-full bg-gradient-to-r from-teal-600 to-blue-600 text-white px-4 py-2.5 rounded-xl text-sm font-bold hover:shadow-lg transition-all hover:scale-[1.02] active:scale-[0.98]"
             >
               Book a Session Now

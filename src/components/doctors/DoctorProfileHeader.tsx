@@ -1,6 +1,6 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Doctor } from '../../types';
-import { useBooking } from '../../context/BookingContext';
 import { Star, ShieldCheck, MapPin, CheckCircle2, Home, Video } from 'lucide-react';
 
 interface DoctorProfileHeaderProps {
@@ -8,7 +8,7 @@ interface DoctorProfileHeaderProps {
 }
 
 export const DoctorProfileHeader: React.FC<DoctorProfileHeaderProps> = ({ doctor }) => {
-  const { openBookingModal } = useBooking();
+  const navigate = useNavigate();
 
   return (
     <div className="relative glass-panel rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-xl bg-white overflow-hidden">
@@ -74,7 +74,7 @@ export const DoctorProfileHeader: React.FC<DoctorProfileHeaderProps> = ({ doctor
           {/* Consultation Modes & Action */}
           <div className="flex flex-wrap items-center justify-center lg:justify-start gap-4">
             <button
-              onClick={() => openBookingModal({ doctor, mode: 'home' })}
+              onClick={() => navigate('/book', { state: { doctor, mode: 'home' } })}
               className="btn-gradient text-white px-6 py-3 rounded-xl font-extrabold text-sm shadow-lg shadow-blue-500/25 flex items-center gap-2 hover:scale-[1.02] active:scale-[0.98] transition-all"
             >
               <Home className="w-4 h-4 text-teal-200" />
@@ -82,7 +82,7 @@ export const DoctorProfileHeader: React.FC<DoctorProfileHeaderProps> = ({ doctor
             </button>
 
             <button
-              onClick={() => openBookingModal({ doctor, mode: 'online' })}
+              onClick={() => navigate('/book', { state: { doctor, mode: 'online' } })}
               className="px-6 py-3 rounded-xl font-bold text-sm text-slate-600 bg-white border border-slate-200 hover:border-teal-400 hover:bg-slate-50 transition-colors flex items-center gap-2 shadow-sm"
             >
               <Video className="w-4 h-4 text-teal-500" />

@@ -58,14 +58,11 @@ export interface ApiSymptom {
   slug: string;
   iconName: string;
   description: string;
+  symptomsList: string | null;
+  treatment: string | null;
   popularFor: string;
   recoveryEstimate: string;
   image: string;
-}
-
-export interface ApiSlot {
-  start: string;
-  end: string;
 }
 
 export interface ApiTimeWindow {
@@ -75,10 +72,6 @@ export interface ApiTimeWindow {
   maxPatients: number;
   bookedCount: number;
   available: boolean;
-}
-
-export function windowLabel(w: ApiTimeWindow): string {
-  return `${w.label} • ${formatTime(w.start)} – ${formatTime(w.end)}`;
 }
 
 export function windowCapacityText(w: ApiTimeWindow): string {
@@ -99,7 +92,7 @@ export function windowFirstSlot(w: ApiTimeWindow): string {
   return `${fmt(slotStart)}-${fmt(slotEnd)}`;
 }
 
-export interface ApiAppointmentDoctor {
+interface ApiAppointmentDoctor {
   id: string;
   slug: string;
   name: string;
@@ -144,7 +137,7 @@ export function formatTime(hhmm: string): string {
   return `${hour}:${String(m).padStart(2, '0')} ${ampm}`;
 }
 
-export function formatTimeSlot(timeSlot: string): string {
+function formatTimeSlot(timeSlot: string): string {
   return formatTime(timeSlot.split('-')[0]);
 }
 
@@ -152,7 +145,7 @@ export function slotLabel(slot: ApiSlot): string {
   return `${formatTime(slot.start)} – ${formatTime(slot.end)}`;
 }
 
-export function formatNextAvailable(dateStr: string | null): string {
+function formatNextAvailable(dateStr: string | null): string {
   if (!dateStr) return 'Check schedule';
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -239,6 +232,8 @@ export function toSymptom(s: ApiSymptom): Symptom {
     slug: s.slug,
     iconName: s.iconName,
     description: s.description,
+    symptomsList: s.symptomsList,
+    treatment: s.treatment,
     popularFor: s.popularFor,
     recoveryEstimate: s.recoveryEstimate,
     image: s.image,

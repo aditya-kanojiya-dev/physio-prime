@@ -2,7 +2,7 @@ import { and, eq, inArray } from 'drizzle-orm';
 import { db } from '../db/pool';
 import { appointments, doctorSchedules } from '../db/schema';
 
-export const WINDOWS = [
+const WINDOWS = [
   { start: '07:00', end: '09:00', label: 'Early Morning' },
   { start: '09:00', end: '12:00', label: 'Morning' },
   { start: '12:00', end: '15:00', label: 'Afternoon' },
@@ -10,7 +10,7 @@ export const WINDOWS = [
   { start: '18:00', end: '21:00', label: 'Night' },
 ] as const;
 
-export interface WindowWithCapacity {
+interface WindowWithCapacity {
   start: string;
   end: string;
   label: string;
@@ -19,12 +19,12 @@ export interface WindowWithCapacity {
   available: boolean;
 }
 
-export function todayStr(): string {
+function todayStr(): string {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-export function nowHHmm(): string {
+function nowHHmm(): string {
   const d = new Date();
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
@@ -149,34 +149,4 @@ export function availableFromSchedules(
     }
   }
   return result;
-}
-
-// ponytail: backward-compat — count total available slots across all schedules for a day
-export async function getDaySlotCount(doctorId: number, dateStr: string): Promise<number> {
-  const day = dayOfWeek(dateStr);
-  const schedules = await db
-    .select()
-    .from(doctorSchedules)
-    .where(
-      and(
-        eq(doctorSchedules.doctorId, doctorId),
-        eq(doctorSchedules.dayOfWeek, day),
-        eq(doctorSchedules.active, true),
-      ),
-    );
-  const booked = await db
-    .select({ timeSlot: appointments.timeSlot })
-    .from(appointments)
-    .where(
-      and(
-        eq(appointments.doctorId, doctorId),
-        eq(appointments.date, dateStr),
-        inArray(appointments.status, ['upcoming', 'completed']),
-      ),
-    );
-  return availableFromSchedules(
-    schedules.map(s => ({ windowStart: s.windowStart, windowEnd: s.windowEnd, maxPatients: s.maxPatients })),
-    booked.map((r) => r.timeSlot.split('-')[0]),
-    dateStr,
-  ).length;
 }

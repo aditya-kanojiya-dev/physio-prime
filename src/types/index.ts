@@ -69,6 +69,8 @@ export interface Symptom {
   slug: string;
   iconName: string;
   description: string;
+  symptomsList: string | null;
+  treatment: string | null;
   popularFor: string;
   recoveryEstimate: string;
   image: string;
@@ -111,4 +113,45 @@ export interface Appointment {
   videoCallLink?: string;
   cancellationReason?: string;
   paymentMethod?: string;
+}
+
+// --- Blog ---
+export interface BlogCategory {
+  id: number;
+  name: string;
+  slug: string;
+  description: string | null;
+  color: string | null;
+  sortOrder: number;
+  active: boolean;
+}
+
+export interface BlogTag {
+  id: number;
+  name: string;
+  slug: string;
+  color: string | null;
+}
+
+export interface BlogPost {
+  id: number;
+  title: string;
+  slug: string;
+  excerpt: string | null;
+  content: string;
+  featuredImage: string | null;
+  status: 'draft' | 'published';
+  authorType: 'admin' | 'doctor';
+  authorId: number;
+  categoryId: number | null;
+  publishedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  category?: BlogCategory | null;
+  tags?: BlogTag[];
+}
+
+export interface BlogPostsResponse {
+  posts: BlogPost[];
+  pagination: { page: number; pageSize: number; total: number; pages: number };
 }
