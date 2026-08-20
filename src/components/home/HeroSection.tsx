@@ -1,21 +1,45 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useDoctors } from '../../hooks/queries';
-import { motion } from 'framer-motion';
+import { motion, useInView } from 'framer-motion';
 import { Calendar, ArrowRight, ShieldCheck, Users, MapPin, Star, Clock } from 'lucide-react';
 import { fadeUp, staggerContainer, EASE_OUT } from '../../lib/motion';
 import heroVid from '../../assets/hero-vid.webm';
 
 const STATS = [
-  { value: '10K+', label: 'Happy Patients', Icon: Users },
-  { value: '100+', label: 'Verified Doctors', Icon: ShieldCheck },
-  { value: '10+', label: 'Cities', Icon: MapPin },
-  { value: '4.9', label: 'Avg Rating', Icon: Star },
+  { value: '10K', suffix: '+', label: 'Happy Patients', Icon: Users },
+  { value: '100', suffix: '+', label: 'Verified Doctors', Icon: ShieldCheck },
+  { value: '10', suffix: '+', label: 'Cities', Icon: MapPin },
+  { value: '4.9', suffix: '', label: 'Avg Rating', Icon: Star },
 ];
+
+function HeroStatValue({ value, suffix, active }: { value: string; suffix: string; active: boolean }) {
+  const [text, setText] = useState('0');
+  useEffect(() => {
+    if (!active) return;
+    const isK = value.endsWith('K');
+    const target = isK ? Number(value.slice(0, -1)) * 1000 : Number(value);
+    const decimals = value.includes('.') ? 1 : 0;
+    let start = 0;
+    const duration = 1200;
+    const startTime = performance.now();
+    const step = (now: number) => {
+      const progress = Math.min((now - startTime) / duration, 1);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      const current = eased * target;
+      setText(isK ? `${+(current / 1000).toFixed(1)}K` : current.toFixed(decimals));
+      if (progress < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  }, [active, value]);
+  return <>{text}{suffix}</>;
+}
 
 export const HeroSection: React.FC = () => {
   const navigate = useNavigate();
   const { data: doctors = [] } = useDoctors();
+  const statsRef = useRef<HTMLDivElement>(null);
+  const statsInView = useInView(statsRef, { once: true });
 
   const urgency = useMemo(() => {
     if (!doctors.length) return null;
@@ -91,16 +115,19 @@ export const HeroSection: React.FC = () => {
 
           {/* Inline Stats */}
           <motion.div
+            ref={statsRef}
             variants={fadeUp(24, 0.24)}
             className="mt-12 flex flex-wrap items-center gap-x-8 gap-y-4"
           >
-            {STATS.map(({ value, label, Icon }) => (
+            {STATS.map(({ value, suffix, label, Icon }) => (
               <div key={label} className="flex items-center gap-2.5">
                 <div className="w-9 h-9 rounded-lg bg-blue-50 flex items-center justify-center">
                   <Icon className="w-4 h-4 text-blue-600" />
                 </div>
                 <div>
-                  <p className="text-lg font-extrabold text-slate-900 leading-tight">{value}</p>
+                  <p className="text-lg font-extrabold text-slate-900 leading-tight">
+                    <HeroStatValue value={value} suffix={suffix} active={statsInView} />
+                  </p>
                   <p className="text-xs text-slate-500 font-medium">{label}</p>
                 </div>
               </div>
