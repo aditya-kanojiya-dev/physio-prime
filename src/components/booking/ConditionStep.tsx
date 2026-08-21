@@ -15,8 +15,12 @@ export const ConditionStep: React.FC<ConditionStepProps> = ({ onSelect }) => {
   const [search, setSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState('All');
 
+  // popularFor is a plain string on legacy rows, a jsonb array (specialty tag) on detailed rows
+  const labelOf = (s: Symptom): string =>
+    Array.isArray(s.popularFor) ? s.popularFor[0] ?? '' : s.popularFor ?? '';
+
   const categoryTabs = useMemo(() => {
-    const popularFors = [...new Set(symptoms.map(s => s.popularFor).filter(Boolean))];
+    const popularFors = [...new Set(symptoms.map(labelOf).filter(Boolean))];
     return ['All', ...popularFors];
   }, [symptoms]);
 
@@ -24,7 +28,7 @@ export const ConditionStep: React.FC<ConditionStepProps> = ({ onSelect }) => {
     const term = search.toLowerCase().trim();
     return symptoms.filter(s => {
       const matchesSearch = !term || s.title.toLowerCase().includes(term) || s.description.toLowerCase().includes(term);
-      const matchesCategory = activeCategory === 'All' || s.popularFor === activeCategory;
+      const matchesCategory = activeCategory === 'All' || labelOf(s) === activeCategory;
       return matchesSearch && matchesCategory;
     });
   }, [symptoms, search, activeCategory]);
@@ -137,9 +141,9 @@ export const ConditionStep: React.FC<ConditionStepProps> = ({ onSelect }) => {
                       {symptom.recoveryEstimate}
                     </span>
                   )}
-                  {symptom.popularFor && (
+                  {labelOf(symptom) && (
                     <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-slate-100 text-slate-600">
-                      {symptom.popularFor}
+                      {labelOf(symptom)}
                     </span>
                   )}
                 </div>

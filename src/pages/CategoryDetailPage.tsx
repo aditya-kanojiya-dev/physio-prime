@@ -291,9 +291,9 @@ export const CategoryDetailPage: React.FC = () => {
               const areas = [
                 ...new Set([
                   doctor.location.area,
-                  ...(doctor.locations ?? []).map((l) => l.area).filter(Boolean),
+                  ...(doctor.locations ?? []).map((l) => l.area).filter((a): a is string => Boolean(a)),
                 ]),
-              ].filter(Boolean).slice(0, 4);
+              ].slice(0, 4);
               const visitTypes = [
                 ...(doctor.fees.home > 0 ? ['home'] : []),
                 ...(doctor.fees.online > 0 ? ['online'] : []),
