@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useBooking, PageView } from '../../context/BookingContext';
 import { useAuth } from '../../context/AuthContext';
-import { Activity, User, Menu, X, ArrowRight, Sparkles, MapPin, LogIn, LogOut, Home, Stethoscope, Layers, Calendar, Info, LayoutDashboard, Phone, Mail, BookOpen, ChevronDown, ChevronRight, Search } from 'lucide-react';
+import { Activity, User, Menu, X, ArrowRight, Sparkles, MapPin, LogIn, LogOut, Home, Stethoscope, Layers, Calendar, LayoutDashboard, Phone, Mail, BookOpen, ChevronDown, ChevronRight, Search } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AuthModal } from '../auth/AuthModal';
 import { EASE_OUT } from '../../lib/motion';
@@ -62,7 +62,6 @@ export const Navbar: React.FC = () => {
     { id: 'categories', label: 'Categories', path: '/categories', icon: <Layers className="w-5 h-5" /> },
     { id: 'conditions', label: 'Conditions', path: '/conditions', icon: <BookOpen className="w-5 h-5" /> },
     { id: 'appointments', label: 'My Appointments', path: '/appointments', icon: <Calendar className="w-5 h-5" />, badge: upcomingCount },
-    { id: 'about', label: 'About Us', path: '/about', icon: <Info className="w-5 h-5" /> },
   ];
 
   // Check if current path matches nav item (also matches sub-pages like /conditions/back-pain)
