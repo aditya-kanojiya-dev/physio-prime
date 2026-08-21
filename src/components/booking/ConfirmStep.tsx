@@ -54,7 +54,6 @@ const RELATIONS = ['Father', 'Mother', 'Spouse', 'Child', 'Grandparent', 'Siblin
 const MODE_LABELS: Record<ConsultationMode, string> = {
   home: 'Home Visit',
   online: 'Online Video',
-  clinic: 'Clinic Visit',
 };
 
 function formatDate(dateStr: string): string {

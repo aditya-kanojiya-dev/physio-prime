@@ -1,225 +1,354 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useBooking } from '../context/BookingContext';
 import { useDoctors, useSymptoms, useCategories } from '../hooks/queries';
-import { DoctorFilterSidebar } from '../components/doctors/DoctorFilterSidebar';
 import { ConsultationMode } from '../types';
-import { 
-  Stethoscope, 
-  ArrowUpDown, 
-  Filter, 
-  Loader2, 
-  Search, 
-  X,
-  Star,
+import { TherapistSearchBar } from '../components/doctors/TherapistSearchBar';
+import { DoctorListCard } from '../components/doctors/DoctorListCard';
+import {
+  SlidersHorizontal,
   MapPin,
-  Clock,
+  ArrowUpDown,
+  ChevronDown,
+  X,
+  Stethoscope,
   Home,
-  Video,
-  CheckCircle2,
-  Shield,
-  Award,
+  Wallet,
+  Check,
+  Loader2,
+  LocateFixed,
+  Sparkles,
   Users,
-  Calendar,
-  ChevronRight
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
 
-// 🏥 List View Doctor Card Component
-const DoctorListItem: React.FC<{ doctor: any }> = ({ doctor }) => {
-  const navigate = useNavigate();
+interface FilterSelectProps {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder: string;
+  options: { value: string; label: string }[];
+}
 
-  const handleViewProfile = () => {
-    navigate(`/doctor/${doctor.id}`);
-  };
+const FilterSelect: React.FC<FilterSelectProps> = ({ value, onChange, placeholder, options }) => {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDocClick = (e: MouseEvent) => {
+      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false);
+    document.addEventListener('mousedown', onDocClick);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDocClick);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
+  const selected = options.find(o => o.value === value);
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 15 }}
-      animate={{ opacity: 1, y: 0 }}
-      whileHover={{ y: -2 }}
-      className="group bg-white rounded-3xl overflow-hidden border border-slate-200 hover:border-blue-300 hover:shadow-2xl transition-all duration-300 shadow-md"
-    >
-      <div className="flex flex-col md:flex-row">
-        {/* 🖼️ Photo - Left side */}
-        <div className="md:w-56 h-56 md:h-auto relative overflow-hidden bg-gradient-to-br from-blue-50 to-teal-50 flex-shrink-0">
-          <img
-            src={doctor.photo}
-            alt={doctor.name}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 via-slate-900/20 to-transparent md:bg-gradient-to-r md:from-slate-900/80 md:via-slate-900/20 md:to-transparent" />
-          
-          {/* ⭐ Rating Badge */}
-          <div className="absolute top-3 left-3 bg-white/95 backdrop-blur-md text-slate-900 px-3 py-1.5 rounded-full text-xs font-black flex items-center gap-1.5 shadow-lg border border-slate-200/50">
-            <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
-            <span>{doctor.rating}</span>
-            <span className="text-[10px] text-slate-500 font-medium">({doctor.reviewCount})</span>
-          </div>
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        aria-expanded={open}
+        className={`w-full flex items-center justify-between gap-2 bg-white border rounded-xl px-3 py-2.5 text-sm text-left transition-all ${
+          open ? 'border-blue-500 ring-4 ring-blue-100' : 'border-slate-200 hover:border-slate-300'
+        }`}
+      >
+        <span className={`truncate ${selected ? 'text-slate-800 font-medium' : 'text-slate-400'}`}>
+          {selected?.label ?? placeholder}
+        </span>
+        <ChevronDown className={`w-4 h-4 text-slate-400 shrink-0 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
+      </button>
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, y: -4, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -4, scale: 0.98 }}
+            transition={{ duration: 0.15 }}
+            className="absolute z-20 mt-2 w-full bg-white border border-slate-200 rounded-xl shadow-xl shadow-slate-900/5 p-1.5 max-h-60 overflow-y-auto"
+          >
+            {options.map(o => (
+              <button
+                key={o.value}
+                type="button"
+                onClick={() => { onChange(o.value); setOpen(false); }}
+                className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-sm text-left transition-colors ${
+                  o.value === value
+                    ? 'bg-blue-50 text-blue-700 font-semibold'
+                    : 'text-slate-600 hover:bg-slate-50'
+                }`}
+              >
+                <span className="truncate">{o.label}</span>
+                {o.value === value && <Check className="w-4 h-4 text-blue-600 shrink-0" />}
+              </button>
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
 
-          {/* ✅ Verified Badge */}
-          {doctor.verified && (
-            <div className="absolute top-3 right-3 bg-teal-500/90 backdrop-blur-md px-2.5 py-1.5 rounded-full text-[10px] font-bold text-white flex items-center gap-1.5 shadow-lg border border-teal-400/30">
-              <CheckCircle2 className="w-3.5 h-3.5 text-white" />
-              <span className="hidden sm:inline">Verified</span>
-            </div>
-          )}
+interface FilterPanelProps {
+  cityInput: string;
+  setCityInput: (v: string) => void;
+  areaInput: string;
+  setAreaInput: (v: string) => void;
+  maxPrice: number;
+  setMaxPrice: (n: number) => void;
+  selectedSymptom: string | null;
+  setSelectedSymptom: (s: string | null) => void;
+  selectedCategory: string | null;
+  setSelectedCategory: (c: string | null) => void;
+  selectedMode: ConsultationMode | 'all';
+  setSelectedMode: (m: ConsultationMode | 'all') => void;
+  selectedGender: 'all' | 'male' | 'female';
+  setSelectedGender: (g: 'all' | 'male' | 'female') => void;
+  resetFilters: () => void;
+  defaultCity: string;
+}
 
-          {/* 📍 Location Overlay on Mobile */}
-          <div className="absolute bottom-3 left-3 right-3 md:hidden bg-white/95 backdrop-blur-md px-3 py-2 rounded-xl border border-slate-200/50">
-            <p className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-              <MapPin className="w-3.5 h-3.5 text-blue-600" /> 
-              {doctor.location.area}, {doctor.location.city}
-            </p>
-          </div>
-        </div>
+const FilterPanel: React.FC<FilterPanelProps> = ({
+  cityInput,
+  setCityInput,
+  areaInput,
+  setAreaInput,
+  maxPrice,
+  setMaxPrice,
+  selectedSymptom,
+  setSelectedSymptom,
+  selectedCategory,
+  setSelectedCategory,
+  selectedMode,
+  setSelectedMode,
+  selectedGender,
+  setSelectedGender,
+  resetFilters,
+  defaultCity,
+}) => {
+  const { data: categories = [] } = useCategories();
+  const { data: symptoms = [] } = useSymptoms();
 
-        {/* 📋 Content - Right side */}
-        <div className="flex-1 p-5 md:p-6 flex flex-col justify-between">
-          <div>
-            {/* Header Row */}
-            <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
-              <div className="flex-1 min-w-0">
-                <h3
-                  onClick={handleViewProfile}
-                  className="text-xl md:text-2xl font-extrabold text-slate-900 hover:text-blue-600 transition-colors cursor-pointer truncate"
-                >
-                  {doctor.name}
-                </h3>
-                <div className="flex flex-wrap items-center gap-2 mt-1">
-                  <span className="text-sm text-teal-600 font-bold bg-teal-50 px-2.5 py-0.5 rounded-full border border-teal-200">
-                    {doctor.specialty}
-                  </span>
-                  <span className="text-xs text-slate-400">•</span>
-                  <span className="text-xs text-slate-500 font-medium flex items-center gap-1">
-                    <Calendar className="w-3 h-3 text-slate-400" />
-                    {doctor.experienceYears} Years Experience
-                  </span>
-                </div>
-                <p className="text-xs text-slate-500 hidden md:flex items-center gap-1.5 mt-1.5">
-                  <MapPin className="w-3.5 h-3.5 text-blue-600" /> 
-                  {doctor.location.address}
-                </p>
-              </div>
-              
-              {/* Next Available */}
-              <div className="flex items-center gap-1.5 bg-teal-50 px-3 py-1.5 rounded-xl border border-teal-200 flex-shrink-0">
-                <Clock className="w-3.5 h-3.5 text-teal-600" />
-                <span className="text-xs font-bold text-teal-700">{doctor.nextAvailable}</span>
-              </div>
-            </div>
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h3 className="font-bold text-slate-900">Filters</h3>
+        <button
+          onClick={resetFilters}
+          className="text-xs text-slate-400 hover:text-slate-600 flex items-center gap-1 transition-colors"
+        >
+          <X className="w-3.5 h-3.5" /> Clear all
+        </button>
+      </div>
 
-            {/* 💰 Fee & Mode Chips */}
-            <div className="flex flex-wrap items-center gap-2 mb-3">
-              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-50 text-blue-700 border border-blue-200 font-bold text-xs">
-                <Home className="w-3.5 h-3.5 text-blue-600" /> 
-                ₹{doctor.fees.home} 
-                <span className="font-normal text-blue-500 ml-0.5">/visit</span>
-              </div>
-              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-teal-50 text-teal-700 border border-teal-200 font-bold text-xs">
-                <Video className="w-3.5 h-3.5 text-teal-600" /> 
-                ₹{doctor.fees.online}
-                <span className="font-normal text-teal-500 ml-0.5">/session</span>
-              </div>
-              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-50 text-slate-600 border border-slate-200 text-xs font-medium">
-                <Users className="w-3.5 h-3.5 text-slate-400" /> 
-                {doctor.patientsTreated}+ patients
-              </div>
-            </div>
+      <div className="space-y-2">
+        <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
+          <Stethoscope className="w-3.5 h-3.5 text-blue-600" />
+          Specialty
+        </label>
+        <FilterSelect
+          value={selectedCategory ?? ''}
+          onChange={v => setSelectedCategory(v || null)}
+          placeholder="All specialties"
+          options={categories.map(c => ({ value: c.slug, label: c.title }))}
+        />
+      </div>
 
-            {/* 🗣️ Languages & Expertise Preview */}
-            <div className="flex flex-wrap items-center gap-3 text-xs">
-              <div className="flex items-center gap-1.5 text-slate-600">
-                <span className="font-semibold text-slate-700">Languages:</span>
-                <span>{doctor.languages.join(', ')}</span>
-              </div>
-              <span className="text-slate-300 hidden sm:inline">|</span>
-              <div className="flex items-center gap-1.5 text-slate-600 hidden sm:flex">
-                <span className="font-semibold text-slate-700">Expertise:</span>
-                <span className="text-slate-500 truncate max-w-xs">
-                  {doctor.expertise.slice(0, 3).join(', ')}
-                  {doctor.expertise.length > 3 && ` +${doctor.expertise.length - 3} more`}
-                </span>
-              </div>
-            </div>
-          </div>
+      <div className="space-y-2">
+        <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
+          <Sparkles className="w-3.5 h-3.5 text-blue-600" />
+          Symptom
+        </label>
+        <FilterSelect
+          value={selectedSymptom ?? ''}
+          onChange={v => setSelectedSymptom(v || null)}
+          placeholder="All symptoms"
+          options={symptoms.map(s => ({ value: s.slug, label: s.title }))}
+        />
+      </div>
 
-          {/* 🎯 Action Buttons */}
-          <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-slate-200">
+      <div className="space-y-2">
+        <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
+          <Home className="w-3.5 h-3.5 text-blue-600" />
+          Consultation type
+        </label>
+        <div className="grid grid-cols-3 gap-1 p-1 bg-slate-100 rounded-xl text-[11px] font-bold">
+          {([
+            ['all', 'All'],
+            ['home', 'Home'],
+            ['online', 'Video'],
+          ] as [ConsultationMode | 'all', string][]).map(([mode, label]) => (
             <button
-              onClick={handleViewProfile}
-              className="flex-1 min-w-[120px] py-2.5 px-4 rounded-xl font-bold text-xs text-slate-700 bg-slate-100 hover:bg-slate-200 transition-colors flex items-center justify-center gap-1"
+              key={mode}
+              onClick={() => setSelectedMode(mode)}
+              className={`py-2 rounded-lg transition-all ${
+                selectedMode === mode ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-200/60'
+              }`}
             >
-              View Profile <ChevronRight className="w-3.5 h-3.5" />
+              {label}
             </button>
-            <button
-              onClick={() => navigate('/book', { state: { doctor, mode: 'home' } })}
-              className="flex-1 min-w-[120px] bg-gradient-to-r from-blue-600 to-blue-700 text-white py-2.5 px-4 rounded-xl font-extrabold text-xs shadow-lg shadow-blue-500/30 hover:shadow-blue-600/40 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-1.5"
-            >
-              <Shield className="w-3.5 h-3.5" />
-              Book Now
-            </button>
-          </div>
+          ))}
         </div>
       </div>
-    </motion.div>
+
+      <div className="space-y-2">
+        <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
+          <Users className="w-3.5 h-3.5 text-blue-600" />
+          Doctor gender
+        </label>
+        <div className="grid grid-cols-3 gap-1 p-1 bg-slate-100 rounded-xl text-xs font-bold">
+          {([
+            ['all', 'Any'],
+            ['female', 'Female'],
+            ['male', 'Male'],
+          ] as ['all' | 'male' | 'female', string][]).map(([gender, label]) => (
+            <button
+              key={gender}
+              onClick={() => setSelectedGender(gender)}
+              className={`py-2 rounded-lg transition-all ${
+                selectedGender === gender ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-200/60'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
+          <MapPin className="w-3.5 h-3.5 text-blue-600" />
+          Location
+        </label>
+        {/* ponytail: no geocoding backend — "use my location" snaps to the primary served city */}
+        <button
+          onClick={() => setCityInput(defaultCity)}
+          className="w-full inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-sm font-medium text-slate-700 transition-colors"
+        >
+          <LocateFixed className="w-4 h-4 text-blue-600" />
+          Use my location
+        </button>
+        <div className="relative">
+          <input
+            type="text"
+            value={cityInput}
+            onChange={e => setCityInput(e.target.value)}
+            placeholder="Enter city"
+            className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 pr-14 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+          />
+          {cityInput && (
+            <button
+              onClick={() => setCityInput('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-blue-600 hover:text-blue-700"
+            >
+              Clear
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
+          <Home className="w-3.5 h-3.5 text-blue-600" />
+          Area (home visits)
+        </label>
+        <input
+          type="text"
+          value={areaInput}
+          onChange={e => setAreaInput(e.target.value)}
+          placeholder={`Any area in ${cityInput.trim() || defaultCity}`}
+          className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+        />
+        <p className="text-[11px] text-slate-400 leading-relaxed">
+          Shows home-visit physios who cover this area.
+        </p>
+      </div>
+
+      <div className="space-y-3">
+        <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
+          <Wallet className="w-3.5 h-3.5 text-blue-600" />
+          Max consultation fee
+        </label>
+        <div className="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-xl px-4 py-3">
+          <span className="text-2xl font-extrabold text-slate-900">₹{maxPrice.toLocaleString('en-IN')}</span>
+          <span className="text-[11px] text-slate-400 text-right leading-tight">max<br />per session</span>
+        </div>
+        <input
+          type="range"
+          min="400"
+          max="2000"
+          step="50"
+          value={maxPrice}
+          onChange={e => setMaxPrice(Number(e.target.value))}
+          className="w-full accent-blue-600 cursor-pointer"
+        />
+        <div className="flex justify-between text-[10px] text-slate-400 font-medium">
+          <span>₹400</span>
+          <span>₹2,000</span>
+        </div>
+      </div>
+    </div>
   );
 };
 
 export const FindDoctorsPage: React.FC = () => {
-  const { 
-    selectedCategorySlug, 
-    selectedSymptomSlug, 
-    setSelectedCategorySlug, 
-    setSelectedSymptomSlug, 
-    searchQuery, 
-    setSearchQuery 
+  const {
+    selectedCategorySlug,
+    selectedSymptomSlug,
+    setSelectedCategorySlug,
+    setSelectedSymptomSlug,
+    searchQuery,
+    setSearchQuery,
   } = useBooking();
-  
+
   const { data: doctors = [], isLoading: doctorsLoading } = useDoctors();
   const { data: symptoms = [] } = useSymptoms();
   const { data: categories = [] } = useCategories();
 
-  const popularAreas = useMemo(() => {
-    const areas = doctors.map(d => d.location.area).filter(Boolean);
-    return [...new Set(areas)].slice(0, 6);
-  }, [doctors]);
-
-  // Filter States
-  const [selectedMode, setSelectedMode] = useState<ConsultationMode | 'all'>('all');
-  const [selectedSymptom, setSelectedSymptom] = useState<string | null>(selectedSymptomSlug);
+  // ponytail: read ?condition= once at mount so condition-page CTAs land pre-filtered
+  const [selectedSymptom, setSelectedSymptom] = useState<string | null>(
+    selectedSymptomSlug ?? new URLSearchParams(window.location.search).get('condition')
+  );
   const [selectedCategory, setSelectedCategory] = useState<string | null>(selectedCategorySlug);
   const [maxPrice, setMaxPrice] = useState<number>(2000);
+  const [cityInput, setCityInput] = useState('');
+  const [areaInput, setAreaInput] = useState('');
+  const [selectedMode, setSelectedMode] = useState<ConsultationMode | 'all'>('all');
   const [selectedGender, setSelectedGender] = useState<'all' | 'male' | 'female'>('all');
   const [sortBy, setSortBy] = useState<'recommended' | 'price-low' | 'rating-high' | 'experience'>('recommended');
-  const [filtersOpen, setFiltersOpen] = useState(false);
-  const [localSearchQuery, setLocalSearchQuery] = useState(searchQuery);
+  const [filtersOpen, setFiltersOpen] = useState(() => typeof window !== 'undefined' && window.innerWidth >= 1024);
 
-  // Debounce search
-  React.useEffect(() => {
-    const timer = setTimeout(() => {
-      setSearchQuery(localSearchQuery);
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [localSearchQuery, setSearchQuery]);
+  const defaultCity = useMemo(
+    () => [...new Set(doctors.map(d => d.location.city))][0] ?? 'your city',
+    [doctors]
+  );
+
+  const cities = useMemo(
+    () => [...new Set(doctors.map(d => d.location.city).filter(Boolean))],
+    [doctors]
+  );
 
   const symptomTitle = selectedSymptom ? symptoms.find(s => s.slug === selectedSymptom)?.title.toLowerCase() : null;
   const categoryTitle = selectedCategory ? categories.find(c => c.slug === selectedCategory)?.title.toLowerCase() : null;
 
-  // Filter and sort logic
   const filteredDoctors = useMemo(() => {
     return doctors.filter(doc => {
-      // Search filter
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
-        const matchesName = doc.name.toLowerCase().includes(q);
-        const matchesSpecialty = doc.specialty.toLowerCase().includes(q);
-        const matchesArea = doc.location.area.toLowerCase().includes(q);
-        const matchesCity = doc.location.city.toLowerCase().includes(q);
-        if (!matchesName && !matchesSpecialty && !matchesArea && !matchesCity) return false;
+        const matches =
+          doc.name.toLowerCase().includes(q) ||
+          doc.specialty.toLowerCase().includes(q) ||
+          doc.location.area.toLowerCase().includes(q) ||
+          doc.location.city.toLowerCase().includes(q);
+        if (!matches) return false;
       }
 
-      // Symptom / category filter
       if (symptomTitle || categoryTitle) {
         const hay = [doc.specialty, ...doc.expertise, ...doc.treatments, doc.bio].join(' ').toLowerCase();
         const terms = [symptomTitle, categoryTitle].filter(Boolean).join(' ').split(' ').filter(w => w.length > 3);
@@ -227,17 +356,24 @@ export const FindDoctorsPage: React.FC = () => {
         if (!fullMatch && !terms.some(t => hay.includes(t))) return false;
       }
 
-      // Gender filter
-      if (selectedGender !== 'all' && doc.gender !== selectedGender) return false;
+      if (cityInput.trim() && !doc.location.city.toLowerCase().includes(cityInput.trim().toLowerCase())) return false;
 
-      // Price filter
-      if (doc.fees.home > maxPrice && doc.fees.online > maxPrice) return false;
-
-      // Mode filter
-      if (selectedMode !== 'all') {
-        if (selectedMode === 'home' && !doc.fees.home) return false;
-        if (selectedMode === 'online' && !doc.fees.online) return false;
+      if (areaInput.trim()) {
+        const a = areaInput.trim().toLowerCase();
+        const covered = [doc.location.area, ...(doc.locations ?? []).map(l => l.area)]
+          .filter(Boolean)
+          .some(area => area!.toLowerCase().includes(a));
+        if (!covered) return false;
       }
+
+      if (selectedMode !== 'all') {
+        if (selectedMode === 'home' && !(doc.fees.home > 0)) return false;
+        if (selectedMode === 'online' && !(doc.fees.online > 0)) return false;
+      }
+
+      if (selectedGender !== 'all' && doc.gender?.toLowerCase() !== selectedGender) return false;
+
+      if (doc.fees.home > maxPrice && doc.fees.online > maxPrice) return false;
 
       return true;
     }).sort((a, b) => {
@@ -246,287 +382,237 @@ export const FindDoctorsPage: React.FC = () => {
       if (sortBy === 'experience') return b.experienceYears - a.experienceYears;
       return 0;
     });
-  }, [doctors, searchQuery, selectedMode, symptomTitle, categoryTitle, maxPrice, selectedGender, sortBy]);
+  }, [doctors, searchQuery, symptomTitle, categoryTitle, cityInput, areaInput, maxPrice, sortBy, selectedMode, selectedGender]);
 
   const resetFilters = () => {
-    setLocalSearchQuery('');
     setSearchQuery('');
-    setSelectedMode('all');
     setSelectedSymptom(null);
     setSelectedCategory(null);
     setSelectedCategorySlug(null);
     setSelectedSymptomSlug(null);
     setMaxPrice(2000);
+    setCityInput('');
+    setAreaInput('');
+    setSelectedMode('all');
     setSelectedGender('all');
   };
 
-  // Count active filters
   const activeFilterCount = [
-    selectedMode !== 'all',
+    !!searchQuery.trim(),
     !!selectedSymptom,
     !!selectedCategory,
     maxPrice < 2000,
-    selectedGender !== 'all'
+    !!cityInput.trim(),
+    !!areaInput.trim(),
+    selectedMode !== 'all',
+    selectedGender !== 'all',
   ].filter(Boolean).length;
 
+  const cityLabel = cityInput.trim() || defaultCity;
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/30">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
-        
-        {/* 🏠 Page Header - Centered */}
-        <div className="text-center max-w-3xl mx-auto mb-8 md:mb-12">
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-gradient-to-r from-blue-600/10 to-teal-600/10 text-blue-700 text-xs font-bold border border-blue-200/50 backdrop-blur-sm mb-4">
-            <Stethoscope className="w-4 h-4" />
-            <span>Doctor Directory</span>
-            <span className="w-1 h-1 rounded-full bg-blue-400" />
-            <span className="text-teal-600">{filteredDoctors.length} Verified Doctors</span>
+    <div className="pt-28 pb-20 min-h-screen">
+      <div className="px-4 sm:px-6 lg:px-8">
+
+        {/* Search bar */}
+        <TherapistSearchBar
+          searchValue={searchQuery}
+          onSearchChange={setSearchQuery}
+          location={cityInput || defaultCity}
+          onLocationChange={setCityInput}
+          cities={cities}
+          onUseMyLocation={() => setCityInput(defaultCity)}
+        />
+
+        {/* Top bar */}
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setFiltersOpen(o => !o)}
+              className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-full text-sm font-bold transition-all ${
+                filtersOpen
+                  ? 'btn-gradient text-white shadow-md'
+                  : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              <SlidersHorizontal className="w-4 h-4" />
+              Filters
+              {activeFilterCount > 0 && (
+                <span className={`w-5 h-5 rounded-full text-[10px] flex items-center justify-center font-extrabold ${
+                  filtersOpen ? 'bg-white/25 text-white' : 'bg-blue-600 text-white'
+                }`}>
+                  {activeFilterCount}
+                </span>
+              )}
+            </button>
           </div>
-          
-          <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold text-slate-900 tracking-tight leading-tight">
-            Find <span className="bg-gradient-to-r from-blue-600 to-teal-600 bg-clip-text text-transparent">Expert Physiotherapists</span>
-          </h1>
-          
-          <p className="text-slate-600 text-sm md:text-base mt-3 max-w-2xl mx-auto">
-            Connect with verified specialists in Nagpur for personalized home visits or convenient online consultations
+
+          <p className="hidden md:block text-sm text-slate-500">
+            <span className="font-bold text-slate-900">{filteredDoctors.length}</span>{' '}
+            physiotherapists in{' '}
+            <span className="font-bold text-slate-900">{cityLabel}</span>
           </p>
 
-          {/* Stats Badges */}
-          <div className="flex flex-wrap items-center justify-center gap-4 mt-4">
-            <div className="flex items-center gap-1.5 text-xs font-medium text-slate-600 bg-white/80 backdrop-blur-sm px-3 py-1.5 rounded-full border border-slate-200 shadow-sm">
-              <Award className="w-3.5 h-3.5 text-blue-600" />
-              <span>100% Verified</span>
-            </div>
-            <div className="flex items-center gap-1.5 text-xs font-medium text-slate-600 bg-white/80 backdrop-blur-sm px-3 py-1.5 rounded-full border border-slate-200 shadow-sm">
-              <Users className="w-3.5 h-3.5 text-teal-600" />
-              <span>10K+ Patients Treated</span>
-            </div>
-            <div className="flex items-center gap-1.5 text-xs font-medium text-slate-600 bg-white/80 backdrop-blur-sm px-3 py-1.5 rounded-full border border-slate-200 shadow-sm">
-              <Shield className="w-3.5 h-3.5 text-blue-600" />
-              <span>Secure Booking</span>
-            </div>
+          <div className="relative">
+            <ArrowUpDown className="w-3.5 h-3.5 text-blue-600 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <select
+              value={sortBy}
+              onChange={e => setSortBy(e.target.value as any)}
+              className="appearance-none bg-blue-50 border border-blue-200 rounded-full pl-9 pr-9 py-2.5 text-xs font-bold text-slate-800 focus:outline-none focus:border-blue-500 cursor-pointer"
+            >
+              <option value="recommended">Sort: Recommended</option>
+              <option value="rating-high">Sort: Top Rated</option>
+              <option value="price-low">Sort: Price Low</option>
+              <option value="experience">Sort: Most Experienced</option>
+            </select>
+            <ChevronDown className="w-3.5 h-3.5 text-slate-500 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
           </div>
         </div>
 
-        {/* 🔍 TOP SEARCH & FILTERS PANEL */}
-        <div className="bg-white rounded-3xl border border-slate-200 shadow-xl hover:shadow-2xl transition-all duration-300 mb-6 md:mb-8 overflow-hidden">
-          <div className="p-4 sm:p-5 md:p-6">
-            <div className="flex flex-col lg:flex-row gap-4">
-              {/* Search Bar */}
-              <div className="flex-1 min-w-0">
-                <div className="relative">
-                  <Search className="w-5 h-5 text-blue-500 absolute left-4 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="text"
-                    value={localSearchQuery}
-                    onChange={e => setLocalSearchQuery(e.target.value)}
-                    placeholder="🔍 Search doctors by name, specialty, location..."
-                    className="w-full pl-12 pr-10 py-3.5 bg-slate-50 border-2 border-slate-200 hover:border-blue-300 focus:border-blue-500 rounded-2xl text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-4 focus:ring-blue-100 transition-all"
-                  />
-                  {localSearchQuery && (
-                    <button
-                      onClick={() => {
-                        setLocalSearchQuery('');
-                        setSearchQuery('');
-                      }}
-                      className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors p-1"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  )}
-                </div>
-                
-                {/* Quick Search Suggestions */}
-                <div className="flex flex-wrap gap-1.5 mt-2.5">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mr-1">Popular Areas:</span>
-                  {popularAreas.map(area => (
-                    <button
-                      key={area}
-                      onClick={() => setLocalSearchQuery(area)}
-                      className="text-[10px] font-semibold px-3 py-1 rounded-full bg-slate-100 hover:bg-blue-100 text-slate-600 hover:text-blue-700 border border-slate-200 hover:border-blue-300 transition-all"
-                    >
-                      {area}
-                    </button>
-                  ))}
-                </div>
-              </div>
+        <p className="md:hidden text-sm text-slate-500 mb-4">
+          <span className="font-bold text-slate-900">{filteredDoctors.length}</span>{' '}
+          physiotherapists in <span className="font-bold text-slate-900">{cityLabel}</span>
+        </p>
 
-              {/* Right Controls */}
-              <div className="flex items-center gap-3 flex-wrap lg:flex-nowrap">
-                {/* Results Count */}
-                <div className="hidden sm:flex items-center gap-1 px-3 py-2 bg-gradient-to-r from-blue-50 to-teal-50 rounded-xl border border-blue-200/50">
-                  <span className="text-xs font-bold text-slate-700">
-                    <span className="text-blue-600 text-sm">{filteredDoctors.length}</span>
-                    <span className="text-slate-400 font-medium ml-1">doctors</span>
-                  </span>
-                </div>
+        {/* Main layout */}
+        <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-6 items-start">
 
-                {/* Sort Dropdown */}
-                <div className="flex items-center gap-2 text-xs font-semibold text-slate-600 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200">
-                  <ArrowUpDown className="w-3.5 h-3.5 text-blue-500" />
-                  <select
-                    value={sortBy}
-                    onChange={e => setSortBy(e.target.value as any)}
-                    className="bg-transparent text-xs font-bold text-slate-900 focus:outline-none cursor-pointer py-0.5"
-                  >
-                    <option value="recommended">⭐ Recommended</option>
-                    <option value="rating-high">🏆 Top Rated</option>
-                    <option value="price-low">💰 Price: Low</option>
-                    <option value="experience">🎓 Most Experienced</option>
-                  </select>
-                </div>
+          {/* Desktop sidebar */}
+          {filtersOpen && (
+            <aside className="hidden lg:block bg-white rounded-2xl border border-slate-200/80 shadow-sm p-5 lg:sticky lg:top-24">
+              <FilterPanel
+                cityInput={cityInput}
+                setCityInput={setCityInput}
+                areaInput={areaInput}
+                setAreaInput={setAreaInput}
+                maxPrice={maxPrice}
+                setMaxPrice={setMaxPrice}
+                selectedSymptom={selectedSymptom}
+                setSelectedSymptom={setSelectedSymptom}
+                selectedCategory={selectedCategory}
+                setSelectedCategory={setSelectedCategory}
+                selectedMode={selectedMode}
+                setSelectedMode={setSelectedMode}
+                selectedGender={selectedGender}
+                setSelectedGender={setSelectedGender}
+                resetFilters={resetFilters}
+                defaultCity={defaultCity}
+              />
+            </aside>
+          )}
 
-                {/* Mobile Filter Toggle */}
-                <button
-                  onClick={() => setFiltersOpen(o => !o)}
-                  className="lg:hidden relative flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl font-bold text-xs shadow-lg shadow-blue-500/30 hover:shadow-blue-600/40 transition-all"
-                >
-                  <Filter className="w-4 h-4" />
-                  <span>Filters</span>
-                  {activeFilterCount > 0 && (
-                    <span className="absolute -top-1 -right-1 w-5 h-5 bg-teal-500 text-white text-[10px] rounded-full flex items-center justify-center font-extrabold border-2 border-white">
-                      {activeFilterCount}
-                    </span>
-                  )}
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* 📱 Mobile Filters Dropdown */}
+          {/* Mobile drawer */}
           <AnimatePresence>
             {filtersOpen && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }}
-                className="lg:hidden border-t border-slate-200 overflow-hidden"
-              >
-                <div className="p-4 sm:p-5 bg-slate-50/50">
-                  <DoctorFilterSidebar
-                    searchQuery={searchQuery}
-                    setSearchQuery={setSearchQuery}
-                    selectedMode={selectedMode}
-                    setSelectedMode={setSelectedMode}
-                    selectedSymptom={selectedSymptom}
-                    setSelectedSymptom={setSelectedSymptom}
-                    selectedCategory={selectedCategory}
-                    setSelectedCategory={setSelectedCategory}
-                    maxPrice={maxPrice}
-                    setMaxPrice={setMaxPrice}
-                    selectedGender={selectedGender}
-                    setSelectedGender={setSelectedGender}
-                    resetFilters={resetFilters}
-                  />
-                </div>
-              </motion.div>
+              <>
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  onClick={() => setFiltersOpen(false)}
+                  className="lg:hidden fixed inset-0 z-40 bg-slate-900/40 backdrop-blur-sm"
+                />
+                <motion.aside
+                  initial={{ x: '-100%' }}
+                  animate={{ x: 0 }}
+                  exit={{ x: '-100%' }}
+                  transition={{ type: 'tween', duration: 0.25 }}
+                  className="lg:hidden fixed inset-y-0 left-0 z-50 w-[320px] max-w-[85vw] bg-white shadow-2xl overflow-y-auto"
+                >
+                  <div className="p-5">
+                    <div className="flex justify-end mb-2 lg:hidden">
+                      <button
+                        onClick={() => setFiltersOpen(false)}
+                        aria-label="Close filters"
+                        className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <FilterPanel
+                      cityInput={cityInput}
+                      setCityInput={setCityInput}
+                      areaInput={areaInput}
+                      setAreaInput={setAreaInput}
+                      maxPrice={maxPrice}
+                      setMaxPrice={setMaxPrice}
+                      selectedSymptom={selectedSymptom}
+                      setSelectedSymptom={setSelectedSymptom}
+                      selectedCategory={selectedCategory}
+                      setSelectedCategory={setSelectedCategory}
+                      selectedMode={selectedMode}
+                      setSelectedMode={setSelectedMode}
+                      selectedGender={selectedGender}
+                      setSelectedGender={setSelectedGender}
+                      resetFilters={resetFilters}
+                      defaultCity={defaultCity}
+                    />
+                  </div>
+                </motion.aside>
+              </>
             )}
           </AnimatePresence>
-        </div>
 
-        {/* Main Content */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8">
-          
-          {/* Left Sidebar - Desktop */}
-          <div className="hidden lg:block lg:col-span-3 space-y-4 lg:sticky lg:top-28 self-start">
-            <DoctorFilterSidebar
-              searchQuery={searchQuery}
-              setSearchQuery={setSearchQuery}
-              selectedMode={selectedMode}
-              setSelectedMode={setSelectedMode}
-              selectedSymptom={selectedSymptom}
-              setSelectedSymptom={setSelectedSymptom}
-              selectedCategory={selectedCategory}
-              setSelectedCategory={setSelectedCategory}
-              maxPrice={maxPrice}
-              setMaxPrice={setMaxPrice}
-              selectedGender={selectedGender}
-              setSelectedGender={setSelectedGender}
-              resetFilters={resetFilters}
-            />
-          </div>
-
-          {/* Right Results - List View Only */}
-          <div className="lg:col-span-9 space-y-4 md:space-y-6">
-            
-            {/* Results Header */}
-            <div className="flex items-center justify-between bg-white rounded-2xl px-4 sm:px-6 py-3 sm:py-4 border border-slate-200 shadow-sm">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-full bg-gradient-to-r from-blue-600 to-teal-600 flex items-center justify-center text-white text-xs font-extrabold">
-                  {filteredDoctors.length}
-                </div>
-                <div>
-                  <span className="text-sm font-bold text-slate-900">
-                    {filteredDoctors.length} Doctor{filteredDoctors.length !== 1 ? 's' : ''} Available
-                  </span>
-                  <p className="text-[10px] text-slate-400 font-medium">
-                    {activeFilterCount > 0 ? `${activeFilterCount} filter${activeFilterCount > 1 ? 's' : ''} applied` : 'Showing all results'}
-                  </p>
-                </div>
-              </div>
-              
-              {activeFilterCount > 0 && (
-                <button
-                  onClick={resetFilters}
-                  className="text-xs font-bold text-blue-600 hover:text-blue-800 transition-colors px-3 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 border border-blue-200"
-                >
-                  Clear All
-                </button>
-              )}
-            </div>
-
-            {/* Results List */}
+          {/* Results list */}
+          <div className="space-y-4 min-w-0">
             {doctorsLoading ? (
-              <div className="text-center py-20 bg-white rounded-3xl border border-slate-200 shadow-sm flex items-center justify-center gap-3 text-sm font-bold text-slate-500">
-                <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
-                Loading verified doctors...
+              <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm py-20 flex items-center justify-center gap-3 text-sm font-medium text-slate-500">
+                <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
+                Loading physiotherapists...
               </div>
             ) : filteredDoctors.length > 0 ? (
-              <AnimatePresence>
-                <div className="space-y-4">
-                  {filteredDoctors.map((doctor, index) => (
-                    <DoctorListItem key={doctor.id} doctor={doctor} />
-                  ))}
-                </div>
-              </AnimatePresence>
+              filteredDoctors.map(doctor => {
+                const areas = [
+                  ...new Set([
+                    doctor.location.area,
+                    ...(doctor.locations ?? []).map(l => l.area).filter(Boolean),
+                  ]),
+                ].filter(Boolean).slice(0, 4);
+                const visitTypes = [
+                  ...(doctor.fees.home > 0 ? ['home'] : []),
+                  ...(doctor.fees.online > 0 ? ['online'] : []),
+                ];
+                return (
+                  <DoctorListCard
+                    key={doctor.id}
+                    name={doctor.name}
+                    photoUrl={doctor.photo}
+                    specialty={doctor.specialty}
+                    verified={doctor.verified}
+                    experienceYears={doctor.experienceYears}
+                    availabilityDate={doctor.nextAvailable}
+                    sessionFee={doctor.fees.home}
+                    visitTypes={visitTypes}
+                    locationTags={areas}
+                    profileUrl={`/doctor/${doctor.id}`}
+                    onBookHomeVisit={() => navigate('/book', { state: { doctor, mode: 'home' } })}
+                    onBookOnline={() => navigate('/book', { state: { doctor, mode: 'online' } })}
+                    shareUrl={`${window.location.origin}/doctor/${doctor.id}`}
+                  />
+                );
+              })
             ) : (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="text-center py-20 bg-white rounded-3xl border border-slate-200 shadow-sm space-y-6"
-              >
-                <div className="w-20 h-20 rounded-full bg-slate-100 flex items-center justify-center mx-auto">
-                  <Stethoscope className="w-10 h-10 text-slate-400" />
+              <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm py-20 text-center space-y-4 px-6">
+                <div className="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center mx-auto">
+                  <Stethoscope className="w-8 h-8 text-slate-400" />
                 </div>
                 <div>
-                  <h3 className="text-2xl font-extrabold text-slate-900">No Doctors Found</h3>
-                  <p className="text-sm text-slate-500 mt-2 max-w-sm mx-auto">
-                    We couldn't find any doctors matching your criteria. Try adjusting your filters or search terms.
+                  <h3 className="text-lg font-bold text-slate-900">No physiotherapists found</h3>
+                  <p className="text-sm text-slate-500 mt-1">
+                    Try adjusting your filters or clearing them to see all results.
                   </p>
                 </div>
                 <button
                   onClick={resetFilters}
-                  className="btn-gradient text-white px-8 py-3 rounded-xl font-bold text-sm shadow-lg shadow-blue-500/30 hover:scale-[1.02] active:scale-[0.98] transition-all inline-flex items-center gap-2"
+                  className="btn-gradient text-white px-6 py-2.5 rounded-full font-bold text-sm shadow-md transition-all inline-flex items-center gap-2"
                 >
-                  <Filter className="w-4 h-4" />
-                  Reset All Filters
+                  Clear all filters
                 </button>
-              </motion.div>
+              </div>
             )}
-
           </div>
 
         </div>
-
-        {/* 📱 Mobile Bottom Stats */}
-        <div className="lg:hidden mt-6 flex items-center justify-between bg-white rounded-2xl px-4 py-3 border border-slate-200 shadow-sm">
-          <span className="text-xs font-bold text-slate-700">
-            {filteredDoctors.length} Doctor{filteredDoctors.length !== 1 ? 's' : ''} Found
-          </span>
-          <span className="text-xs text-slate-400">
-            {activeFilterCount} filter{activeFilterCount > 1 ? 's' : ''} active
-          </span>
-        </div>
-
       </div>
     </div>
   );

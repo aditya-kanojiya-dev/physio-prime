@@ -1,20 +1,67 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ConsultationMode } from '../../types';
-import { motion, useInView } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { Video, Home, Calendar, ArrowRight, Sparkles, Award } from 'lucide-react';
-import homepageVid from '../../assets/homepage.mp4';
+import heroVid from '../../assets/hero-vid.webm';
 import { fadeUp, staggerContainer, EASE_OUT } from '../../lib/motion';
+
+// ponytail: ~40-line vanilla typewriter instead of Typed.js dependency
+const TYPE_WORDS = ['Physiotherapy Care', 'Pain Recovery', 'Home Rehab', 'Sports Injury Care'];
+
+function useTypewriter(words: string[], enabled: boolean) {
+  const [text, setText] = useState(enabled ? '' : words[0]);
+
+  useEffect(() => {
+    if (!enabled) return;
+    let word = 0;
+    let char = 0;
+    let deleting = false;
+    let timer: number;
+
+    const tick = () => {
+      const current = words[word];
+      if (!deleting) {
+        char += 1;
+        setText(current.slice(0, char));
+        if (char === current.length) {
+          deleting = true;
+          timer = window.setTimeout(tick, 1800);
+          return;
+        }
+        timer = window.setTimeout(tick, 70);
+      } else {
+        char -= 1;
+        setText(current.slice(0, char));
+        if (char === 0) {
+          deleting = false;
+          word = (word + 1) % words.length;
+          timer = window.setTimeout(tick, 400);
+          return;
+        }
+        timer = window.setTimeout(tick, 35);
+      }
+    };
+
+    timer = window.setTimeout(tick, 500);
+    return () => window.clearTimeout(timer);
+  }, [enabled, words]);
+
+  return text;
+}
 
 export const HeroSection: React.FC = () => {
   const navigate = useNavigate();
   const [selectedMode, setSelectedMode] = useState<ConsultationMode>('home');
-  const vidRef = useRef<HTMLVideoElement>(null);
-  const vidInView = useInView(vidRef, { once: true, margin: '200px' });
+  const prefersReducedMotion = useMemo(
+    () => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+    []
+  );
+  const typed = useTypewriter(TYPE_WORDS, !prefersReducedMotion);
 
   return (
     <section className="relative pt-14 pb-10 lg:pt-20 lg:pb-16 overflow-hidden">
-      
+
       {/* Dynamic Background Blobs */}
       <div className="absolute top-20 left-10 w-96 h-96 bg-blue-100/40 rounded-full blur-3xl animate-pulse-glow pointer-events-none" />
       <div className="absolute top-40 right-10 w-[30rem] h-[30rem] bg-teal-100/40 rounded-full blur-3xl animate-float-slow pointer-events-none" />
@@ -22,7 +69,7 @@ export const HeroSection: React.FC = () => {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8 items-center">
-          
+
           {/* Left Hero Column */}
           <motion.div
             variants={staggerContainer(0.12, 0.15)}
@@ -30,7 +77,7 @@ export const HeroSection: React.FC = () => {
             animate="visible"
             className="lg:col-span-7 space-y-8"
           >
-            
+
             {/* Top Pill Badge */}
             <motion.div
               variants={fadeUp(20)}
@@ -45,10 +92,17 @@ export const HeroSection: React.FC = () => {
             </motion.div>
 
             {/* Headline */}
-            <motion.div variants={fadeUp(20)} className="space-y-4">
-              <h1 className="text-4xl sm:text-6xl lg:text-7xl font-extrabold tracking-tight text-slate-900 leading-[1.1]">
-                Your Trusted Partner in{' '}
-                <span className="text-gradient">Physiotherapy Care.</span>
+            <motion.div variants={fadeUp(20)} className="space-y-5">
+              <h1
+                aria-label="Your Trusted Partner in Physiotherapy Care"
+                className="text-5xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-slate-900 leading-[1.1]"
+              >
+                Your Trusted Partner in
+                {/* own line + fluid size + nowrap: never wraps, so hero height never changes */}
+                <span aria-hidden="true" className="block mt-1 text-gradient whitespace-nowrap leading-[1.15] text-[clamp(1.9rem,5vw,3.4rem)]">
+                  {typed}
+                  <span className="typewriter-caret">|</span>
+                </span>
               </h1>
               <p className="text-lg sm:text-xl text-slate-600 leading-relaxed font-normal max-w-2xl">
                 Book certified physiotherapists for personalized <strong className="text-slate-900 font-semibold">Home Visits</strong> or instant <strong className="text-slate-900 font-semibold">HD Video Consultations</strong>. Recover comfortably at your speed.
@@ -56,31 +110,49 @@ export const HeroSection: React.FC = () => {
             </motion.div>
 
             {/* Mode Selection Toggle Card */}
-            <motion.div variants={fadeUp(20)} className="glass-panel p-2 rounded-2xl border border-slate-200 shadow-xl max-w-xl">
-              <div className="grid grid-cols-2 gap-2">
-                
+            <motion.div variants={fadeUp(20)} className="max-w-xl">
+              <div className="flex items-center gap-1 bg-white/70 p-1.5 rounded-full border border-slate-200/80 backdrop-blur-md shadow-sm">
+
                 <button
                   onClick={() => setSelectedMode('home')}
-                  className={`p-3.5 rounded-xl font-bold text-xs sm:text-sm transition-all duration-200 flex items-center justify-center gap-2 ${
+                  className={`relative flex-1 p-3 rounded-full font-bold text-xs sm:text-sm transition-colors duration-200 flex items-center justify-center gap-2 ${
                     selectedMode === 'home'
-                      ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
-                      : 'text-slate-600 hover:bg-slate-100'
+                      ? 'text-white'
+                      : 'text-slate-600 hover:text-blue-600 hover:bg-slate-100/50'
                   }`}
                 >
-                  <Home className="w-5 h-5 text-teal-300 flex-shrink-0" />
-                  <span>Home Visit Physio</span>
+                  {selectedMode === 'home' && (
+                    <motion.span
+                      layoutId="hero-mode-pill"
+                      className="absolute inset-0 rounded-full bg-blue-600 shadow-md shadow-blue-500/20"
+                      transition={{ duration: 0.45, ease: EASE_OUT }}
+                    />
+                  )}
+                  <span className="relative z-10 flex items-center justify-center gap-2">
+                    <Home className={`w-5 h-5 flex-shrink-0 ${selectedMode === 'home' ? 'text-teal-300' : 'text-teal-500'}`} />
+                    <span>Home Visit Physio</span>
+                  </span>
                 </button>
 
                 <button
                   onClick={() => setSelectedMode('online')}
-                  className={`p-3.5 rounded-xl font-bold text-xs sm:text-sm transition-all duration-200 flex items-center justify-center gap-2 ${
+                  className={`relative flex-1 p-3 rounded-full font-bold text-xs sm:text-sm transition-colors duration-200 flex items-center justify-center gap-2 ${
                     selectedMode === 'online'
-                      ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
-                      : 'text-slate-600 hover:bg-slate-100'
+                      ? 'text-white'
+                      : 'text-slate-600 hover:text-blue-600 hover:bg-slate-100/50'
                   }`}
                 >
-                  <Video className="w-5 h-5 text-cyan-300 flex-shrink-0" />
-                  <span>Online Video Consult</span>
+                  {selectedMode === 'online' && (
+                    <motion.span
+                      layoutId="hero-mode-pill"
+                      className="absolute inset-0 rounded-full bg-blue-600 shadow-md shadow-blue-500/20"
+                      transition={{ duration: 0.45, ease: EASE_OUT }}
+                    />
+                  )}
+                  <span className="relative z-10 flex items-center justify-center gap-2">
+                    <Video className={`w-5 h-5 flex-shrink-0 ${selectedMode === 'online' ? 'text-cyan-300' : 'text-cyan-500'}`} />
+                    <span>Online Video Consult</span>
+                  </span>
                 </button>
 
               </div>
@@ -109,39 +181,24 @@ export const HeroSection: React.FC = () => {
 
           </motion.div>
 
-          {/* Right Hero Interactive 3D Graphic / Card */}
+          {/* Right: Hero video */}
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.7, delay: 0.35, ease: EASE_OUT }}
-            className="lg:col-span-5 relative"
+            transition={{ duration: 0.7, delay: 0.3, ease: EASE_OUT }}
+            className="lg:col-span-5"
           >
-            <div className="relative mx-auto max-w-md lg:max-w-none">
-              
-              {/* Glowing Outer Ring */}
-              <div className="absolute -inset-4 rounded-3xl bg-gradient-to-r from-blue-100 to-teal-100 opacity-60 blur-xl animate-pulse" />
-
-              {/* Main Illustration Card */}
-              <div className="relative rounded-3xl overflow-hidden glass-panel border border-slate-200 shadow-2xl p-4 sm:p-6 bg-white">
-                <div className="relative h-[22rem] sm:h-[26rem] rounded-2xl overflow-hidden group">
-                  <video
-                    ref={vidRef}
-                    src={vidInView ? homepageVid : undefined}
-                    autoPlay
-                    muted
-                    loop
-                    playsInline
-                    preload="none"
-                    className="w-full h-full object-cover"
-                  />
-
-                  {/* Elegant gradient overlay for depth */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-slate-900/30 via-slate-900/5 to-transparent" />
-                  
-                  {/* Subtle decorative border glow */}
-                  <div className="absolute inset-0 ring-1 ring-white/20 ring-inset rounded-2xl" />
-                </div>
-              </div>
+            <div className="relative rounded-2xl overflow-hidden">
+              <video
+                src={heroVid}
+                autoPlay
+                muted
+                loop
+                playsInline
+                preload="metadata"
+                className="w-full h-full aspect-[4/5]"
+              />
+              <div className="absolute inset-0 pointer-events-none" />
             </div>
           </motion.div>
         </div>

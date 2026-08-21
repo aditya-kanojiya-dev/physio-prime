@@ -1,4 +1,4 @@
-export type ConsultationMode = 'home' | 'online' | 'clinic';
+export type ConsultationMode = 'home' | 'online';
 
 export interface DoctorReview {
   id: string;
@@ -30,7 +30,6 @@ export interface Doctor {
   fees: {
     home: number;
     online: number;
-    clinic: number;
   };
   nextAvailable: string;
   verified: boolean;
@@ -71,7 +70,7 @@ export interface Symptom {
   description: string;
   symptomsList: string | null;
   treatment: string | null;
-  popularFor: string;
+  popularFor: string | string[];
   recoveryEstimate: string;
   image: string;
 }

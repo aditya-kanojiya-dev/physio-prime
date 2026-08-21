@@ -41,7 +41,7 @@ export const CareerSection: React.FC = () => {
   ];
 
   return (
-    <section className="py-8 lg:py-12 bg-gradient-to-br from-blue-50 via-teal-50 to-blue-50 relative overflow-hidden">
+    <section className="py-8 lg:py-12 relative overflow-hidden">
       
       {/* Background Decorative Elements */}
       <div className="absolute top-0 right-0 w-96 h-96 bg-blue-200/30 rounded-full blur-3xl animate-pulse" />
@@ -118,9 +118,9 @@ export const CareerSection: React.FC = () => {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.4, delay: index * 0.1 + 0.3 }}
-                className="bg-white rounded-2xl p-6 border border-slate-200 shadow-lg hover:shadow-xl transition-all hover:border-blue-300 group"
+                className="bg-white rounded-2xl p-6 border border-slate-200 shadow-lg transition-all duration-300 hover:bg-teal-50 hover:border-teal-300 hover:shadow-xl hover:shadow-teal-100/50 group"
               >
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-50 to-teal-50 flex items-center justify-center text-blue-600 group-hover:scale-110 transition-transform mb-4">
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-50 to-teal-50 flex items-center justify-center text-blue-600 group-hover:text-teal-600 group-hover:scale-110 transition-all duration-300 mb-4">
                   {benefit.icon}
                 </div>
                 <h4 className="text-sm font-extrabold text-slate-900">{benefit.title}</h4>

@@ -1,10 +1,10 @@
 import React from 'react';
 import { HeroSection } from '../components/home/HeroSection';
 import { SearchSection } from '../components/home/SearchSection';
-import { HeroShowcase } from '../components/home/HeroShowcase';
 import { StatStrip } from '../components/home/StatStrip';
 import { FeaturedDoctors } from '../components/home/FeaturedDoctors';
 import { SymptomsGrid } from '../components/home/SymptomsGrid';
+import { CategoriesGrid } from '../components/home/CategoriesGrid';
 import { WhyChooseUs } from '../components/home/WhyChooseUs';
 import { RecoveryTimeline } from '../components/home/RecoveryTimeline';
 import { PatientStories } from '../components/home/PatientStories';
@@ -17,8 +17,8 @@ export const HomePage: React.FC = () => {
       <HeroSection />
       <SearchSection />
       <StatStrip />
-      <HeroShowcase />
       <SymptomsGrid />
+      <CategoriesGrid />
       <RecoveryTimeline />
       <FeaturedDoctors />
       <PatientStories />

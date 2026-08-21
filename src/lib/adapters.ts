@@ -74,11 +74,6 @@ export interface ApiTimeWindow {
   available: boolean;
 }
 
-export function windowCapacityText(w: ApiTimeWindow): string {
-  const remaining = w.maxPatients - w.bookedCount;
-  return `${remaining} of ${w.maxPatients} spots left`;
-}
-
 /** Generate 45-min slot candidates within a window, first free = what gets booked. */
 export function windowFirstSlot(w: ApiTimeWindow): string {
   const [sh, sm] = w.start.split(':').map(Number);
@@ -178,7 +173,6 @@ export function toDoctor(d: ApiDoctor): Doctor {
     fees: {
       home: d.fees?.home || 0,
       online: d.fees?.online || 0,
-      clinic: d.fees?.clinic || 0,
     },
     nextAvailable: formatNextAvailable(d.nextAvailable),
     verified: d.verified,

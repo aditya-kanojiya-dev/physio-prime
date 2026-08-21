@@ -1,11 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useBooking, PageView } from '../../context/BookingContext';
 import { useAuth } from '../../context/AuthContext';
-import { Activity, User, Menu, X, ArrowRight, Sparkles, MapPin, LogIn, LogOut, Home, Stethoscope, Layers, Calendar, Info, LayoutDashboard, Phone, Mail, BookOpen } from 'lucide-react';
+import { Activity, User, Menu, X, ArrowRight, Sparkles, MapPin, LogIn, LogOut, Home, Stethoscope, Layers, Calendar, Info, LayoutDashboard, Phone, Mail, BookOpen, ChevronDown, ChevronRight, Search } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AuthModal } from '../auth/AuthModal';
 import { EASE_OUT } from '../../lib/motion';
+import { useSymptoms, useCategories } from '../../hooks/queries';
+import { buildConditionGroups } from '../../data/conditions';
 import logo from '../../assets/logo.png';
 
 export const Navbar: React.FC = () => {
@@ -15,6 +17,23 @@ export const Navbar: React.FC = () => {
   const { user, logout, authModalOpen, openAuthModal, closeAuthModal } = useAuth();
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [conditionQuery, setConditionQuery] = useState('');
+  const [categoryQuery, setCategoryQuery] = useState('');
+
+  const { data: symptoms = [] } = useSymptoms();
+  const { data: categories = [] } = useCategories();
+  const conditionGroups = useMemo(() => buildConditionGroups(symptoms), [symptoms]);
+  const filteredConditions = useMemo(() => {
+    const all = conditionGroups.flatMap((g) => g.conditions);
+    if (!conditionQuery.trim()) return all.slice(0, 8);
+    const q = conditionQuery.trim().toLowerCase();
+    return all.filter((c) => c.name.toLowerCase().includes(q)).slice(0, 8);
+  }, [conditionGroups, conditionQuery]);
+  const filteredCategories = useMemo(() => {
+    if (!categoryQuery.trim()) return categories;
+    const q = categoryQuery.trim().toLowerCase();
+    return categories.filter((c) => c.title.toLowerCase().includes(q));
+  }, [categories, categoryQuery]);
 
   const upcomingCount = appointments.filter(a => a.status === 'upcoming').length;
 
@@ -40,14 +59,15 @@ export const Navbar: React.FC = () => {
   }[] = [
     { id: 'home', label: 'Home', path: '/', icon: <Home className="w-5 h-5" /> },
     { id: 'doctors', label: 'Find Therapists', path: '/doctors', icon: <Stethoscope className="w-5 h-5" /> },
-    { id: 'categories', label: 'Specialties', path: '/categories', icon: <Layers className="w-5 h-5" /> },
+    { id: 'categories', label: 'Categories', path: '/categories', icon: <Layers className="w-5 h-5" /> },
+    { id: 'conditions', label: 'Conditions', path: '/conditions', icon: <BookOpen className="w-5 h-5" /> },
     { id: 'appointments', label: 'My Appointments', path: '/appointments', icon: <Calendar className="w-5 h-5" />, badge: upcomingCount },
     { id: 'about', label: 'About Us', path: '/about', icon: <Info className="w-5 h-5" /> },
   ];
 
-  // Check if current path matches nav item
+  // Check if current path matches nav item (also matches sub-pages like /conditions/back-pain)
   const isActiveRoute = (path: string) => {
-    return location.pathname === path;
+    return location.pathname === path || (path !== '/' && location.pathname.startsWith(`${path}/`));
   };
 
   return (
@@ -88,9 +108,29 @@ export const Navbar: React.FC = () => {
             <nav className="hidden lg:flex items-center gap-1 bg-white/70 p-1.5 rounded-full border border-slate-200/80 backdrop-blur-md shadow-sm">
               {navItems.map(item => {
                 const isActive = isActiveRoute(item.path);
-                return (
+
+                const dd = item.id === 'conditions'
+                  ? {
+                      query: conditionQuery,
+                      setQuery: setConditionQuery,
+                      placeholder: 'Search conditions...',
+                      items: filteredConditions.map((c) => ({ name: c.name, key: c.slug, to: `/conditions/${c.slug}` })),
+                      viewAllTo: '/conditions',
+                      viewAllLabel: 'View all conditions',
+                    }
+                  : item.id === 'categories'
+                  ? {
+                      query: categoryQuery,
+                      setQuery: setCategoryQuery,
+                      placeholder: 'Search specialties...',
+                      items: filteredCategories.map((c) => ({ name: c.title, key: c.slug, to: `/categories/${c.slug}` })),
+                      viewAllTo: '/categories',
+                      viewAllLabel: 'View all categories',
+                    }
+                  : null;
+
+                const link = (
                   <Link
-                    key={item.id}
                     to={item.path}
                     className={`relative px-4 py-2 text-sm font-semibold rounded-full transition-colors duration-200 flex items-center gap-2 ${
                       isActive
@@ -107,6 +147,9 @@ export const Navbar: React.FC = () => {
                     )}
                     <span className="relative z-10 flex items-center gap-2">
                       {item.label}
+                      {dd && (
+                        <ChevronDown className={`w-3.5 h-3.5 transition-transform group-hover:rotate-180 ${isActive ? '' : 'text-slate-400'}`} />
+                      )}
                       {item.badge !== undefined && item.badge > 0 && (
                         <span
                           className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded-full ${
@@ -120,6 +163,56 @@ export const Navbar: React.FC = () => {
                       )}
                     </span>
                   </Link>
+                );
+
+                if (!dd) {
+                  return <React.Fragment key={item.id}>{link}</React.Fragment>;
+                }
+
+                return (
+                  <div key={item.id} className="relative group">
+                    {link}
+                    {/* Dropdown - hover bridge via pt-3 keeps hover alive */}
+                    <div className="absolute left-1/2 -translate-x-1/2 top-full pt-3 hidden group-hover:block group-focus-within:block">
+                      <div className="w-80 bg-white rounded-2xl border border-slate-200/80 shadow-xl shadow-blue-500/10 p-3">
+                        <div className="relative mb-2">
+                          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                          <input
+                            type="text"
+                            value={dd.query}
+                            onChange={(e) => dd.setQuery(e.target.value)}
+                            placeholder={dd.placeholder}
+                            className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3 py-2.5 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-teal-400 focus:ring-4 focus:ring-teal-100 transition-all"
+                            aria-label={dd.placeholder}
+                          />
+                        </div>
+                        <div className="max-h-72 overflow-y-auto space-y-0.5">
+                          {dd.items.length > 0 ? (
+                            dd.items.map((cond) => (
+                              <Link
+                                key={cond.key}
+                                to={cond.to}
+                                onClick={() => dd.setQuery('')}
+                                className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-teal-50 hover:text-teal-700 transition-colors"
+                              >
+                                {cond.name}
+                                <ChevronRight className="w-3.5 h-3.5 text-slate-300 shrink-0" />
+                              </Link>
+                            ))
+                          ) : (
+                            <p className="px-3 py-4 text-sm text-slate-400 text-center">No matches found</p>
+                          )}
+                        </div>
+                        <Link
+                          to={dd.viewAllTo}
+                          onClick={() => dd.setQuery('')}
+                          className="mt-2 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-blue-50 text-blue-700 text-xs font-bold hover:bg-blue-100 transition-colors border border-blue-100"
+                        >
+                          {dd.viewAllLabel} <ArrowRight className="w-3.5 h-3.5" />
+                        </Link>
+                      </div>
+                    </div>
+                  </div>
                 );
               })}
             </nav>

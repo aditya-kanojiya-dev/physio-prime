@@ -15,6 +15,12 @@
   --color-blue-900: #164E63;
   --color-blue-950: #083344;
 
+  /* Typography system: headings/UI = Plus Jakarta Sans, body = Inter.
+     Emitted as :root vars, so usable as var(--font-heading) / var(--font-body). */
+  --font-heading: "Plus Jakarta Sans", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-body: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+
   --animate-float-slow: float 6s ease-in-out infinite;
   --animate-pulse-glow: pulse-glow 3s ease-in-out infinite;
 
@@ -38,7 +44,40 @@
     background: linear-gradient(180deg, #F4FBF9 0%, #F0FDFA 60%, #E9F6F2 100%);
     background-attachment: fixed;
     color: #475569;
-    font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
+    font-family: var(--font-body);
+    line-height: 1.6;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-heading);
+  }
+
+  button {
+    font-family: var(--font-heading);
+    /* ponytail: normalize CTA weights to spec (500-600); utilities would win without !important */
+    font-weight: 600 !important;
+  }
+
+  input, select, textarea {
+    font-family: var(--font-body);
+  }
+}
+
+/* Hero typewriter caret — teal to match the animated gradient word */
+@keyframes caret-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+.typewriter-caret {
+  animation: caret-blink 530ms step-end infinite;
+  color: #0891B2;
+  font-weight: inherit;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .typewriter-caret {
+    animation: none;
   }
 }
 

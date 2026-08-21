@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { api, getStoredUser, saveAuth, clearAuth, getToken, setToken, type StoredUser } from '../lib/api';
 
@@ -102,21 +102,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(null);
   }, []);
 
+  // ponytail: stable value — inline arrows here gave openAuthModal a new identity
+  // every render, which re-fired consumers' effects (modal reopened after close)
+  const openAuthModal = useCallback(() => setAuthModalOpen(true), []);
+  const closeAuthModal = useCallback(() => setAuthModalOpen(false), []);
+
+  const value = useMemo(
+    () => ({
+      user,
+      hydrated,
+      login,
+      register,
+      loginWithGoogle,
+      updateProfile,
+      logout,
+      authModalOpen,
+      openAuthModal,
+      closeAuthModal,
+    }),
+    [user, hydrated, login, register, loginWithGoogle, updateProfile, logout, authModalOpen, openAuthModal, closeAuthModal]
+  );
+
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        hydrated,
-        login,
-        register,
-        loginWithGoogle,
-        updateProfile,
-        logout,
-        authModalOpen,
-        openAuthModal: () => setAuthModalOpen(true),
-        closeAuthModal: () => setAuthModalOpen(false),
-      }}
-    >
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );

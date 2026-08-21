@@ -1,144 +1,154 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Doctor } from '../../types';
-import { Star, MapPin, Clock, Home, Video, CheckCircle2, Navigation } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { Link } from 'react-router-dom';
+import { Star, BadgeCheck, MapPin, Clock } from 'lucide-react';
 
-interface DoctorCardProps {
-  doctor: Doctor;
+export interface DoctorCardProps {
+  name: string;
+  specialty: string;
+  location: string;
+  photoUrl?: string;
+  rating?: number | null;
+  reviewCount?: number;
+  verified?: boolean;
+  experienceYears: number;
+  consultationFee: number;
+  nextAvailableDate?: string | null;
+  profileUrl?: string;
+  onBookNow?: () => void;
 }
 
-export const DoctorCard: React.FC<DoctorCardProps> = ({ doctor }) => {
-  const navigate = useNavigate();
+function initialsOf(name: string) {
+  return name
+    .split(' ')
+    .filter(Boolean)
+    .map((w) => w[0])
+    .slice(0, 2)
+    .join('')
+    .toUpperCase();
+}
 
-  const handleViewProfile = () => {
-    navigate(`/doctor/${doctor.id}`);
-  };
+export const DoctorCard: React.FC<DoctorCardProps> = ({
+  name,
+  specialty,
+  location,
+  photoUrl,
+  rating,
+  reviewCount,
+  verified,
+  experienceYears,
+  consultationFee,
+  nextAvailableDate,
+  profileUrl,
+  onBookNow,
+}) => {
+  const fullyBooked = !nextAvailableDate;
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 15 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true }}
-      className="group glass-panel rounded-3xl overflow-hidden border border-slate-200 hover:border-blue-300 transition-all duration-300 shadow-lg hover:shadow-xl flex flex-col justify-between"
-    >
-      <div>
-        
-        {/* Photo Header */}
-        <div className="relative h-60 overflow-hidden bg-slate-100">
+    <div className="bg-white rounded-2xl border border-slate-200 hover:border-blue-300 transition-colors duration-300 overflow-hidden flex flex-col h-full">
+      {/* Photo / avatar block */}
+      <div className="relative h-[170px] bg-slate-50 flex items-center justify-center shrink-0">
+        {photoUrl ? (
           <img
-            src={doctor.photo}
-            alt={doctor.name}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+            src={photoUrl}
+            alt={name}
+            className="w-24 h-24 rounded-full object-cover ring-4 ring-white shadow-sm"
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/20 to-transparent" />
-
-          {/* Rating Badge */}
-          <div className="absolute top-4 left-4 bg-white/90 backdrop-blur-md text-slate-900 px-3 py-1 rounded-full text-xs font-black flex items-center gap-1 shadow-md border border-slate-200">
-            <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
-            <span>{doctor.rating}</span>
-            <span className="text-[10px] text-slate-500 font-medium">({doctor.reviewCount})</span>
+        ) : (
+          <div className="w-24 h-24 rounded-full bg-blue-50 text-blue-600 ring-4 ring-white shadow-sm flex items-center justify-center text-xl font-extrabold">
+            {initialsOf(name)}
           </div>
+        )}
 
-          {/* Verified Checkmark */}
-          {doctor.verified && (
-            <div className="absolute top-4 right-4 glass-panel border border-slate-200/50 px-2.5 py-1 rounded-full text-[11px] font-bold text-white flex items-center gap-1">
-              <CheckCircle2 className="w-3.5 h-3.5 text-teal-400" />
-              <span>Verified Doctor</span>
-            </div>
+        {/* Rating badge */}
+        <div className="absolute top-2.5 left-2.5 bg-white border border-slate-200 px-2 py-0.5 rounded-full text-[11px] font-bold text-slate-900 flex items-center gap-1">
+          {rating != null ? (
+            <>
+              <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
+              <span>{rating}</span>
+              {reviewCount != null && reviewCount > 0 && (
+                <span className="text-[10px] font-medium text-slate-400">({reviewCount})</span>
+              )}
+            </>
+          ) : (
+            <span className="text-slate-500">New</span>
           )}
-
-          {/* Bottom Overlay Text */}
-          <div className="absolute bottom-4 left-5 right-5 text-white space-y-1">
-            <h3
-              onClick={handleViewProfile}
-              className="text-2xl font-bold hover:text-teal-300 transition-colors cursor-pointer"
-            >
-              {doctor.name}
-            </h3>
-            <p className="text-xs text-teal-300 font-semibold">{doctor.specialty}</p>
-            <p className="text-xs text-slate-300 flex items-center gap-1">
-              <MapPin className="w-3.5 h-3.5 text-slate-400" /> {doctor.location.area}, {doctor.location.city}
-            </p>
-          </div>
         </div>
 
-        {/* Doctor Details Body */}
-        <div className="p-6 space-y-4">
-          
-          {/* Key Metrics */}
-          <div className="grid grid-cols-2 gap-3 p-3 rounded-2xl bg-slate-50 border border-slate-200 text-xs">
-            <div>
-              <p className="text-slate-500 font-medium">Experience</p>
-              <p className="font-extrabold text-slate-900">{doctor.experienceYears} Years</p>
-            </div>
-            <div>
-              <p className="text-slate-500 font-medium">Home Visit Fee</p>
-              <p className="font-extrabold text-blue-600">₹{doctor.fees.home} / Session</p>
-            </div>
+        {/* Verified badge */}
+        {verified && (
+          <div className="absolute top-2.5 right-2.5 bg-white border border-slate-200 px-2 py-0.5 rounded-full text-[10px] font-semibold text-emerald-600 flex items-center gap-1">
+            <BadgeCheck className="w-3 h-3" />
+            Verified doctor
           </div>
+        )}
+      </div>
 
-          {/* Consultation Modes & Languages */}
-          <div className="space-y-2">
-            <div className="flex items-center gap-2 text-xs font-semibold text-slate-600 flex-wrap">
-              <span className="text-slate-400">Available via:</span>
-              {doctor.fees.home > 0 && (
-                <span className="px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-200 font-bold flex items-center gap-1">
-                  <Home className="w-3 h-3 text-blue-600" /> Home Visit
-                </span>
-              )}
-              {doctor.fees.online > 0 && (
-                <span className="px-2 py-0.5 rounded-md bg-teal-50 text-teal-600 border border-teal-200 font-bold flex items-center gap-1">
-                  <Video className="w-3 h-3 text-teal-500" /> Video
-                </span>
-              )}
-            </div>
+      {/* Identity */}
+      <div className="px-3.5 pt-3">
+        <h3 className="text-[15px] font-bold text-slate-900 truncate">{name}</h3>
+        <p className="text-[13px] font-semibold text-blue-600 truncate">{specialty}</p>
+        <p className="text-[11px] text-slate-400 flex items-center gap-1 mt-0.5 truncate">
+          <MapPin className="w-3 h-3 shrink-0" />
+          <span className="truncate">{location}</span>
+        </p>
+      </div>
 
-            {doctor.homeVisitsEnabled && (
-              <div className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
-                <Navigation className="w-3 h-3" />
-                Home Visit Available
-              </div>
-            )}
-
-            {doctor.locations && doctor.locations.length > 0 && (
-              <div className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-500 flex-wrap">
-                <MapPin className="w-3 h-3 text-slate-400 flex-shrink-0" />
-                {doctor.locations.filter(l => l.active).map(l => l.area).filter(Boolean).join(' · ')}
-              </div>
-            )}
-
-            <div className="text-xs text-slate-500">
-              <strong className="text-slate-600">Languages:</strong> {doctor.languages.join(', ')}
-            </div>
-          </div>
-
-          {/* Next Available Pill */}
-          <div className="flex items-center gap-2 text-xs font-semibold text-teal-600 bg-teal-50 px-3 py-2 rounded-xl border border-teal-200">
-            <Clock className="w-4 h-4 text-teal-500 flex-shrink-0" />
-            <span>Next Available Slot: <strong>{doctor.nextAvailable}</strong></span>
-          </div>
-
+      {/* Stats row */}
+      <div className="mx-3.5 mt-2.5 grid grid-cols-2 gap-2 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5">
+        <div>
+          <p className="text-[10px] font-medium text-slate-400">Experience</p>
+          <p className="text-[13px] font-extrabold text-slate-900">{experienceYears} years</p>
+        </div>
+        <div>
+          <p className="text-[10px] font-medium text-slate-400">Home consultation</p>
+          <p className="text-[13px] font-extrabold text-blue-600">
+            ₹{consultationFee.toLocaleString('en-IN')}
+            <span className="text-[10px] font-medium text-slate-400"> / session</span>
+          </p>
         </div>
       </div>
 
-      {/* Action Footer */}
-      <div className="p-6 pt-0 grid grid-cols-2 gap-3">
-        <button
-          onClick={handleViewProfile}
-          className="w-full py-3 px-4 rounded-xl font-bold text-xs text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors"
+      {/* Availability strip */}
+      <div className="mx-3.5 mt-2.5">
+        <div
+          className={`w-full px-3 py-1.5 rounded-full border text-[11px] flex items-center gap-1.5 ${
+            fullyBooked
+              ? 'border-amber-200 bg-amber-50 text-amber-700'
+              : 'border-teal-200 bg-teal-50/60 text-teal-700'
+          }`}
         >
-          View Full Profile
-        </button>
-
-        <button
-          onClick={() => navigate('/book', { state: { doctor, mode: 'home' } })}
-          className="w-full btn-gradient text-white py-3 px-4 rounded-xl font-extrabold text-xs shadow-md shadow-blue-500/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
-        >
-          BOOK NOW
-        </button>
+          <Clock className="w-3.5 h-3.5 shrink-0" />
+          {fullyBooked ? (
+            <span className="font-medium">Fully booked</span>
+          ) : (
+            <span className="font-medium truncate">
+              Next available: <strong className="font-bold">{nextAvailableDate}</strong>
+            </span>
+          )}
+        </div>
       </div>
 
-    </motion.div>
+      {/* Action row */}
+      <div className="p-3.5 pt-2.5 mt-auto grid grid-cols-2 gap-2">
+        {profileUrl ? (
+          <Link
+            to={profileUrl}
+            className="text-center py-2 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-50 text-[11px] font-bold transition-colors"
+          >
+            View profile
+          </Link>
+        ) : (
+          <button className="py-2 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-50 text-[11px] font-bold transition-colors">
+            View profile
+          </button>
+        )}
+        <button
+          onClick={onBookNow}
+          className="py-2 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white text-[11px] font-bold transition-all"
+        >
+          Book now
+        </button>
+      </div>
+    </div>
   );
 };

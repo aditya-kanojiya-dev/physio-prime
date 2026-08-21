@@ -5,7 +5,7 @@ import { api } from '../lib/api';
 import { ApiAppointment, toAppointment } from '../lib/adapters';
 import { useAppointments } from '../hooks/queries';
 
-export type PageView = 'home' | 'doctors' | 'doctor-detail' | 'categories' | 'appointments' | 'dashboard' | 'about' | 'career' | 'blog';
+export type PageView = 'home' | 'doctors' | 'doctor-detail' | 'categories' | 'conditions' | 'appointments' | 'dashboard' | 'about' | 'career' | 'blog';
 
 export interface CreateAppointmentParams {
   doctorSlug: string;

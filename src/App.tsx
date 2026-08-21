@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { motion, AnimatePresence, MotionConfig } from 'framer-motion';
@@ -10,6 +10,9 @@ import { HomePage } from './pages/HomePage';
 import { FindDoctorsPage } from './pages/FindDoctorsPage';
 import { DoctorDetailPage } from './pages/DoctorDetailPage';
 import { CategoriesPage } from './pages/CategoriesPage';
+import { CategoryDetailPage } from './pages/CategoryDetailPage';
+import { ConditionsHubPage } from './pages/ConditionsHubPage';
+import { ConditionDetailPage } from './pages/ConditionDetailPage';
 import { AppointmentsPage } from './pages/AppointmentsPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { AboutPage } from './pages/AboutPage';
@@ -30,6 +33,14 @@ const queryClient = new QueryClient({
   },
 });
 
+function ScrollToTop() {
+  const { pathname } = useLocation();
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname]);
+  return null;
+}
+
 function AnimatedRoutes() {
   const location = useLocation();
   return (
@@ -48,7 +59,9 @@ function AnimatedRoutes() {
             <Route path="/doctors" element={<FindDoctorsPage />} />
             <Route path="/doctor/:id" element={<DoctorDetailPage />} />
             <Route path="/categories" element={<CategoriesPage />} />
-            <Route path="/categories/:specialty" element={<CategoriesPage />} />
+            <Route path="/categories/:slug" element={<CategoryDetailPage />} />
+            <Route path="/conditions" element={<ConditionsHubPage />} />
+            <Route path="/conditions/:slug" element={<ConditionDetailPage />} />
             <Route path="/appointments" element={<AppointmentsPage />} />
             <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/about" element={<AboutPage />} />
@@ -73,6 +86,7 @@ export function App() {
           <BookingProvider>
             <MotionConfig reducedMotion="user">
               <div className="min-h-screen flex flex-col">
+                <ScrollToTop />
                 <Navbar />
                 <AnimatedRoutes />
                 <ChatbotButton />

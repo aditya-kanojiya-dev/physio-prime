@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Check, Loader2 } from 'lucide-react';
@@ -29,12 +29,19 @@ export const BookingPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const state = (location.state as BookingState) || {};
-  const { user, hydrated, openAuthModal } = useAuth();
+  const { user, hydrated, openAuthModal, authModalOpen } = useAuth();
 
   // Gate: require login before showing booking flow
   useEffect(() => {
     if (hydrated && !user) openAuthModal();
   }, [hydrated, user, openAuthModal]);
+
+  // ponytail: closing the auth modal (X) while gated on booking returns to the previous page
+  const wasAuthOpen = useRef(authModalOpen);
+  useEffect(() => {
+    if (wasAuthOpen.current && !authModalOpen && hydrated && !user) navigate(-1);
+    wasAuthOpen.current = authModalOpen;
+  }, [authModalOpen, hydrated, user, navigate]);
 
   // Determine starting step from route state
   const initialStep = useMemo(() => {

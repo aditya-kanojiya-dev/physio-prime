@@ -2,8 +2,9 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useBooking } from '../../context/BookingContext';
 import { useDoctors, useSymptoms } from '../../hooks/queries';
-import { Search, MapPin, Stethoscope, ArrowRight, X, Sparkles } from 'lucide-react';
+import { ArrowRight, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { TherapistSearchBar } from '../doctors/TherapistSearchBar';
 
 export const SearchSection: React.FC = () => {
   const navigate = useNavigate();
@@ -11,8 +12,11 @@ export const SearchSection: React.FC = () => {
   const { data: doctors = [] } = useDoctors();
   const { data: symptoms = [] } = useSymptoms();
   const [query, setQuery] = useState('');
-  const [selectedCity, setSelectedCity] = useState('Nagpur');
+  const [selectedCity, setSelectedCity] = useState('');
   const [isFocused, setIsFocused] = useState(false);
+
+  const cities = [...new Set(doctors.map(d => d.location.city).filter(Boolean))];
+  const defaultCity = cities[0] ?? '';
 
   const filteredDoctors = doctors.filter(doc =>
     doc.name.toLowerCase().includes(query.toLowerCase()) ||
@@ -27,8 +31,8 @@ export const SearchSection: React.FC = () => {
 
   const hasResults = query.trim().length > 0;
 
-  const handleSearchSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSearchSubmit = () => {
+    setIsFocused(false);
     setSearchQuery(query);
     setCurrentPage('doctors');
     navigate('/doctors');
@@ -45,78 +49,29 @@ export const SearchSection: React.FC = () => {
     setIsFocused(false);
     setQuery('');
     navigateToSymptom(slug);
-    navigate(`/doctors?category=${slug}`);
+    navigate(`/doctors?condition=${slug}`);
   };
 
   const handleViewAll = () => {
-    setIsFocused(false);
-    setSearchQuery(query);
-    setCurrentPage('doctors');
-    navigate('/doctors');
+    handleSearchSubmit();
   };
 
   return (
-    <section className="relative z-20 -mt-10 max-w-5xl mx-auto px-4 sm:px-6">
+    <section className="relative z-20 -mt-10 px-4 sm:px-6">
       <div className="relative">
-        
-        {/* Main Floating Glass Search Bar */}
-        <form
-          onSubmit={handleSearchSubmit}
-          className="glass-panel p-3 sm:p-4 rounded-3xl border border-slate-200 shadow-xl bg-white"
-        >
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
-            
-            {/* Search Query Input */}
-            <div className="md:col-span-6 relative flex items-center">
-              <Search className="w-5 h-5 text-blue-500 absolute left-4 pointer-events-none" />
-              <input
-                type="text"
-                value={query}
-                onFocus={() => setIsFocused(true)}
-                onChange={e => setQuery(e.target.value)}
-                placeholder="Search symptoms (e.g. Back pain, Knee rehab), doctors, or therapy..."
-                className="w-full pl-12 pr-10 py-3.5 bg-white border border-slate-200 focus:border-blue-500 rounded-2xl text-sm font-semibold text-slate-900 placeholder-slate-400 focus:outline-none transition-all shadow-sm"
-              />
-              {query && (
-                <button
-                  type="button"
-                  onClick={() => setQuery('')}
-                  className="absolute right-3 p-1 rounded-full text-slate-400 hover:text-slate-600"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              )}
-            </div>
 
-            {/* City Location Dropdown */}
-            <div className="md:col-span-3 relative flex items-center">
-              <MapPin className="w-5 h-5 text-teal-500 absolute left-4 pointer-events-none" />
-              <select
-                value={selectedCity}
-                onChange={e => setSelectedCity(e.target.value)}
-                className="w-full pl-12 pr-8 py-3.5 bg-white border border-slate-200 focus:border-teal-500 rounded-2xl text-sm font-semibold text-slate-900 focus:outline-none appearance-none cursor-pointer shadow-sm"
-              >
-                <option value="Nagpur">Nagpur (HQ)</option>
-                <option value="Mumbai">Mumbai</option>
-                <option value="Pune">Pune</option>
-                <option value="Delhi">Delhi NCR</option>
-                <option value="Bangalore">Bangalore</option>
-              </select>
-            </div>
-
-            {/* Submit Button */}
-            <div className="md:col-span-3">
-              <button
-                type="submit"
-                className="w-full btn-gradient text-white py-3.5 px-6 rounded-2xl font-extrabold text-sm shadow-lg shadow-blue-500/25 flex items-center justify-center gap-2 hover:scale-[1.01] active:scale-[0.99] transition-all"
-              >
-                <Stethoscope className="w-4 h-4 text-teal-300" />
-                <span>Search Therapists</span>
-              </button>
-            </div>
-
-          </div>
-        </form>
+        <TherapistSearchBar
+          searchValue={query}
+          onSearchChange={setQuery}
+          location={selectedCity || defaultCity}
+          onLocationChange={setSelectedCity}
+          onSearch={handleSearchSubmit}
+          onInputFocus={() => setIsFocused(true)}
+          placeholder="Search symptoms (e.g. Back pain, Knee rehab), doctors, or therapy..."
+          cities={cities}
+          onUseMyLocation={() => setSelectedCity(defaultCity)}
+          className="max-w-5xl mx-auto"
+        />
 
         {/* Live Search Suggestions Dropdown */}
         <AnimatePresence>
@@ -127,7 +82,7 @@ export const SearchSection: React.FC = () => {
               exit={{ opacity: 0, y: 10 }}
               className="absolute left-0 right-0 top-full mt-3 glass-panel rounded-3xl border border-slate-200 shadow-xl p-4 bg-white max-h-[28rem] overflow-y-auto z-50 divide-y divide-slate-100"
             >
-              
+
               {/* Doctor Matches */}
               {filteredDoctors.length > 0 && (
                 <div className="pb-3">
