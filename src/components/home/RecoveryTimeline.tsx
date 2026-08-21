@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useBooking } from '../../context/BookingContext';
-import { Search, UserCheck, CalendarCheck, Home, Activity, Sparkles, Play, Pause } from 'lucide-react';
+import { Search, UserCheck, CalendarCheck, Home, Activity, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export const RecoveryTimeline: React.FC = () => {
@@ -76,8 +76,6 @@ export const RecoveryTimeline: React.FC = () => {
     setIsAutoPlaying(false);
     setTimeout(() => setIsAutoPlaying(true), 5000);
   };
-
-  const toggleAutoPlay = () => setIsAutoPlaying(!isAutoPlaying);
 
   return (
     <section className="py-12 lg:py-16 relative">
@@ -159,25 +157,8 @@ export const RecoveryTimeline: React.FC = () => {
             })}
           </div>
 
-          {/* Auto-Play Controls */}
+          {/* Step Indicators */}
           <div className="flex justify-center mt-6 gap-3">
-            <button
-              onClick={toggleAutoPlay}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 transition-colors text-xs font-bold text-slate-700 border border-slate-200"
-            >
-              {isAutoPlaying ? (
-                <>
-                  <Pause className="w-3.5 h-3.5" />
-                  <span>Pause Auto-Play</span>
-                </>
-              ) : (
-                <>
-                  <Play className="w-3.5 h-3.5" />
-                  <span>Resume Auto-Play</span>
-                </>
-              )}
-            </button>
-
             <div className="flex items-center gap-1.5">
               {steps.map((_, idx) => (
                 <button
