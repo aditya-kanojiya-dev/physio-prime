@@ -21,22 +21,26 @@ export const CareerSection: React.FC = () => {
     {
       icon: <Users className="w-5 h-5" />,
       title: 'Expert Team',
-      description: 'Work with India\'s top physiotherapists'
+      description: 'Work with India\'s top physiotherapists',
+      color: 'from-blue-500 to-indigo-600'
     },
     {
       icon: <GraduationCap className="w-5 h-5" />,
       title: 'Continuous Learning',
-      description: 'Regular workshops and certifications'
+      description: 'Regular workshops and certifications',
+      color: 'from-teal-500 to-emerald-600'
     },
     {
       icon: <TrendingUp className="w-5 h-5" />,
       title: 'Career Growth',
-      description: 'Clear path to senior roles'
+      description: 'Clear path to senior roles',
+      color: 'from-amber-500 to-orange-600'
     },
     {
       icon: <Heart className="w-5 h-5" />,
       title: 'Patient Impact',
-      description: 'Make a real difference in lives'
+      description: 'Make a real difference in lives',
+      color: 'from-rose-500 to-pink-600'
     }
   ];
 
@@ -120,7 +124,7 @@ export const CareerSection: React.FC = () => {
                 transition={{ duration: 0.4, delay: index * 0.1 + 0.3 }}
                 className="bg-white rounded-2xl p-6 border border-slate-200 shadow-lg transition-all duration-300 hover:bg-teal-50 hover:border-teal-300 hover:shadow-xl hover:shadow-teal-100/50 group"
               >
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-50 to-teal-50 flex items-center justify-center text-blue-600 group-hover:text-teal-600 group-hover:scale-110 transition-all duration-300 mb-4">
+                <div className={`w-12 h-12 rounded-xl bg-gradient-to-tr ${benefit.color} flex items-center justify-center text-white shadow-lg shadow-blue-500/20 group-hover:scale-110 transition-all duration-300 mb-4`}>
                   {benefit.icon}
                 </div>
                 <h4 className="text-sm font-extrabold text-slate-900">{benefit.title}</h4>
