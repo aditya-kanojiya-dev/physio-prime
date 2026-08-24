@@ -196,6 +196,7 @@ export const HeroSection: React.FC = () => {
                 loop
                 playsInline
                 preload="metadata"
+                ref={(el) => { if (el) el.playbackRate = 1.3; }}
                 className="w-full h-full aspect-[4/5]"
               />
               <div className="absolute inset-0 pointer-events-none" />
