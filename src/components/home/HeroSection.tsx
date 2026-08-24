@@ -165,7 +165,7 @@ export const HeroSection: React.FC = () => {
                 className="btn-gradient text-white px-8 py-4 rounded-2xl font-extrabold text-base shadow-xl shadow-blue-500/30 flex items-center gap-3 hover:scale-[1.02] active:scale-[0.98] transition-all"
               >
                 <Sparkles className="w-5 h-5 text-teal-300" />
-                <span>Book {selectedMode === 'home' ? 'Home Visit' : 'Video Consult'} Now</span>
+                <span>See Available Physiotherapists</span>
                 <ArrowRight className="w-5 h-5" />
               </button>
 

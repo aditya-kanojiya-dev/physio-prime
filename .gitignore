@@ -32,3 +32,6 @@ dist-ssr
 .vercel
 
 .vercel
+
+# db backups
+backup/
