@@ -312,7 +312,7 @@ export const FindDoctorsPage: React.FC = () => {
   const { data: symptoms = [] } = useSymptoms();
   const { data: categories = [] } = useCategories();
 
-  // ponytail: read ?condition= once at mount so condition-page CTAs land pre-filtered
+  // ponytail: read ?condition=/?mode= once at mount so CTA links land pre-filtered
   const [selectedSymptom, setSelectedSymptom] = useState<string | null>(
     selectedSymptomSlug ?? new URLSearchParams(window.location.search).get('condition')
   );
@@ -320,7 +320,11 @@ export const FindDoctorsPage: React.FC = () => {
   const [maxPrice, setMaxPrice] = useState<number>(2000);
   const [cityInput, setCityInput] = useState('');
   const [areaInput, setAreaInput] = useState('');
-  const [selectedMode, setSelectedMode] = useState<ConsultationMode | 'all'>('all');
+  // ponytail: seed from hero CTA's ?mode= once at mount, 'all' fallback
+  const [selectedMode, setSelectedMode] = useState<ConsultationMode | 'all'>(() => {
+    const mode = new URLSearchParams(window.location.search).get('mode');
+    return mode === 'home' || mode === 'online' ? mode : 'all';
+  });
   const [selectedGender, setSelectedGender] = useState<'all' | 'male' | 'female'>('all');
   const [sortBy, setSortBy] = useState<'recommended' | 'price-low' | 'rating-high' | 'experience'>('recommended');
   const [filtersOpen, setFiltersOpen] = useState(() => typeof window !== 'undefined' && window.innerWidth >= 1024);

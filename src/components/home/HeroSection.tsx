@@ -7,7 +7,7 @@ import heroVid from '../../assets/hero-vid.webm';
 import { fadeUp, staggerContainer, EASE_OUT } from '../../lib/motion';
 
 // ponytail: ~40-line vanilla typewriter instead of Typed.js dependency
-const TYPE_WORDS = ['Physiotherapy Care', 'Pain Recovery', 'Home Rehab', 'Sports Injury Care'];
+const TYPE_WORDS = ['Home Visit.', 'Online Video Consult.', 'Stroke Recovery.', 'Post Surgical Rehab.', 'Sports Injury.', 'Back and Neck Pain.'];
 
 function useTypewriter(words: string[], enabled: boolean) {
   const [text, setText] = useState(enabled ? '' : words[0]);
@@ -97,7 +97,7 @@ export const HeroSection: React.FC = () => {
                 aria-label="Your Trusted Partner in Physiotherapy Care"
                 className="text-5xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-slate-900 leading-[1.1]"
               >
-                Your Trusted Partner in
+                Book Prime Physiotherapist for
                 {/* own line + fluid size + nowrap: never wraps, so hero height never changes */}
                 <span aria-hidden="true" className="block mt-1 text-gradient whitespace-nowrap leading-[1.15] text-[clamp(1.9rem,5vw,3.4rem)]">
                   {typed}
@@ -105,7 +105,7 @@ export const HeroSection: React.FC = () => {
                 </span>
               </h1>
               <p className="text-lg sm:text-xl text-slate-600 leading-relaxed font-normal max-w-2xl">
-                Book certified physiotherapists for personalized <strong className="text-slate-900 font-semibold">Home Visits</strong> or instant <strong className="text-slate-900 font-semibold">HD Video Consultations</strong>. Recover comfortably at your speed.
+                Connect with certified <strong className="text-slate-900 font-semibold text-gradient underline">Prime Physiotherapists</strong> for expert care, personalized treatment, and recovery from the comfort of home.
               </p>
             </motion.div>
 
@@ -161,7 +161,7 @@ export const HeroSection: React.FC = () => {
             {/* CTA Buttons */}
             <motion.div variants={fadeUp(20)} className="flex flex-wrap items-center gap-4">
               <button
-                onClick={() => navigate('/book', { state: { mode: selectedMode } })}
+                onClick={() => navigate(`/doctors?mode=${selectedMode}`)}
                 className="btn-gradient text-white px-8 py-4 rounded-2xl font-extrabold text-base shadow-xl shadow-blue-500/30 flex items-center gap-3 hover:scale-[1.02] active:scale-[0.98] transition-all"
               >
                 <Sparkles className="w-5 h-5 text-teal-300" />
