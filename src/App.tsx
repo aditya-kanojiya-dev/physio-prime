@@ -21,6 +21,9 @@ import { BookingSlotsPage } from './pages/BookingSlotsPage';
 import { BookingPage } from './pages/BookingPage';
 import { BlogListingPage } from './pages/BlogListingPage';
 import { BlogDetailPage } from './pages/BlogDetailPage';
+import { HowItWorksPage } from './pages/HowItWorksPage';
+import { PatientGuidesPage } from './pages/PatientGuidesPage';
+import { PricingPage } from './pages/PricingPage';
 import { ChatbotButton } from './components/chatbot/ChatbotButton';
 import { pageVariants } from './lib/motion';
 
@@ -70,6 +73,9 @@ function AnimatedRoutes() {
             <Route path="/book" element={<BookingPage />} />
             <Route path="/blog" element={<BlogListingPage />} />
             <Route path="/blog/:slug" element={<BlogDetailPage />} />
+            <Route path="/how-it-works" element={<HowItWorksPage />} />
+            <Route path="/guides/patients" element={<PatientGuidesPage />} />
+            <Route path="/pricing" element={<PricingPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </motion.div>
