@@ -5,7 +5,6 @@ import logo from '../../assets/logo.png';
 
 const platformLinks = [
   { to: '/about', label: 'About Physio Prime' },
-  { to: '/how-it-works', label: 'How It Works' },
   { to: '/doctors', label: 'Find a Physiotherapist' },
   { to: '/categories', label: 'Physiotherapy Services' },
   { to: '/conditions', label: 'Conditions We Treat' },
