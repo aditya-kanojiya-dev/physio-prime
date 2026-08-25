@@ -177,19 +177,19 @@ export const Footer: React.FC = () => {
             </button>
 
             {/* Contact details */}
-            <div className="space-y-2.5 pt-1">
-              <a href="tel:+919876543210" className="flex items-center gap-2.5 text-sm text-slate-600 hover:text-blue-600 transition-colors">
-                <Phone className="w-4 h-4 text-blue-500 shrink-0" />
+            <div className="flex flex-wrap items-center gap-2 pt-1">
+              <a href="tel:+919876543210" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-50 border border-slate-200 text-sm text-slate-600 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-600 transition-all duration-200">
+                <Phone className="w-3.5 h-3.5 text-blue-500" />
                 +91 98765 43210
               </a>
-              <a href="mailto:care@physioprime.health" className="flex items-center gap-2.5 text-sm text-slate-600 hover:text-blue-600 transition-colors">
-                <Mail className="w-4 h-4 text-blue-500 shrink-0" />
+              <a href="mailto:care@physioprime.health" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-50 border border-slate-200 text-sm text-slate-600 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-600 transition-all duration-200">
+                <Mail className="w-3.5 h-3.5 text-blue-500" />
                 care@physioprime.health
               </a>
-              <p className="flex items-start gap-2.5 text-sm text-slate-600">
-                <MapPin className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
-                IT Park, South Ambazari Road, Nagpur, MH 440022
-              </p>
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-50 border border-slate-200 text-sm text-slate-600">
+                <MapPin className="w-3.5 h-3.5 text-blue-500" />
+                Nagpur, MH
+              </span>
             </div>
           </div>
 
