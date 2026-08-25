@@ -72,10 +72,10 @@ export const Navbar: React.FC = () => {
   return (
     <>
       <header
-        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 py-3 ${
           isScrolled
-            ? 'py-3 glass-nav shadow-lg shadow-blue-500/5'
-            : 'py-5 bg-transparent'
+            ? 'glass-nav shadow-lg shadow-blue-500/5'
+            : 'bg-transparent'
         }`}
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -277,7 +277,7 @@ export const Navbar: React.FC = () => {
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: '100%' }}
               transition={{ duration: 0.35, ease: EASE_OUT }}
-              className="lg:hidden fixed top-[60px] left-0 right-0 bottom-0 bg-white/95 backdrop-blur-lg border-b border-slate-200 overflow-y-auto shadow-2xl"
+              className="lg:hidden fixed top-[64px] left-0 right-0 bottom-0 bg-white/95 backdrop-blur-lg border-b border-slate-200 overflow-y-auto shadow-2xl"
             >
               <div className="flex flex-col h-full">
                 {/* User Info Card */}
