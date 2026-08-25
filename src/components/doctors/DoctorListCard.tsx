@@ -2,12 +2,14 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { BadgeCheck, Calendar, Share2, Check, Home, Video } from 'lucide-react';
+import primeBadge from '../../assets/prime-badge.png';
 
 export interface DoctorListCardProps {
   name: string;
   photoUrl?: string;
   specialty: string;
   verified?: boolean;
+  featured?: boolean;
   experienceYears: number;
   availabilityDate?: string | null;
   sessionFee: number;
@@ -28,6 +30,7 @@ export const DoctorListCard: React.FC<DoctorListCardProps> = ({
   photoUrl,
   specialty,
   verified,
+  featured,
   experienceYears,
   availabilityDate,
   sessionFee,
@@ -96,6 +99,9 @@ export const DoctorListCard: React.FC<DoctorListCardProps> = ({
               </h3>
               {verified && (
                 <BadgeCheck className="w-[18px] h-[18px] text-blue-600 fill-blue-100 shrink-0" />
+              )}
+              {featured && (
+                <img src={primeBadge} alt="Prime" className="h-5 w-auto shrink-0" />
               )}
             </div>
             <p className="text-sm text-slate-500 truncate">{specialty}</p>

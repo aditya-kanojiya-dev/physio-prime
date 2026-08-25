@@ -608,6 +608,7 @@ export const FindDoctorsPage: React.FC = () => {
                     photoUrl={doctor.photo}
                     specialty={doctor.specialty}
                     verified={doctor.verified}
+                    featured={doctor.featured}
                     experienceYears={doctor.experienceYears}
                     availabilityDate={doctor.nextAvailable}
                     sessionFee={doctor.fees.home}
