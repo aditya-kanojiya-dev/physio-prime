@@ -18,6 +18,7 @@ import {
 import { api, ApiError } from '../../lib/api'
 import { AdminApplication, AdminClient, AdminDoctor } from '../../lib/types'
 import { AdminLayout } from '../../components/admin/AdminLayout'
+import { ImageUpload } from '../../components/admin/ImageUpload'
 
 const emptyForm = {
   name: '',
@@ -395,9 +396,7 @@ export function DoctorsPage() {
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <Field label="Photo URL">
-                  <input type="text" value={form.photo} onChange={(e) => setForm({ ...form, photo: e.target.value })} className={inputCls} />
-                </Field>
+                <ImageUpload value={form.photo} onChange={(url) => setForm({ ...form, photo: url })} folder="doctors" label="Doctor Photo" />
                 <Field label="Experience (Years) *">
                   <input type="number" required value={form.experienceYears} onChange={(e) => setForm({ ...form, experienceYears: Number(e.target.value) })} className={inputCls} />
                 </Field>

@@ -6,6 +6,7 @@ import { AdminSymptom } from '../../lib/types'
 import { AdminLayout } from '../../components/admin/AdminLayout'
 import { StatusPill } from './AppointmentsPage'
 import { Field, Modal, inputCls } from './CategoriesPage'
+import { ImageUpload } from '../../components/admin/ImageUpload'
 
 const emptyForm = {
   title: '',
@@ -193,9 +194,7 @@ export function SymptomsPage() {
               </Field>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field label="Image URL">
-                <input type="text" value={form.image} onChange={(e) => setForm({ ...form, image: e.target.value })} className={inputCls} />
-              </Field>
+              <ImageUpload value={form.image} onChange={(url) => setForm({ ...form, image: url })} folder="symptoms" label="Symptom Image" />
               <Field label="Sort Order">
                 <input type="number" value={form.sortOrder} onChange={(e) => setForm({ ...form, sortOrder: Number(e.target.value) })} className={inputCls} />
               </Field>

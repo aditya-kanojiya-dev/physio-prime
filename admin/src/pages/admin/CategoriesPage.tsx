@@ -5,6 +5,7 @@ import { api, ApiError } from '../../lib/api'
 import { AdminCategory } from '../../lib/types'
 import { AdminLayout } from '../../components/admin/AdminLayout'
 import { StatusPill } from './AppointmentsPage'
+import { ImageUpload } from '../../components/admin/ImageUpload'
 
 const emptyForm = {
   title: '',
@@ -177,9 +178,7 @@ export function CategoriesPage() {
               <textarea rows={3} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className={`${inputCls} resize-none`} />
             </Field>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field label="Image URL">
-                <input type="text" value={form.image} onChange={(e) => setForm({ ...form, image: e.target.value })} className={inputCls} />
-              </Field>
+              <ImageUpload value={form.image} onChange={(url) => setForm({ ...form, image: url })} folder="categories" label="Category Image" />
               <Field label="Color">
                 <input type="color" value={form.color} onChange={(e) => setForm({ ...form, color: e.target.value })} className="w-full h-10 rounded-xl bg-white border border-slate-200" />
               </Field>

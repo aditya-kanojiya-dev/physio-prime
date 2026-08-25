@@ -5,6 +5,7 @@ import { api, ApiError } from '../lib/api'
 import { DoctorProfile } from '../lib/types'
 import { AdminLayout } from '../components/admin/AdminLayout'
 import { ChangePasswordModal } from '../components/admin/ChangePasswordModal'
+import { ImageUpload } from '../components/admin/ImageUpload'
 
 const inputCls = 'w-full p-2.5 bg-white border border-slate-200 rounded-xl text-slate-900 font-bold focus:outline-none focus:border-teal-500 transition-colors'
 const labelCls = 'font-bold text-slate-600'
@@ -175,10 +176,7 @@ export function ProfilePage() {
                 </select>
               </div>
             </div>
-            <div>
-              <label className={labelCls}>Photo URL</label>
-              <input value={photo} onChange={(e) => setPhoto(e.target.value)} placeholder="https://..." className={inputCls} />
-            </div>
+            <ImageUpload value={photo} onChange={setPhoto} folder="doctors" label="Photo" />
             <div>
               <label className={labelCls}>Bio</label>
               <textarea value={bio} onChange={(e) => setBio(e.target.value)} rows={4} className={`${inputCls} resize-none`} />
