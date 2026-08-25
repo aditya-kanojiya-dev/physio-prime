@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, Activity, MapPin } from 'lucide-react';
 import logo from '../../assets/logo.png';
 
 const platformLinks = [
@@ -92,16 +92,16 @@ function FooterColumn({
     <div className="lg:block">
       <button
         onClick={() => setOpen(!open)}
-        className="flex items-center justify-between w-full lg:pointer-events-none py-4 lg:py-0 border-b border-white/[0.06] lg:border-0"
+        className="flex items-center justify-between w-full lg:pointer-events-none py-4 lg:py-0 border-b border-slate-700/50 lg:border-0"
       >
         <h4
-          className="text-[15px] font-semibold text-white/90 tracking-wide"
+          className="text-sm font-bold text-slate-200 tracking-wide"
           style={{ fontFamily: 'var(--font-heading)' }}
         >
           {title}
         </h4>
         <ChevronDown
-          className={`w-4 h-4 text-white/30 transition-transform duration-300 lg:hidden ${open ? 'rotate-180' : ''}`}
+          className={`w-4 h-4 text-slate-500 transition-transform duration-300 lg:hidden ${open ? 'rotate-180' : ''}`}
         />
       </button>
 
@@ -110,10 +110,10 @@ function FooterColumn({
           <li key={link.label}>
             <Link
               to={link.to}
-              className={`text-[15px] leading-relaxed transition-colors duration-200 ${
+              className={`text-[14.5px] leading-relaxed transition-colors duration-200 ${
                 link.accent
-                  ? 'text-[#22D3EE]/80 hover:text-[#22D3EE]'
-                  : 'text-white/40 hover:text-white/90'
+                  ? 'text-blue-400 hover:text-blue-300'
+                  : 'text-slate-400 hover:text-slate-100'
               }`}
             >
               {link.label}
@@ -129,48 +129,52 @@ export const Footer: React.FC = () => {
   const [lang, setLang] = useState<'en' | 'hi'>('en');
 
   return (
-    <footer className="relative bg-[#0B0B0F] text-white overflow-hidden">
-      {/* Top accent — site's primary teal */}
-      <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-[#0891B2]/25 to-transparent" />
+    <footer className="relative bg-slate-900 text-white overflow-hidden">
+      {/* Subtle top accent — matches the site's teal identity */}
+      <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-blue-500/30 to-transparent" />
 
       {/* Main content */}
-      <div className="max-w-[1320px] mx-auto px-5 sm:px-8 lg:px-12 pt-16 sm:pt-20 lg:pt-24 pb-12 lg:pb-14">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-16 sm:pt-20 lg:pt-24 pb-12 lg:pb-14">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-8">
 
-          {/* Brand column */}
+          {/* Brand column — mirrors the Navbar logo treatment */}
           <div className="lg:col-span-4 space-y-5 lg:pr-8">
             <Link to="/" className="inline-flex items-center gap-2.5 group">
               <img
                 src={logo}
                 alt="Physio Prime"
-                className="h-9 w-auto object-contain"
+                className="h-9 w-auto object-contain group-hover:scale-105 transition-transform duration-300"
               />
-              <span
-                className="text-xl font-extrabold tracking-tight text-white/95"
-                style={{ fontFamily: 'var(--font-heading)' }}
-              >
-                PHYSIO{' '}
-                <span className="text-[#22D3EE]">PRIME</span>
-              </span>
+              <div>
+                <span
+                  className="text-xl font-extrabold tracking-tight text-white"
+                  style={{ fontFamily: 'var(--font-heading)' }}
+                >
+                  Physio<span className="text-gradient">Prime</span>
+                </span>
+                <p className="text-[10px] font-medium text-slate-500 flex items-center gap-1 mt-0.5">
+                  <MapPin className="w-2.5 h-2.5 text-blue-400" /> Nagpur &amp; Pan-India
+                </p>
+              </div>
             </Link>
 
-            <p className="text-[#0891B2]/80 text-sm font-medium tracking-wide">
+            <p className="text-blue-400/80 text-sm font-semibold tracking-wide">
               Optimizing motion. Improving lives.
             </p>
 
-            <p className="text-white/35 text-[14.5px] leading-relaxed max-w-sm">
+            <p className="text-slate-400 text-[14.5px] leading-relaxed max-w-sm">
               Physio Prime connects patients with trusted physiotherapists for
               professional clinic and home-based physiotherapy care.
             </p>
 
-            {/* Social icons */}
+            {/* Social icons — matches site's rounded-2xl card aesthetic */}
             <div className="flex items-center gap-2.5 pt-1">
               {socials.map((s) => (
                 <a
                   key={s.label}
                   href={s.href}
                   aria-label={s.label}
-                  className="w-10 h-10 rounded-lg bg-white/[0.04] border border-white/[0.07] flex items-center justify-center text-white/35 hover:text-[#22D3EE] hover:border-[#0891B2]/30 hover:bg-[#0891B2]/[0.06] transition-all duration-300"
+                  className="w-10 h-10 rounded-2xl bg-slate-800 border border-slate-700/60 flex items-center justify-center text-slate-400 hover:text-blue-400 hover:border-blue-500/40 hover:bg-blue-500/10 transition-all duration-300"
                 >
                   {s.icon}
                 </a>
@@ -191,27 +195,29 @@ export const Footer: React.FC = () => {
         </div>
       </div>
 
-      {/* Divider */}
-      <div className="border-t border-white/[0.06]" />
+      {/* Divider — subtle slate */}
+      <div className="border-t border-slate-800" />
 
       {/* Bottom bar */}
-      <div className="max-w-[1320px] mx-auto px-5 sm:px-8 lg:px-12 py-5 flex flex-col md:flex-row items-center justify-between gap-4 text-[13px] text-white/30">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 flex flex-col md:flex-row items-center justify-between gap-4 text-[13px] text-slate-500">
         <p>&copy; {new Date().getFullYear()} Physio Prime. All rights reserved.</p>
 
-        <p className="hidden sm:block">
-          Made with{' '}
-          <span className="text-[#0891B2]">&#9829;</span> in India
-        </p>
+        <div className="hidden sm:flex items-center gap-1.5 text-slate-500 font-medium">
+          <Activity className="w-3.5 h-3.5 text-blue-400" />
+          <span>Made with</span>
+          <span className="text-blue-400">&#9829;</span>
+          <span>in India</span>
+        </div>
 
         <div className="flex items-center gap-4 flex-wrap justify-center">
-          {/* Language selector */}
-          <div className="inline-flex items-center rounded-full bg-white/[0.04] border border-white/[0.07] p-0.5 text-[13px]">
+          {/* Language selector — matches site's pill/badge style */}
+          <div className="inline-flex items-center rounded-full bg-slate-800 border border-slate-700/60 p-0.5 text-[13px]">
             <button
               onClick={() => setLang('en')}
               className={`px-3 py-1 rounded-full transition-all duration-300 ${
                 lang === 'en'
-                  ? 'bg-white/10 text-white'
-                  : 'text-white/35 hover:text-white/60'
+                  ? 'bg-blue-600 text-white'
+                  : 'text-slate-400 hover:text-slate-200'
               }`}
             >
               English
@@ -220,20 +226,20 @@ export const Footer: React.FC = () => {
               onClick={() => setLang('hi')}
               className={`px-3 py-1 rounded-full transition-all duration-300 ${
                 lang === 'hi'
-                  ? 'bg-white/10 text-white'
-                  : 'text-white/35 hover:text-white/60'
+                  ? 'bg-blue-600 text-white'
+                  : 'text-slate-400 hover:text-slate-200'
               }`}
             >
               हिंदी
             </button>
           </div>
 
-          <span className="text-white/10 hidden sm:inline">|</span>
+          <span className="text-slate-700 hidden sm:inline">|</span>
 
-          <Link to="/privacy" className="hover:text-white/70 transition-colors duration-200">
+          <Link to="/privacy" className="hover:text-slate-200 transition-colors duration-200">
             Privacy Policy
           </Link>
-          <Link to="/terms" className="hover:text-white/70 transition-colors duration-200">
+          <Link to="/terms" className="hover:text-slate-200 transition-colors duration-200">
             Terms of Service
           </Link>
         </div>
