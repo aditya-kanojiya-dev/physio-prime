@@ -90,12 +90,14 @@ function FooterColumn({
 
   return (
     <div className="lg:block">
-      {/* Mobile accordion trigger */}
       <button
         onClick={() => setOpen(!open)}
         className="flex items-center justify-between w-full lg:pointer-events-none py-4 lg:py-0 border-b border-white/[0.06] lg:border-0"
       >
-        <h4 className="text-[15px] font-semibold text-white/90 tracking-wide">
+        <h4
+          className="text-[15px] font-semibold text-white/90 tracking-wide"
+          style={{ fontFamily: 'var(--font-heading)' }}
+        >
           {title}
         </h4>
         <ChevronDown
@@ -103,7 +105,6 @@ function FooterColumn({
         />
       </button>
 
-      {/* Links — always visible on desktop, toggle on mobile */}
       <ul className={`mt-3 lg:mt-4 space-y-2.5 ${open ? 'block' : 'hidden lg:block'}`}>
         {links.map((link) => (
           <li key={link.label}>
@@ -111,8 +112,8 @@ function FooterColumn({
               to={link.to}
               className={`text-[15px] leading-relaxed transition-colors duration-200 ${
                 link.accent
-                  ? 'text-cyan-400/80 hover:text-cyan-300'
-                  : 'text-white/45 hover:text-white/90'
+                  ? 'text-[#22D3EE]/80 hover:text-[#22D3EE]'
+                  : 'text-white/40 hover:text-white/90'
               }`}
             >
               {link.label}
@@ -129,8 +130,8 @@ export const Footer: React.FC = () => {
 
   return (
     <footer className="relative bg-[#0B0B0F] text-white overflow-hidden">
-      {/* Very subtle top edge glow */}
-      <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-cyan-500/20 to-transparent" />
+      {/* Top accent — site's primary teal */}
+      <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-[#0891B2]/25 to-transparent" />
 
       {/* Main content */}
       <div className="max-w-[1320px] mx-auto px-5 sm:px-8 lg:px-12 pt-16 sm:pt-20 lg:pt-24 pb-12 lg:pb-14">
@@ -144,12 +145,16 @@ export const Footer: React.FC = () => {
                 alt="Physio Prime"
                 className="h-9 w-auto object-contain"
               />
-              <span className="text-xl font-extrabold tracking-tight text-white/95">
-                PHYSIO <span className="text-cyan-400">PRIME</span>
+              <span
+                className="text-xl font-extrabold tracking-tight text-white/95"
+                style={{ fontFamily: 'var(--font-heading)' }}
+              >
+                PHYSIO{' '}
+                <span className="text-[#22D3EE]">PRIME</span>
               </span>
             </Link>
 
-            <p className="text-cyan-400/80 text-sm font-medium tracking-wide">
+            <p className="text-[#0891B2]/80 text-sm font-medium tracking-wide">
               Optimizing motion. Improving lives.
             </p>
 
@@ -165,7 +170,7 @@ export const Footer: React.FC = () => {
                   key={s.label}
                   href={s.href}
                   aria-label={s.label}
-                  className="w-10 h-10 rounded-lg bg-white/[0.04] border border-white/[0.07] flex items-center justify-center text-white/40 hover:text-cyan-400 hover:border-cyan-400/30 hover:bg-cyan-400/[0.06] transition-all duration-300"
+                  className="w-10 h-10 rounded-lg bg-white/[0.04] border border-white/[0.07] flex items-center justify-center text-white/35 hover:text-[#22D3EE] hover:border-[#0891B2]/30 hover:bg-[#0891B2]/[0.06] transition-all duration-300"
                 >
                   {s.icon}
                 </a>
@@ -195,7 +200,7 @@ export const Footer: React.FC = () => {
 
         <p className="hidden sm:block">
           Made with{' '}
-          <span className="text-cyan-400">&#9829;</span> in India
+          <span className="text-[#0891B2]">&#9829;</span> in India
         </p>
 
         <div className="flex items-center gap-4 flex-wrap justify-center">
