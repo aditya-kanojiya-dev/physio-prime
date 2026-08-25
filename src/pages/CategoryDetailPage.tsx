@@ -113,6 +113,15 @@ export const CategoryDetailPage: React.FC = () => {
         {/* Category header */}
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-8 items-start mb-10">
           <div>
+            {category.image && (
+              <div className="rounded-2xl overflow-hidden mb-6 border border-slate-200/80 shadow-sm">
+                <img
+                  src={category.image}
+                  alt={category.title}
+                  className="w-full h-48 sm:h-64 object-cover"
+                />
+              </div>
+            )}
             <h1 className="text-3xl sm:text-5xl font-extrabold text-slate-900 tracking-tight leading-tight">
               {category.title}
             </h1>
