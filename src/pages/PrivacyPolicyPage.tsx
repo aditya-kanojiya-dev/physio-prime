@@ -4,7 +4,7 @@ import { ArrowLeft, Shield } from 'lucide-react';
 
 export const PrivacyPolicyPage: React.FC = () => {
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 via-white to-slate-50">
+    <div className="pt-28 pb-20 min-h-screen bg-gradient-to-b from-slate-50 via-white to-slate-50">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
         <Link to="/" className="inline-flex items-center gap-2 text-sm font-semibold text-slate-500 hover:text-teal-600 transition-colors mb-8">
           <ArrowLeft className="w-4 h-4" /> Back to Home
