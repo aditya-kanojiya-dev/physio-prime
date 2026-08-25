@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { ChevronDown } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { ChevronDown, Phone, Mail, MapPin, ArrowRight } from 'lucide-react';
 import logo from '../../assets/logo.png';
 
 const platformLinks = [
@@ -120,6 +120,8 @@ function FooterColumn({
 }
 
 export const Footer: React.FC = () => {
+  const navigate = useNavigate();
+
   return (
     <footer className="relative bg-white border-t border-slate-200/80 overflow-hidden">
       {/* Main content */}
@@ -163,6 +165,31 @@ export const Footer: React.FC = () => {
                   {s.icon}
                 </a>
               ))}
+            </div>
+
+            {/* CTA */}
+            <button
+              onClick={() => navigate('/book')}
+              className="btn-gradient text-white px-5 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 shadow-md shadow-blue-500/20 hover:shadow-lg hover:shadow-blue-500/30 active:scale-[0.98] transition-all duration-300"
+            >
+              Book a Session
+              <ArrowRight className="w-4 h-4" />
+            </button>
+
+            {/* Contact details */}
+            <div className="space-y-2.5 pt-1">
+              <a href="tel:+919876543210" className="flex items-center gap-2.5 text-sm text-slate-600 hover:text-blue-600 transition-colors">
+                <Phone className="w-4 h-4 text-blue-500 shrink-0" />
+                +91 98765 43210
+              </a>
+              <a href="mailto:care@physioprime.health" className="flex items-center gap-2.5 text-sm text-slate-600 hover:text-blue-600 transition-colors">
+                <Mail className="w-4 h-4 text-blue-500 shrink-0" />
+                care@physioprime.health
+              </a>
+              <p className="flex items-start gap-2.5 text-sm text-slate-600">
+                <MapPin className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
+                IT Park, South Ambazari Road, Nagpur, MH 440022
+              </p>
             </div>
           </div>
 
