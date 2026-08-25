@@ -108,7 +108,7 @@ function FooterColumn({
               className={`text-[14.5px] leading-relaxed transition-colors duration-200 ${
                 link.accent
                   ? 'text-blue-600 hover:text-blue-700'
-                  : 'text-slate-500 hover:text-slate-900'
+                  : 'text-slate-600 hover:text-slate-900'
               }`}
             >
               {link.label}
@@ -121,8 +121,6 @@ function FooterColumn({
 }
 
 export const Footer: React.FC = () => {
-  const [lang, setLang] = useState<'en' | 'hi'>('en');
-
   return (
     <footer className="relative bg-white border-t border-slate-200/80 overflow-hidden">
       {/* Main content */}
@@ -149,7 +147,7 @@ export const Footer: React.FC = () => {
               Optimizing motion. Improving lives.
             </p>
 
-            <p className="text-slate-500 text-[14.5px] leading-relaxed max-w-sm">
+            <p className="text-slate-600 text-[14.5px] leading-relaxed max-w-sm">
               Physio Prime connects patients with trusted physiotherapists for
               professional clinic and home-based physiotherapy care.
             </p>
@@ -161,7 +159,7 @@ export const Footer: React.FC = () => {
                   key={s.label}
                   href={s.href}
                   aria-label={s.label}
-                  className="w-10 h-10 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-400 hover:text-blue-600 hover:border-blue-200 hover:bg-blue-50 transition-all duration-300"
+                  className="w-10 h-10 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-500 hover:text-blue-600 hover:border-blue-200 hover:bg-blue-50 transition-all duration-300"
                 >
                   {s.icon}
                 </a>
@@ -186,46 +184,20 @@ export const Footer: React.FC = () => {
       <div className="border-t border-slate-200/80" />
 
       {/* Bottom bar */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 flex flex-col md:flex-row items-center justify-between gap-4 text-[13px] text-slate-400">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 flex flex-col md:flex-row items-center justify-between gap-4 text-[13px] text-slate-500">
         <p>&copy; {new Date().getFullYear()} Physio Prime. All rights reserved.</p>
 
-        <div className="hidden sm:flex items-center gap-1.5 text-slate-400 font-medium">
+        <div className="hidden sm:flex items-center gap-1.5 text-slate-500 font-medium">
           <span>Made with</span>
           <span className="text-blue-500">&#9829;</span>
           <span>in India</span>
         </div>
 
         <div className="flex items-center gap-4 flex-wrap justify-center">
-          {/* Language selector */}
-          <div className="inline-flex items-center rounded-full bg-slate-100 border border-slate-200 p-0.5 text-[13px]">
-            <button
-              onClick={() => setLang('en')}
-              className={`px-3 py-1 rounded-full transition-all duration-300 ${
-                lang === 'en'
-                  ? 'bg-blue-600 text-white'
-                  : 'text-slate-500 hover:text-slate-700'
-              }`}
-            >
-              English
-            </button>
-            <button
-              onClick={() => setLang('hi')}
-              className={`px-3 py-1 rounded-full transition-all duration-300 ${
-                lang === 'hi'
-                  ? 'bg-blue-600 text-white'
-                  : 'text-slate-500 hover:text-slate-700'
-              }`}
-            >
-              हिंदी
-            </button>
-          </div>
-
-          <span className="text-slate-300 hidden sm:inline">|</span>
-
-          <Link to="/privacy" className="hover:text-slate-700 transition-colors duration-200">
+          <Link to="/privacy" className="hover:text-slate-900 transition-colors duration-200">
             Privacy Policy
           </Link>
-          <Link to="/terms" className="hover:text-slate-700 transition-colors duration-200">
+          <Link to="/terms" className="hover:text-slate-900 transition-colors duration-200">
             Terms of Service
           </Link>
         </div>
