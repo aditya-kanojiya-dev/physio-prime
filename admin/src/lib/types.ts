@@ -84,6 +84,9 @@ export interface AdminDoctor {
   bio: string | null;
   expertise: string[];
   treatments: string[];
+  education: string[];
+  experience: Record<string, unknown>[];
+  registration: Record<string, string>;
   phone: string | null;
   designation: string | null;
   employeeId: string | null;
@@ -168,6 +171,17 @@ export interface AdminClient {
   appointmentCount: number;
   lastVisit: string | null;
   totalSpentPaise: number;
+}
+
+export interface DoctorLedger {
+  doctor: AdminDoctor;
+  schedule: { id: number; doctorId: number; dayOfWeek: number; windowStart: string; windowEnd: string; maxPatients: number; active: boolean }[];
+  locations: { id: number; name: string; address: string | null; area: string | null; city: string | null; state: string | null; pincode: string | null; lat: string | null; lng: string | null; radiusKm: string; isPrimary: boolean; active: boolean }[];
+  reviews: { avgRating: number; reviewCount: number; featuredCount: number };
+  appointments: { total: number; completed: number; cancelled: number; upcoming: number; totalRevenuePaise: number };
+  payouts: { totalPaidPaise: number; pendingPayoutPaise: number; payoutCount: number };
+  recentAppointments: AdminAppointment[];
+  recentPrescriptions: { id: number; diagnosis: string | null; followUpDate: string | null; createdAt: string; patientName: string; date: string }[];
 }
 
 export interface PatientDetail {

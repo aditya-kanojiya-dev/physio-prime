@@ -4,15 +4,11 @@ import { z } from 'zod';
 import { db } from '../db/pool';
 import { doctors, doctorLocations } from '../db/schema';
 import { requireAuth, requireRole } from '../middleware/auth';
+import { requireDoctor } from '../lib/doctor';
 
 export const doctorLocationsRouter = Router();
 
 doctorLocationsRouter.use(requireAuth, requireRole('doctor'));
-
-async function requireDoctor(userId: number) {
-  const [doctor] = await db.select().from(doctors).where(eq(doctors.userId, userId));
-  return doctor;
-}
 
 const createLocationSchema = z.object({
   name: z.string().min(1),

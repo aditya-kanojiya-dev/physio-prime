@@ -2,6 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Doctor } from '../../types';
 import { Star, ShieldCheck, MapPin, CheckCircle2, Home, Video } from 'lucide-react';
+import primeBadge from '../../assets/prime-badge.png';
 
 interface DoctorProfileHeaderProps {
   doctor: Doctor;
@@ -22,6 +23,11 @@ export const DoctorProfileHeader: React.FC<DoctorProfileHeaderProps> = ({ doctor
         <div className="lg:col-span-4 relative flex justify-center">
           <div className="relative w-56 sm:w-64 h-64 sm:h-72 rounded-3xl overflow-hidden shadow-2xl border-4 border-white">
             <img src={doctor.photo} alt={doctor.name} className="w-full h-full object-cover" />
+            {doctor.featured && (
+              <div className="absolute top-3 left-3 drop-shadow-md">
+                <img src={primeBadge} alt="Prime Physiotherapist" className="h-10 w-auto" />
+              </div>
+            )}
             <div className="absolute bottom-3 left-3 right-3 bg-white/90 backdrop-blur-md px-3 py-1.5 rounded-xl border border-slate-200 flex items-center justify-between text-xs font-bold text-slate-900 shadow-sm">
               <span className="flex items-center gap-1">
                 <CheckCircle2 className="w-4 h-4 text-teal-500" /> Verified Doctor
@@ -40,9 +46,14 @@ export const DoctorProfileHeader: React.FC<DoctorProfileHeaderProps> = ({ doctor
               <span>{doctor.title}</span>
             </div>
             
-            <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">
-              {doctor.name}
-            </h1>
+            <div className="flex items-center gap-3 flex-wrap justify-center lg:justify-start">
+              <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">
+                {doctor.name}
+              </h1>
+              {doctor.featured && (
+                <img src={primeBadge} alt="Prime Physiotherapist" className="h-12 sm:h-14 w-auto drop-shadow-sm" />
+              )}
+            </div>
             
             <p className="text-base text-teal-600 font-bold">
               {doctor.specialty}

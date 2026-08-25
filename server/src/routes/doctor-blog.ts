@@ -7,18 +7,13 @@ import {
   blogPosts,
   blogPostTags,
   blogTags,
-  doctors,
 } from '../db/schema';
 import { requireAuth, requireRole } from '../middleware/auth';
+import { requireDoctor } from '../lib/doctor';
 
 export const doctorBlogRouter = Router();
 
 doctorBlogRouter.use(requireAuth, requireRole('doctor'));
-
-async function requireDoctor(userId: number) {
-  const [doctor] = await db.select().from(doctors).where(eq(doctors.userId, userId));
-  return doctor;
-}
 
 const slugSchema = z.string().regex(/^[a-z0-9-]+$/);
 

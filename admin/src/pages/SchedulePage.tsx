@@ -62,7 +62,10 @@ export function SchedulePage() {
       }
       return api.put('/doctor/schedules', { windows })
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['doctor/schedules'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['doctor/schedules'] })
+      qc.invalidateQueries({ queryKey: ['slots'] })
+    },
   })
 
   function toggle(day: number, start: string) {

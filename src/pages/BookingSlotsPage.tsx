@@ -81,7 +81,8 @@ export const BookingSlotsPage: React.FC = () => {
         return data;
       },
       enabled: !!selectedDate,
-      staleTime: 60 * 1000,
+      staleTime: 30 * 1000,
+      refetchInterval: 30 * 1000,
     })),
   });
 

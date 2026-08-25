@@ -24,6 +24,9 @@ import { BlogDetailPage } from './pages/BlogDetailPage';
 import { HowItWorksPage } from './pages/HowItWorksPage';
 import { PatientGuidesPage } from './pages/PatientGuidesPage';
 import { PricingPage } from './pages/PricingPage';
+import { PrivacyPolicyPage } from './pages/PrivacyPolicyPage';
+import { TermsPage } from './pages/TermsPage';
+import { CompliancePage } from './pages/CompliancePage';
 import { ChatbotButton } from './components/chatbot/ChatbotButton';
 import { pageVariants } from './lib/motion';
 
@@ -76,6 +79,9 @@ function AnimatedRoutes() {
             <Route path="/how-it-works" element={<HowItWorksPage />} />
             <Route path="/guides/patients" element={<PatientGuidesPage />} />
             <Route path="/pricing" element={<PricingPage />} />
+            <Route path="/privacy" element={<PrivacyPolicyPage />} />
+            <Route path="/terms" element={<TermsPage />} />
+            <Route path="/compliance" element={<CompliancePage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </motion.div>

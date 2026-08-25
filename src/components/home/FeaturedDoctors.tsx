@@ -27,7 +27,7 @@ export const FeaturedDoctors: React.FC = () => {
               <span>Certified Healthcare Specialists</span>
             </div>
             <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-slate-900 tracking-tight">
-              Top Featured <span className="text-gradient">Physiotherapists</span>
+              Top Prime <span className="text-gradient">Physiotherapists</span>
             </h2>
             <p className="text-slate-600 text-base max-w-xl">
               Hand-picked certified physical therapists available for home visits and HD video consultations today.
@@ -72,6 +72,7 @@ export const FeaturedDoctors: React.FC = () => {
                       rating={doctor.rating}
                       reviewCount={doctor.reviewCount}
                       verified={doctor.verified}
+                      featured={doctor.featured}
                       experienceYears={doctor.experienceYears}
                       consultationFee={doctor.fees.home}
                       nextAvailableDate={doctor.nextAvailable}

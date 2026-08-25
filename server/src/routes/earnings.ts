@@ -2,19 +2,13 @@ import { Router } from 'express';
 import { and, asc, desc, eq, sql, gte, lte, ilike, count } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '../db/pool';
-import { appointments, doctors } from '../db/schema';
+import { appointments } from '../db/schema';
 import { requireAuth, requireRole } from '../middleware/auth';
+import { requireDoctor, noProfile } from '../lib/doctor';
 
 export const doctorEarningsRouter = Router();
 
 doctorEarningsRouter.use(requireAuth, requireRole('doctor'));
-
-const noProfile = { status: 403, message: 'Doctor profile not approved yet' } as const;
-
-async function requireDoctor(userId: number) {
-  const [doctor] = await db.select().from(doctors).where(eq(doctors.userId, userId));
-  return doctor;
-}
 
 function periodRange(period: string, from?: string, to?: string) {
   const now = new Date();

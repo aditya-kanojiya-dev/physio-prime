@@ -82,7 +82,8 @@ export function useSlots(doctorSlug: string | null, date: string | null) {
       return data.windows;
     },
     enabled: !!doctorSlug && !!date,
-    staleTime: 60 * 1000,
+    staleTime: 30 * 1000,
+    refetchInterval: 30 * 1000,
   });
 }
 

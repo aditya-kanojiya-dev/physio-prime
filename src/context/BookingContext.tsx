@@ -91,21 +91,30 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
       });
       return { appointment: toAppointment(result.appointment), razorpayOrder: result.razorpayOrder };
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['appointments'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['appointments'] });
+      queryClient.invalidateQueries({ queryKey: ['slots'] });
+    },
   });
 
   const rescheduleMutation = useMutation({
     mutationFn: async ({ id, date, slot }: { id: string; date: string; slot: string }) => {
       await api.post(`/appointments/${id}/reschedule`, { date, slot });
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['appointments'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['appointments'] });
+      queryClient.invalidateQueries({ queryKey: ['slots'] });
+    },
   });
 
   const cancelMutation = useMutation({
     mutationFn: async ({ id, reason }: { id: string; reason?: string }) => {
       await api.post(`/appointments/${id}/cancel`, { reason });
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['appointments'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['appointments'] });
+      queryClient.invalidateQueries({ queryKey: ['slots'] });
+    },
   });
 
   const setCurrentPage = (page: PageView) => {

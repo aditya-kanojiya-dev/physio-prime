@@ -2,8 +2,15 @@ import type { NextFunction, Request, Response } from 'express';
 import { eq } from 'drizzle-orm';
 import { db } from '../db/pool';
 import { users } from '../db/schema';
-import type { TokenUser } from '../lib/tokens';
 import { getSupabaseAdmin } from '../lib/supabase';
+
+export type UserRole = 'patient' | 'doctor' | 'admin';
+
+export interface TokenUser {
+  id: number;
+  role: UserRole;
+  email: string;
+}
 
 declare module 'express-serve-static-core' {
   interface Request {

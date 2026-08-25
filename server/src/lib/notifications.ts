@@ -1,7 +1,7 @@
 import { and, eq } from 'drizzle-orm';
 import { db } from '../db/pool';
 import { appointments, doctors, notifications } from '../db/schema';
-import { requireEnv } from './env';
+import { getConfig } from '../config';
 
 function isNotOnWhatsApp(err: unknown): boolean {
   const msg = err instanceof Error ? err.message : String(err);
@@ -12,11 +12,12 @@ function isNotOnWhatsApp(err: unknown): boolean {
 const FETCH_TIMEOUT_MS = 10_000;
 
 async function sendTwilioMessage(params: { to: string; body: string; whatsapp: boolean }): Promise<void> {
-  const accountSid = requireEnv('TWILIO_ACCOUNT_SID');
-  const authToken = requireEnv('TWILIO_AUTH_TOKEN');
+  const config = getConfig();
+  const accountSid = config.TWILIO_ACCOUNT_SID;
+  const authToken = config.TWILIO_AUTH_TOKEN;
   const from = params.whatsapp
-    ? requireEnv('TWILIO_WHATSAPP_FROM')
-    : requireEnv('TWILIO_FROM_NUMBER');
+    ? config.TWILIO_WHATSAPP_FROM
+    : config.TWILIO_FROM_NUMBER;
   const res = await fetch(
     `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`,
     {

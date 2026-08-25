@@ -7,7 +7,9 @@ import {
   categories,
   contentSections,
   doctorApplications,
+  doctorLocations,
   doctorPayouts,
+  doctorSchedules,
   doctors,
   patientProfiles,
   prescriptions,
@@ -221,6 +223,16 @@ const doctorPatchSchema = z.object({
   bio: z.string().max(5000).nullable().optional(),
   expertise: z.array(z.string()).optional(),
   treatments: z.array(z.string()).optional(),
+  education: z.array(z.string()).optional(),
+  experience: z.array(z.record(z.string(), z.unknown())).optional(),
+  registration: z.record(z.string(), z.unknown()).optional(),
+  phone: z.string().max(20).nullable().optional(),
+  designation: z.string().max(100).nullable().optional(),
+  employeeId: z.string().max(50).nullable().optional(),
+  department: z.string().max(100).nullable().optional(),
+  address: z.record(z.string(), z.unknown()).optional(),
+  homeVisitsEnabled: z.boolean().optional(),
+  maxRadiusKm: z.string().optional(),
 });
 
 adminRouter.patch('/doctors/:id', async (req, res, next) => {
@@ -379,6 +391,92 @@ adminRouter.get('/doctors/:id/clients', async (req, res, next) => {
     res.json({
       doctor,
       clients: clients.map((c) => ({ ...c, appointmentCount: Number(c.appointmentCount), totalSpentPaise: Number(c.totalSpentPaise) })),
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// --- per-doctor full ledger ---------------------------------------------
+
+adminRouter.get('/doctors/:id', async (req, res, next) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) {
+      res.status(400).json({ error: { message: 'id must be an integer' } });
+      return;
+    }
+
+    const [doctor] = await db
+      .select({ ...doctorColumns, email: users.email })
+      .from(doctors)
+      .innerJoin(users, eq(users.id, doctors.userId))
+      .where(eq(doctors.id, id));
+    if (!doctor) {
+      res.status(404).json({ error: { message: 'Doctor not found' } });
+      return;
+    }
+
+    const [schedule, locationList, [reviewStats], [appointmentStats], [payoutStats], recentAppointments, recentPrescriptions] = await Promise.all([
+      db.select().from(doctorSchedules).where(eq(doctorSchedules.doctorId, id)).orderBy(asc(doctorSchedules.dayOfWeek)),
+      db.select().from(doctorLocations).where(eq(doctorLocations.doctorId, id)),
+      db.select({
+        avgRating: sql<number>`coalesce(avg(${reviews.rating}), 0)`,
+        reviewCount: count(),
+        featuredCount: sql<number>`count(case when ${reviews.featured} then 1 end)`,
+      }).from(reviews).where(eq(reviews.doctorId, id)),
+      db.select({
+        total: count(),
+        completed: sql<number>`count(case when ${appointments.status} = 'completed' then 1 end)`,
+        cancelled: sql<number>`count(case when ${appointments.status} = 'cancelled' then 1 end)`,
+        upcoming: sql<number>`count(case when ${appointments.status} = 'upcoming' then 1 end)`,
+        totalRevenuePaise: sql<number>`coalesce(sum(case when ${appointments.paymentStatus} = 'paid' then ${appointments.feePaise} else 0 end), 0)`,
+      }).from(appointments).where(eq(appointments.doctorId, id)),
+      db.select({
+        totalPaidPaise: sql<number>`coalesce(sum(case when ${doctorPayouts.status} = 'completed' then ${doctorPayouts.amountPaise} else 0 end), 0)`,
+        pendingPayoutPaise: sql<number>`coalesce(sum(case when ${doctorPayouts.status} = 'pending' then ${doctorPayouts.amountPaise} else 0 end), 0)`,
+        payoutCount: count(),
+      }).from(doctorPayouts).where(eq(doctorPayouts.doctorId, id)),
+      db.select(appointmentColumns).from(appointments).where(eq(appointments.doctorId, id)).orderBy(desc(appointments.createdAt)).limit(20),
+      db.select({
+        id: prescriptions.id,
+        diagnosis: prescriptions.diagnosis,
+        followUpDate: prescriptions.followUpDate,
+        createdAt: prescriptions.createdAt,
+        patientName: users.name,
+        date: appointments.date,
+      })
+        .from(prescriptions)
+        .innerJoin(appointments, eq(prescriptions.appointmentId, appointments.id))
+        .innerJoin(users, eq(users.id, prescriptions.patientId))
+        .where(eq(prescriptions.doctorId, id))
+        .orderBy(desc(prescriptions.createdAt))
+        .limit(20),
+    ]);
+
+    res.json({
+      doctor,
+      schedule,
+      locations: locationList,
+      reviews: {
+        avgRating: Number(reviewStats.avgRating) || 0,
+        reviewCount: reviewStats.reviewCount,
+        featuredCount: reviewStats.featuredCount,
+      },
+      appointments: {
+        total: appointmentStats.total,
+        completed: appointmentStats.completed,
+        cancelled: appointmentStats.cancelled,
+        upcoming: appointmentStats.upcoming,
+        totalRevenuePaise: appointmentStats.totalRevenuePaise,
+      },
+      payouts: {
+        totalPaidPaise: payoutStats.totalPaidPaise,
+        pendingPayoutPaise: payoutStats.pendingPayoutPaise,
+        payoutCount: payoutStats.payoutCount,
+      },
+      recentAppointments,
+      recentPrescriptions,
     });
   } catch (err) {
     next(err);

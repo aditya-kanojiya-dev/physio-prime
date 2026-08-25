@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Star, BadgeCheck, MapPin, Clock } from 'lucide-react';
+import primeBadge from '../../assets/prime-badge.png';
 
 export interface DoctorCardProps {
   name: string;
@@ -10,6 +11,7 @@ export interface DoctorCardProps {
   rating?: number | null;
   reviewCount?: number;
   verified?: boolean;
+  featured?: boolean;
   experienceYears: number;
   consultationFee: number;
   nextAvailableDate?: string | null;
@@ -35,6 +37,7 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
   rating,
   reviewCount,
   verified,
+  featured,
   experienceYears,
   consultationFee,
   nextAvailableDate,
@@ -59,8 +62,14 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
           </div>
         )}
 
+        {/* Prime badge — stamp style */}
+        {featured && (
+          <div className="absolute bottom-2 right-2 drop-shadow-lg z-10">
+            <img src={primeBadge} alt="Prime Physiotherapist" className="h-16 w-auto" />
+          </div>
+        )}
         {/* Rating badge */}
-        <div className="absolute top-2.5 left-2.5 bg-white border border-slate-200 px-2 py-0.5 rounded-full text-[11px] font-bold text-slate-900 flex items-center gap-1">
+        <div className="absolute top-2.5 left-2.5 bg-white border border-slate-200 px-2 py-0.5 rounded-full text-[11px] font-bold text-slate-900 flex items-center gap-1 shadow-sm">
           {rating != null ? (
             <>
               <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />

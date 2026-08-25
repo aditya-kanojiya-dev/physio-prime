@@ -10,15 +10,9 @@ import {
   doctors,
 } from '../db/schema';
 import { requireAuth, requireRole } from '../middleware/auth';
+import { requireDoctor } from '../lib/doctor';
 
 export const communityRouter = Router();
-
-// --- public helpers ---
-
-async function requireDoctor(userId: number) {
-  const [doctor] = await db.select().from(doctors).where(eq(doctors.userId, userId));
-  return doctor;
-}
 
 // --- GET /community/categories (public) ---
 

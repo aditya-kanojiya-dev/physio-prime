@@ -5,17 +5,11 @@ import { db } from '../db/pool';
 import { appointments, doctors, doctorSchedules, patientProfiles, prescriptions, users } from '../db/schema';
 import { requireAuth, requireRole } from '../middleware/auth';
 import { isValidDate, getNextFreeSlot } from '../lib/slots';
+import { requireDoctor, noProfile } from '../lib/doctor';
 
 export const doctorRouter = Router();
 
 doctorRouter.use(requireAuth, requireRole('doctor'));
-
-async function requireDoctor(userId: number) {
-  const [doctor] = await db.select().from(doctors).where(eq(doctors.userId, userId));
-  return doctor;
-}
-
-const noProfile = { status: 403, message: 'Doctor profile not approved yet' } as const;
 
 const doctorColumns = {
   id: doctors.id,

@@ -1,9 +1,10 @@
 import React, { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   AlertCircle,
   CheckCircle,
-  Edit3,
+  FileText,
   Loader2,
   MapPin,
   Plus,
@@ -39,7 +40,6 @@ export function DoctorsPage() {
   const qc = useQueryClient()
   const [search, setSearch] = useState('')
   const [modalOpen, setModalOpen] = useState(false)
-  const [editing, setEditing] = useState<AdminDoctor | null>(null)
   const [form, setForm] = useState(emptyForm)
   const [error, setError] = useState<string | null>(null)
   const [appError, setAppError] = useState<string | null>(null)
@@ -69,15 +69,6 @@ export function DoctorsPage() {
     qc.invalidateQueries({ queryKey: ['admin/applications'] })
   }
 
-  const saveDoctor = useMutation({
-    mutationFn: (body: Record<string, unknown>) => api.patch(`/admin/doctors/${editing!.id}`, body),
-    onSuccess: () => {
-      setModalOpen(false)
-      invalidate()
-    },
-    onError: (err) => setError(err instanceof ApiError ? err.message : 'Save failed'),
-  })
-
   const decide = useMutation({
     mutationFn: ({ id, approve }: { id: number; approve: boolean }) =>
       api.post(`/admin/doctor-applications/${id}/decide`, { approve }),
@@ -92,37 +83,19 @@ export function DoctorsPage() {
     onError: (err) => setError(err instanceof ApiError ? err.message : 'Update failed'),
   })
 
-  const openCreate = () => {
-    setEditing(null)
-    setForm(emptyForm)
-    setModalOpen(true)
-  }
-
-  const openEdit = (d: AdminDoctor) => {
-    setEditing(d)
-    setForm({
-      name: d.name,
-      title: d.title || 'Senior Physiotherapist',
-      specialty: d.specialty || '',
-      photo: d.photo || '',
-      experienceYears: d.experienceYears || 8,
-      feesHome: (d.fees?.home || 80000) / 100,
-      feesOnline: (d.fees?.online || 50000) / 100,
-      feesClinic: (d.fees?.clinic || 60000) / 100,
-      area: String(d.location?.area || ''),
-      city: String(d.location?.city || 'Nagpur'),
-      gender: (d.gender as 'male' | 'female') || 'female',
-      verified: d.verified,
-      featured: d.featured,
-      bio: d.bio || '',
-    })
-    setModalOpen(true)
-  }
+  const saveDoctor = useMutation({
+    mutationFn: (body: Record<string, unknown>) => api.post('/admin/doctors', body),
+    onSuccess: () => {
+      setModalOpen(false)
+      invalidate()
+    },
+    onError: (err) => setError(err instanceof ApiError ? err.message : 'Save failed'),
+  })
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
-    const payload: Record<string, unknown> = {
+    saveDoctor.mutate({
       name: form.name,
       title: form.title,
       specialty: form.specialty,
@@ -134,8 +107,12 @@ export function DoctorsPage() {
       verified: form.verified,
       featured: form.featured,
       bio: form.bio,
-    }
-    saveDoctor.mutate(payload)
+    })
+  }
+
+  const openCreate = () => {
+    setForm(emptyForm)
+    setModalOpen(true)
   }
 
   const filtered = (doctors || []).filter(
@@ -292,27 +269,27 @@ export function DoctorsPage() {
                                 ? 'bg-amber-50 text-amber-700 border-amber-200'
                                 : 'bg-slate-100 text-slate-400 border-slate-200 hover:text-amber-700'
                             }`}
-                            title="Toggle featured"
+                            title="Toggle prime status"
                           >
-                            {d.featured ? 'Featured' : 'Not Featured'}
+                            {d.featured ? 'Prime' : 'Not Prime'}
                           </button>
                         </div>
                       </td>
                       <td className="p-4 text-right">
                         <div className="flex gap-2 justify-end">
+                          <Link
+                            to={`/admin/doctors/${d.id}`}
+                            className="p-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 transition-all"
+                            title="View Ledger"
+                          >
+                            <FileText className="w-4 h-4" />
+                          </Link>
                           <button
                             onClick={() => setClientsDoctor(d)}
                             className="p-2 rounded-xl bg-teal-50 hover:bg-teal-100 text-teal-700 border border-teal-200 transition-all"
                             title="View Clients"
                           >
                             <Users className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => openEdit(d)}
-                            className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-teal-700 border border-slate-200 transition-all"
-                            title="Edit Profile"
-                          >
-                            <Edit3 className="w-4 h-4" />
                           </button>
                         </div>
                       </td>
@@ -388,7 +365,7 @@ export function DoctorsPage() {
           <div className="bg-white border border-slate-200 rounded-3xl max-w-xl w-full p-6 space-y-6 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-slate-200 pb-4">
               <h3 className="text-lg font-extrabold text-slate-900">
-                {editing ? 'Edit Doctor Profile' : 'Add New Doctor Profile'}
+                Add New Doctor Profile
               </h3>
               <button onClick={() => setModalOpen(false)} className="text-slate-500 hover:text-slate-900 transition-colors">
                 <X className="w-5 h-5" />
@@ -446,7 +423,7 @@ export function DoctorsPage() {
                 </label>
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input type="checkbox" checked={form.featured} onChange={(e) => setForm({ ...form, featured: e.target.checked })} className="accent-amber-500 w-4 h-4" />
-                  <span className="font-bold text-slate-600">Featured Doctor</span>
+                  <span className="font-bold text-slate-600">Prime Physiotherapist</span>
                 </label>
               </div>
 
