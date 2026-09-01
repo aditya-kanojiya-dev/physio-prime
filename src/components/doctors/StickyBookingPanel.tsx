@@ -21,7 +21,7 @@ export const StickyBookingPanel: React.FC<StickyBookingPanelProps> = ({ doctor }
       return {
         day: d.toLocaleDateString('en-US', { weekday: 'short' }),
         date: d.toLocaleDateString('en-US', { day: 'numeric', month: 'short' }),
-        full: d.toISOString().split('T')[0],
+        full: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`,
       };
     });
   }, []);

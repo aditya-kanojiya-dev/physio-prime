@@ -23,7 +23,7 @@ function generateWeekDates(count = 7): WeekDate[] {
       day: d.toLocaleDateString('en-US', { weekday: 'short' }),
       date: d.getDate(),
       month: d.toLocaleDateString('en-US', { month: 'short' }),
-      full: d.toISOString().split('T')[0],
+      full: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`,
       isToday: i === 0,
     });
   }

@@ -19,14 +19,16 @@ interface WindowWithCapacity {
   available: boolean;
 }
 
+// Schedule window times are IST wall-clock, so "today"/"now" must be IST too
+// (Vercel functions run in UTC — a GMT `now` would keep morning slots alive all evening).
+const IST_TZ = 'Asia/Kolkata';
+
 function todayStr(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  return new Intl.DateTimeFormat('en-CA', { timeZone: IST_TZ, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
 }
 
 function nowHHmm(): string {
-  const d = new Date();
-  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  return new Intl.DateTimeFormat('en-GB', { timeZone: IST_TZ, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date());
 }
 
 export function isValidDate(dateStr: string): boolean {

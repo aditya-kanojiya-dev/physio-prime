@@ -44,7 +44,7 @@ export const BookingSlotsPage: React.FC = () => {
         day: date.toLocaleDateString('en-US', { weekday: 'short' }),
         date: date.getDate(),
         month: date.toLocaleDateString('en-US', { month: 'short' }),
-        full: date.toISOString().split('T')[0],
+        full: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`,
         isToday: i === 0
       });
     }
