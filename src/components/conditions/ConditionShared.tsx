@@ -5,23 +5,23 @@ import { COMPARISON_ROWS, DISCLAIMER_TEXT } from '../../data/conditions';
 export const ComparisonTable: React.FC = () => (
   <section className="max-w-3xl mx-auto">
     <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight mb-5">
-      In-clinic vs home visit physiotherapy
+      Home visit vs online consultation
     </h2>
     <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden overflow-x-auto">
       <table className="w-full text-sm min-w-[560px]">
         <thead>
           <tr className="border-b border-slate-200 bg-slate-50/60">
             <th className="text-left font-bold text-slate-500 px-5 py-3.5">What to compare</th>
-            <th className="text-left font-bold text-blue-700 px-5 py-3.5">In-clinic</th>
             <th className="text-left font-bold text-teal-700 px-5 py-3.5">Home visit</th>
+            <th className="text-left font-bold text-blue-700 px-5 py-3.5">Online consultation</th>
           </tr>
         </thead>
         <tbody>
           {COMPARISON_ROWS.map((row) => (
             <tr key={row.label} className="border-b border-slate-100 last:border-0">
               <td className="px-5 py-3.5 font-bold text-slate-900 align-top">{row.label}</td>
-              <td className="px-5 py-3.5 text-slate-600 align-top">{row.clinic}</td>
               <td className="px-5 py-3.5 text-slate-600 align-top">{row.home}</td>
+              <td className="px-5 py-3.5 text-slate-600 align-top">{row.online}</td>
             </tr>
           ))}
         </tbody>

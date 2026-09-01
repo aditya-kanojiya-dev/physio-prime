@@ -6,6 +6,9 @@ import { appointments, doctors, doctorSchedules, patientProfiles, prescriptions,
 import { requireAuth, requireRole } from '../middleware/auth';
 import { isValidDate, getNextFreeSlot } from '../lib/slots';
 import { requireDoctor, noProfile } from '../lib/doctor';
+import { computeCommission } from '../lib/commission';
+import { recordCashEntry, recordPaymentTransaction } from '../lib/payments';
+import { createUpiQrCode } from '../lib/razorpay';
 
 export const doctorRouter = Router();
 
@@ -54,6 +57,10 @@ const appointmentColumns = {
   feePaise: appointments.feePaise,
   address: appointments.address,
   paymentStatus: appointments.paymentStatus,
+  paymentMode: appointments.paymentMode,
+  paymentMethod: appointments.paymentMethod,
+  sessionStartedAt: appointments.sessionStartedAt,
+  sessionCompletedAt: appointments.sessionCompletedAt,
   patientName: appointments.patientName,
   patientPhone: appointments.patientPhone,
   patientRelation: appointments.patientRelation,
@@ -189,6 +196,237 @@ doctorRouter.patch('/appointments/:id', async (req, res, next) => {
       .returning(appointmentColumns);
     res.json({ appointment: { ...updated!, id: updated!.bookingId } });
   } catch (err) {
+    next(err);
+  }
+});
+
+// Shared lookup: the appointment row (with commission config) belonging to the
+// calling doctor, or null.
+async function doctorAppointment(
+  doctorId: number,
+  bookingId: string,
+): Promise<{
+  id: number;
+  doctorId: number;
+  status: string;
+  paymentMode: string;
+  paymentStatus: string;
+  feePaise: number;
+  sessionStartedAt: Date | null;
+  platformFeePercent: number;
+} | null> {
+  const [row] = await db
+    .select({
+      id: appointments.id,
+      doctorId: appointments.doctorId,
+      status: appointments.status,
+      paymentMode: appointments.paymentMode,
+      paymentStatus: appointments.paymentStatus,
+      feePaise: appointments.feePaise,
+      sessionStartedAt: appointments.sessionStartedAt,
+      platformFeePercent: doctors.platformFeePercent,
+    })
+    .from(appointments)
+    .innerJoin(doctors, eq(doctors.id, appointments.doctorId))
+    .where(eq(appointments.bookingId, bookingId));
+  if (!row || row.doctorId !== doctorId) return null;
+  return row;
+}
+
+// --- session state machine ----------------------------------------------
+
+// Begin the session. Separate from payment state: a session can start whether or
+// not payment happened (prepay paid, or postpay collected before/after).
+doctorRouter.post('/appointments/:id/session/start', async (req, res, next) => {
+  try {
+    const doctor = await requireDoctor(req.user!.id);
+    if (!doctor) {
+      res.status(noProfile.status).json({ error: { message: noProfile.message } });
+      return;
+    }
+    const row = await doctorAppointment(doctor.id, req.params.id);
+    if (!row) {
+      res.status(404).json({ error: { message: 'Appointment not found' } });
+      return;
+    }
+    if (row.status !== 'upcoming') {
+      res.status(400).json({ error: { message: 'Only upcoming appointments can start a session' } });
+      return;
+    }
+    if (row.sessionStartedAt) {
+      res.status(400).json({ error: { message: 'Session already started' } });
+      return;
+    }
+    const [updated] = await db
+      .update(appointments)
+      .set({ sessionStartedAt: new Date() })
+      .where(eq(appointments.id, row.id))
+      .returning(appointmentColumns);
+    res.json({ appointment: { ...updated!, id: updated!.bookingId } });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Complete the session: records duration and moves the appointment to completed.
+doctorRouter.post('/appointments/:id/session/complete', async (req, res, next) => {
+  try {
+    const doctor = await requireDoctor(req.user!.id);
+    if (!doctor) {
+      res.status(noProfile.status).json({ error: { message: noProfile.message } });
+      return;
+    }
+    const row = await doctorAppointment(doctor.id, req.params.id);
+    if (!row) {
+      res.status(404).json({ error: { message: 'Appointment not found' } });
+      return;
+    }
+    if (row.status !== 'upcoming' || !row.sessionStartedAt) {
+      res.status(400).json({ error: { message: 'Start the session before completing it' } });
+      return;
+    }
+    const durationSec = Math.max(0, Math.round((Date.now() - row.sessionStartedAt.getTime()) / 1000));
+    const [updated] = await db
+      .update(appointments)
+      .set({ status: 'completed', sessionCompletedAt: new Date(), sessionDurationSec: durationSec })
+      .where(eq(appointments.id, row.id))
+      .returning(appointmentColumns);
+    res.json({ appointment: { ...updated!, id: updated!.bookingId } });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// --- postpay collection --------------------------------------------------
+
+// Generate a single-use fixed-amount UPI QR for the patient to scan and pay at
+// the clinic. The QR id is stored on the appointment so the payment.captured
+// webhook can reconcile it back (source of truth).
+doctorRouter.post('/appointments/:id/collect/upi', async (req, res, next) => {
+  try {
+    const doctor = await requireDoctor(req.user!.id);
+    if (!doctor) {
+      res.status(noProfile.status).json({ error: { message: noProfile.message } });
+      return;
+    }
+    const row = await doctorAppointment(doctor.id, req.params.id);
+    if (!row) {
+      res.status(404).json({ error: { message: 'Appointment not found' } });
+      return;
+    }
+    if (row.paymentMode !== 'postpay') {
+      res.status(400).json({ error: { message: 'Only postpay appointments can collect via UPI QR' } });
+      return;
+    }
+    if (row.paymentStatus === 'paid') {
+      res.status(400).json({ error: { message: 'Appointment is already paid' } });
+      return;
+    }
+    try {
+      const qr = await createUpiQrCode({ amountPaise: row.feePaise, idempotencyKey: `APT-${row.id}-${req.params.id}` });
+      await db
+        .update(appointments)
+        .set({ razorpayQrId: qr.id })
+        .where(and(eq(appointments.id, row.id), eq(appointments.paymentStatus, 'pending')));
+      res.json({ qr });
+    } catch {
+      res.status(502).json({ error: { message: 'Could not generate UPI QR. Payment gateway may be misconfigured.' } });
+    }
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Record cash collected at the clinic, mark the appointment paid, and write the
+// doctor cash ledger (collection + platform obligation) in one transaction.
+doctorRouter.post('/appointments/:id/collect/cash', async (req, res, next) => {
+  try {
+    const doctor = await requireDoctor(req.user!.id);
+    if (!doctor) {
+      res.status(noProfile.status).json({ error: { message: noProfile.message } });
+      return;
+    }
+    const updated = await db.transaction(async (tx) => {
+      const [row] = await tx
+        .select({
+          id: appointments.id,
+          doctorId: appointments.doctorId,
+          patientId: appointments.patientId,
+          status: appointments.status,
+          paymentMode: appointments.paymentMode,
+          paymentStatus: appointments.paymentStatus,
+          feePaise: appointments.feePaise,
+          platformFeePercent: doctors.platformFeePercent,
+        })
+        .from(appointments)
+        .innerJoin(doctors, eq(doctors.id, appointments.doctorId))
+        .where(eq(appointments.bookingId, req.params.id))
+        .for('update');
+      if (!row || row.doctorId !== doctor.id) {
+        throw Object.assign(new Error('Appointment not found'), { status: 404 });
+      }
+      if (row.paymentMode !== 'postpay') {
+        throw Object.assign(new Error('Only postpay appointments can be collected in cash'), { status: 400 });
+      }
+      if (row.paymentStatus === 'paid') {
+        throw Object.assign(new Error('Appointment is already paid'), { status: 400 });
+      }
+      if (row.status === 'cancelled' || row.status === 'no_show') {
+        throw Object.assign(new Error('Cannot collect payment on a cancelled or no-show appointment'), { status: 400 });
+      }
+      const c = computeCommission(row.feePaise, row.platformFeePercent);
+      const [upd] = await tx
+        .update(appointments)
+        .set({
+          paymentStatus: 'paid',
+          paymentMethod: 'cash',
+          cashCollectedAt: new Date(),
+          paymentCollectedByDoctorId: doctor.id,
+        })
+        .where(eq(appointments.id, row.id))
+        .returning(appointmentColumns);
+      await recordPaymentTransaction(tx, {
+        appointmentId: row.id,
+        patientId: row.patientId,
+        doctorId: row.doctorId,
+        transactionType: 'patient_postpay_cash',
+        status: 'completed',
+        amountPaise: row.feePaise,
+        platformFeePaise: c.platformFeePaise,
+        doctorEarningsPaise: c.doctorEarningsPaise,
+        netAmountPaise: c.doctorEarningsPaise,
+        gateway: 'cash',
+        paymentMethod: 'cash',
+        createdBy: doctor.userId,
+        metadata: { collectedInPerson: true },
+      });
+      // cash custody ledger: total collected + how much the doctor must remit (platform share)
+      await recordCashEntry(tx, {
+        doctorId: row.doctorId,
+        appointmentId: row.id,
+        entryType: 'collection',
+        amountPaise: row.feePaise,
+        platformFeePaise: c.platformFeePaise,
+        reference: `APT-${row.id}`,
+        recordedBy: doctor.userId,
+      });
+      await recordCashEntry(tx, {
+        doctorId: row.doctorId,
+        appointmentId: row.id,
+        entryType: 'obligation',
+        amountPaise: c.platformFeePaise,
+        platformFeePaise: c.platformFeePaise,
+        reference: `APT-${row.id}`,
+        recordedBy: doctor.userId,
+      });
+      return upd!;
+    });
+    res.json({ appointment: { ...updated, id: updated.bookingId } });
+  } catch (err) {
+    if (err instanceof Error && 'status' in err) {
+      res.status((err as { status: number }).status).json({ error: { message: err.message } });
+      return;
+    }
     next(err);
   }
 });

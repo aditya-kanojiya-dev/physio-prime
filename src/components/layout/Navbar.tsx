@@ -2,13 +2,76 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useBooking, PageView } from '../../context/BookingContext';
 import { useAuth } from '../../context/AuthContext';
-import { Activity, User, Menu, X, ArrowRight, Sparkles, MapPin, LogIn, LogOut, Home, Stethoscope, Layers, Calendar, LayoutDashboard, Phone, Mail, BookOpen, ChevronDown, ChevronRight, Search } from 'lucide-react';
+import { useLocationContext } from '../../context/LocationContext';
+import { Activity, User, Menu, X, ArrowRight, Sparkles, MapPin, LogIn, LogOut, Home, Stethoscope, Layers, Calendar, LayoutDashboard, Phone, Mail, BookOpen, ChevronDown, ChevronRight, Search, Check, Globe } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AuthModal } from '../auth/AuthModal';
 import { EASE_OUT } from '../../lib/motion';
 import { useSymptoms, useCategories } from '../../hooks/queries';
 import { buildConditionGroups } from '../../data/conditions';
 import logo from '../../assets/logo.png';
+
+function LocationPicker({ compact = false }: { compact?: boolean }) {
+  const { cities, city, setCity, panIndia } = useLocationContext();
+  const [open, setOpen] = useState(false);
+  const ref = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', onDoc);
+    return () => document.removeEventListener('mousedown', onDoc);
+  }, [open]);
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        onClick={() => setOpen(o => !o)}
+        aria-label="Select your city"
+        className={`inline-flex items-center gap-1 group ${compact ? 'text-[10px]' : 'text-[10px]'}`}
+      >
+        <MapPin className={`${compact ? 'w-2.5 h-2.5' : 'w-3 h-3'} text-teal-500`} />
+        <span className="font-semibold text-slate-600 group-hover:text-teal-600 transition-colors truncate max-w-[110px]">
+          {city}
+        </span>
+        <ChevronDown className={`${compact ? 'w-2.5 h-2.5' : 'w-3 h-3'} text-slate-400`} />
+      </button>
+
+      {open && (
+        <div className="absolute left-0 top-full mt-2 w-56 rounded-2xl border border-slate-200 bg-white shadow-xl overflow-hidden z-50">
+          <div className="px-4 py-2.5 border-b border-slate-100">
+            <p className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wide">Your city</p>
+          </div>
+          <div className="max-h-64 overflow-y-auto py-1">
+            {cities.map((opt) => {
+              const isSelected = opt === city;
+              return (
+                <button
+                  key={opt}
+                  onClick={() => { setCity(opt); setOpen(false); }}
+                  className={`w-full flex items-center justify-between gap-2 px-4 py-2 text-left text-xs font-bold transition-colors ${
+                    isSelected ? 'text-teal-700 bg-teal-50' : 'text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  <span className="flex items-center gap-2">
+                    {opt === panIndia ? <Globe className="h-3.5 w-3.5 text-emerald-600" /> : <MapPin className="h-3.5 w-3.5 text-slate-400" />}
+                    {opt}
+                  </span>
+                  {isSelected && <Check className="h-3.5 w-3.5 text-teal-600 shrink-0" />}
+                </button>
+              );
+            })}
+          </div>
+          <p className="px-4 py-2 border-t border-slate-100 text-[10px] text-slate-400">
+            {panIndia} = online video consultations anywhere.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export const Navbar: React.FC = () => {
   const location = useLocation();
@@ -98,7 +161,7 @@ export const Navbar: React.FC = () => {
                   </span>
                 </div>
                 <p className="text-[10px] font-medium text-slate-500 flex items-center gap-1">
-                  <MapPin className="w-2.5 h-2.5 text-teal-500" /> Nagpur & Pan-India
+                  <LocationPicker />
                 </p>
               </div>
             </Link>
@@ -297,8 +360,7 @@ export const Navbar: React.FC = () => {
                         <Activity className="w-3 h-3 text-teal-500" />
                         <span className="font-medium">PhysioPrime</span>
                         <span className="text-slate-300">•</span>
-                        <MapPin className="w-3 h-3 text-teal-500" />
-                        <span>Nagpur & Pan-India</span>
+                        <LocationPicker compact />
                       </div>
                     </div>
                   </div>

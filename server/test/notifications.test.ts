@@ -7,7 +7,7 @@ import { seed } from '../src/lib/seed';
 import { createApp } from '../src/index';
 import { appointments, doctors, notifications } from '../src/db/schema';
 import { sendNotification, templates, providers } from '../src/lib/notifications';
-import { registerPatient, registerAdmin } from './helpers';
+import { futureDate, futureWeekday, pickSlot, registerPatient, registerAdmin } from './helpers';
 
 vi.mock('../src/lib/razorpay', () => ({
   createOrder: vi.fn(),
@@ -36,8 +36,9 @@ function futureWeekday(dayOfWeek: number): string {
   return `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, '0')}-${String(cur.getDate()).padStart(2, '0')}`;
 }
 
-async function bookAndVerify(email: string, slot: string): Promise<{ token: string; bookingId: string }> {
+async function bookAndVerify(email: string): Promise<{ token: string; bookingId: string }> {
   const { token } = await registerPatient(email);
+  const slot = await pickSlot(futureWeekday(1), DOCTOR);
   const book = await api
     .post('/api/v1/appointments')
     .set('Authorization', `Bearer ${token}`)
@@ -154,7 +155,7 @@ describe('templates', () => {
 
 describe('booking flow notifications', () => {
   it('creates a bookingConfirmed whatsapp row when a payment is verified', async () => {
-    await bookAndVerify('ntf.confirm@example.com', '10:00-10:45');
+    await bookAndVerify('ntf.confirm@example.com');
     const rows = await db.select().from(notifications);
     const confirmed = rows.filter((r) => r.template === 'confirmed');
     expect(confirmed.length).toBe(1);
@@ -164,11 +165,13 @@ describe('booking flow notifications', () => {
   });
 
   it('creates bookingRescheduled rows on a real change and skips no-op reschedules', async () => {
-    const { token, bookingId } = await bookAndVerify('ntf.resched@example.com', '10:45-11:30');
+    const { token, bookingId } = await bookAndVerify('ntf.resched@example.com');
+    const targetDay = futureWeekday(2);
+    const targetSlot = await pickSlot(targetDay, DOCTOR);
     await api
       .post(`/api/v1/appointments/${bookingId}/reschedule`)
       .set('Authorization', `Bearer ${token}`)
-      .send({ date: futureWeekday(2), slot: '10:45-11:30' })
+      .send({ date: targetDay, slot: targetSlot })
       .expect(200);
     const rows = await db.select().from(notifications);
     const rescheduled = rows.filter((r) => r.template === 'rescheduled');
@@ -179,14 +182,14 @@ describe('booking flow notifications', () => {
     await api
       .post(`/api/v1/appointments/${bookingId}/reschedule`)
       .set('Authorization', `Bearer ${token}`)
-      .send({ date: futureWeekday(2), slot: '10:45-11:30' })
+      .send({ date: targetDay, slot: targetSlot })
       .expect(200);
     const after = await db.select().from(notifications);
     expect(after.filter((r) => r.template === 'rescheduled').length).toBe(1);
   });
 
-  it('creates a bookingCancelled row (with refund note) after cancel', async () => {
-    const { token, bookingId } = await bookAndVerify('ntf.cancel@example.com', '11:30-12:15');
+  it('creates a bookingCancelled row (non-refundable note) after cancel', async () => {
+    const { token, bookingId } = await bookAndVerify('ntf.cancel@example.com');
     await api
       .post(`/api/v1/appointments/${bookingId}/cancel`)
       .set('Authorization', `Bearer ${token}`)
@@ -196,7 +199,7 @@ describe('booking flow notifications', () => {
     const cancelled = rows.filter((r) => r.template === 'cancelled');
     expect(cancelled.length).toBe(1);
     expect(cancelled[0].channel).toBe('whatsapp');
-    expect(cancelled[0].body).toContain('refunded');
+    expect(cancelled[0].body).toContain('non-refundable');
   });
 });
 

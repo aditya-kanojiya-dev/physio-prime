@@ -23,10 +23,11 @@ const envSchema = coreSchema.extend({
   RAZORPAY_KEY_ID: z.string().min(1),
   RAZORPAY_KEY_SECRET: z.string().min(1),
   RAZORPAY_WEBHOOK_SECRET: z.string().min(1),
-  TWILIO_ACCOUNT_SID: z.string().min(1),
-  TWILIO_AUTH_TOKEN: z.string().min(1),
-  TWILIO_WHATSAPP_FROM: z.string().min(1),
-  TWILIO_FROM_NUMBER: z.string().min(1),
+  // Twilio is optional: skip SMS/WhatsApp when unconfigured instead of blocking payments.
+  TWILIO_ACCOUNT_SID: z.string().optional(),
+  TWILIO_AUTH_TOKEN: z.string().optional(),
+  TWILIO_WHATSAPP_FROM: z.string().optional(),
+  TWILIO_FROM_NUMBER: z.string().optional(),
 });
 
 type Config = z.infer<typeof envSchema>;

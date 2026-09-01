@@ -39,7 +39,6 @@ export function ProfilePage() {
   const [treatments, setTreatments] = useState('')
   const [homeFee, setHomeFee] = useState('')
   const [onlineFee, setOnlineFee] = useState('')
-  const [clinicFee, setClinicFee] = useState('')
   const [hydrated, setHydrated] = useState(false)
 
   const { data: doctor, isLoading } = useQuery({
@@ -66,7 +65,6 @@ export function ProfilePage() {
     setTreatments((doctor.treatments || []).join(', '))
     setHomeFee(String(doctor.fees?.home ?? ''))
     setOnlineFee(String(doctor.fees?.online ?? ''))
-    setClinicFee(String(doctor.fees?.clinic ?? ''))
     setHydrated(true)
   }
 
@@ -86,7 +84,6 @@ export function ProfilePage() {
         fees: {
           home: Number(homeFee) || 0,
           online: Number(onlineFee) || 0,
-          clinic: Number(clinicFee) || 0,
         },
         languages: splitList(languages),
         expertise: splitList(expertise),
@@ -225,11 +222,11 @@ export function ProfilePage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {(['home', 'online', 'clinic'] as const).map((m) => (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {(['home', 'online'] as const).map((m) => (
                 <div key={m} className="space-y-1">
                   <label className={labelCls}>Fees – {m} (₹)</label>
-                  <input type="number" min={0} value={m === 'home' ? homeFee : m === 'online' ? onlineFee : clinicFee} onChange={(e) => m === 'home' ? setHomeFee(e.target.value) : m === 'online' ? setOnlineFee(e.target.value) : setClinicFee(e.target.value)} className={inputCls} />
+                  <input type="number" min={0} value={m === 'home' ? homeFee : onlineFee} onChange={(e) => m === 'home' ? setHomeFee(e.target.value) : setOnlineFee(e.target.value)} className={inputCls} />
                 </div>
               ))}
             </div>

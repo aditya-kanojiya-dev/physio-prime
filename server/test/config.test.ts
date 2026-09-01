@@ -6,7 +6,7 @@ describe('config split', () => {
     expect(getCoreConfig().JWT_SECRET).toBe('dev-secret-change-in-production');
   });
 
-  it('getConfig throws while provider keys are empty (dev proof of the split)', () => {
-    expect(() => getConfig()).toThrow();
+  it('getConfig tolerates empty Twilio keys but requires Razorpay (dev proof of the split)', () => {
+    expect(getConfig().RAZORPAY_KEY_ID).toBeTruthy();
   });
 });

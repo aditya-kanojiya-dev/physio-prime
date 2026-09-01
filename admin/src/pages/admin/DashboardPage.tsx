@@ -19,7 +19,6 @@ import { AdminLayout } from '../../components/admin/AdminLayout'
 const modeMeta: Record<string, { label: string; bar: string; text: string }> = {
   home: { label: 'Home Consultation Visits', bar: 'from-blue-600 to-teal-400', text: 'text-blue-700' },
   online: { label: 'Online Tele-Consultations', bar: 'bg-teal-500', text: 'text-teal-700' },
-  clinic: { label: 'In-Clinic Visits', bar: 'bg-purple-500', text: 'text-purple-700' },
 }
 
 export function DashboardPage() {
@@ -121,7 +120,7 @@ export function DashboardPage() {
                 <div className="flex items-center justify-between border-b border-slate-200 pb-4">
                   <div>
                     <h3 className="text-base font-extrabold text-slate-900">Consultation Mode Distribution</h3>
-                    <p className="text-xs text-slate-500">Analysis by Home Visit, Online Video, and Clinic Appointments</p>
+                    <p className="text-xs text-slate-500">Analysis by Home Visit and Online Video Appointments</p>
                   </div>
                   <span className="text-xs font-bold text-teal-700 px-3 py-1 bg-teal-100 rounded-full border border-teal-200">
                     {range ? range : 'All time'}

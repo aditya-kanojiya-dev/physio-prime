@@ -89,7 +89,7 @@ describe('GET /api/v1/doctors', () => {
       patientsTreated: expect.any(Number),
       languages: expect.any(Array),
       location: { area: expect.any(String), city: expect.any(String), address: expect.any(String) },
-      fees: { home: expect.any(Number), online: expect.any(Number), clinic: expect.any(Number) },
+      fees: { home: expect.any(Number), online: expect.any(Number) },
       nextAvailable: expect.any(String),
       verified: expect.any(Boolean),
       featured: expect.any(Boolean),
@@ -145,9 +145,10 @@ describe('GET /api/v1/doctors filters', () => {
       'doc-pratyush-kulkarni',
     ]);
 
-    const modeClinic = await api.get('/api/v1/doctors?mode=clinic');
-    expect(modeClinic.status).toBe(200);
-    expect(modeClinic.body.doctors).toHaveLength(6);
+    const modeOnline = await api.get('/api/v1/doctors?mode=online');
+    expect(modeOnline.status).toBe(200);
+    expect(modeOnline.body.doctors).toHaveLength(6);
+    expect(modeOnline.body.doctors.every((d: { fees: { online?: number } }) => d.fees.online != null)).toBe(true);
     const modeHome = await api.get('/api/v1/doctors?mode=home');
     expect(modeHome.status).toBe(200);
     expect(modeHome.body.doctors).toHaveLength(6);
@@ -191,7 +192,7 @@ describe('GET /api/v1/doctors/:slug', () => {
     );
     expect(d.registration).toMatchObject({ number: expect.any(String), council: expect.any(String) });
     expect(d.rating).toBe(4.9);
-    expect(d.fees).toEqual({ home: 1000, online: 599, clinic: 800 });
+    expect(d.fees).toEqual({ home: 1000, online: 599 });
 
     const missing = await api.get('/api/v1/doctors/not-a-real-doctor');
     expect(missing.status).toBe(404);

@@ -18,6 +18,7 @@ import {
   users,
 } from '../db/schema';
 import { requireAuth, requireRole } from '../middleware/auth';
+import { getEarnedNet } from './payouts';
 
 export const adminRouter = Router();
 
@@ -620,8 +621,8 @@ adminRouter.get('/appointments', async (req, res, next) => {
       );
     }
     if (typeof query.mode === 'string' && query.mode) {
-      if (!['home', 'online', 'clinic'].includes(query.mode)) {
-        res.status(400).json({ error: { message: 'mode must be home, online or clinic' } });
+      if (!['home', 'online'].includes(query.mode)) {
+        res.status(400).json({ error: { message: 'mode must be home or online' } });
         return;
       }
       filters.push(eq(appointments.mode, query.mode));
@@ -1144,22 +1145,48 @@ adminRouter.patch('/payouts/:id', async (req, res, next) => {
     }
     const body = z.object({
       status: z.enum(['processing', 'completed', 'failed']),
-      transactionId: z.string().nullable().optional(),
-      notes: z.string().nullable().optional(),
+      transactionId: z.string().min(1).max(200).optional(),
+      notes: z.string().max(500).nullable().optional(),
     }).parse(req.body);
     if (Object.keys(body).length === 0) {
       res.status(400).json({ error: { message: 'Nothing to update' } });
       return;
     }
-    const update: Record<string, unknown> = { ...body };
-    if (body.status === 'completed' || body.status === 'failed') {
-      update.processedAt = new Date();
-    }
-    const [updated] = await db.update(doctorPayouts).set(update).where(eq(doctorPayouts.id, id)).returning();
-    if (!updated) {
+
+    const [payout] = await db.select().from(doctorPayouts).where(eq(doctorPayouts.id, id));
+    if (!payout) {
       res.status(404).json({ error: { message: 'Payout not found' } });
       return;
     }
+    // Payout status is one-way: pending → processing/failed, processing → completed/failed. Terminal states never change.
+    if (payout.status !== 'pending' && payout.status !== 'processing') {
+      res.status(400).json({ error: { message: `Cannot change a ${payout.status} payout` } });
+      return;
+    }
+    const status = body.status;
+    if (status === 'completed') {
+      if (payout.status !== 'processing') {
+        res.status(400).json({ error: { message: 'Mark the payout processing before completing it' } });
+        return;
+      }
+      const transactionId = body.transactionId?.trim();
+      if (!transactionId) {
+        res.status(400).json({ error: { message: 'transactionId is required to complete a payout' } });
+        return;
+      }
+      // Never pay out more than the doctor's total net earnings, even if rows shifted underneath us.
+      const earned = await getEarnedNet(payout.doctorId);
+      if (payout.amountPaise > earned) {
+        res.status(400).json({ error: { message: 'Payout exceeds the doctor\u2019s earned balance' } });
+        return;
+      }
+      body.transactionId = transactionId;
+    }
+    const update: Record<string, unknown> = { ...body };
+    if (status === 'completed' || status === 'failed') {
+      update.processedAt = new Date();
+    }
+    const [updated] = await db.update(doctorPayouts).set(update).where(eq(doctorPayouts.id, id)).returning();
     res.json({ payout: { ...updated, createdAt: updated.createdAt.toISOString(), processedAt: updated.processedAt?.toISOString() ?? null } });
   } catch (err) {
     next(err);

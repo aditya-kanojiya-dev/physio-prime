@@ -5,7 +5,7 @@ import { db } from '../db/pool';
 import { appointments, doctors, doctorSchedules } from '../db/schema';
 import { requireAuth, requireRole } from '../middleware/auth';
 import { availableFromSchedules, dayOfWeek, isPast, isValidDate } from '../lib/slots';
-import { createOrder, createRefund, verifySignature } from '../lib/razorpay';
+import { createOrder, verifySignature } from '../lib/razorpay';
 import { sendNotification, templates, type NotificationCtx } from '../lib/notifications';
 
 export const appointmentsRouter = Router();
@@ -27,7 +27,7 @@ const dateField = z.string().refine(isValidDate, 'date must be YYYY-MM-DD');
 
 const bookSchema = z.object({
   doctorSlug: z.string().min(1),
-  mode: z.enum(['home', 'online', 'clinic']),
+  mode: z.enum(['home', 'online']),
   date: dateField,
   slot: z.string().regex(/^\d{2}:\d{2}-\d{2}:\d{2}$/, 'slot must be HH:MM-HH:MM'),
   symptom: z.string().max(2000).optional(),
@@ -40,6 +40,7 @@ const bookSchema = z.object({
   patientHeight: z.coerce.number().positive().max(250).optional(),
   patientRelation: z.string().trim().max(50).optional(),
   address: z.record(z.string(), z.unknown()).optional(),
+  paymentMode: z.enum(['prepay', 'postpay']).optional(),
 });
 
 const verifySchema = z.object({
@@ -78,6 +79,7 @@ interface AppointmentView {
   symptom: string | null;
   feePaise: number;
   address: unknown;
+  paymentMode: string;
   paymentStatus: string;
   razorpayOrderId: string | null;
   razorpayPaymentId: string | null;
@@ -114,6 +116,7 @@ const appointmentColumns = {
   symptom: appointments.symptom,
   feePaise: appointments.feePaise,
   address: appointments.address,
+  paymentMode: appointments.paymentMode,
   paymentStatus: appointments.paymentStatus,
   razorpayOrderId: appointments.razorpayOrderId,
   razorpayPaymentId: appointments.razorpayPaymentId,
@@ -161,6 +164,7 @@ function serializeAppointment(row: AppointmentView) {
     symptom: row.symptom,
     feePaise: row.feePaise,
     address: row.address,
+    paymentMode: row.paymentMode,
     paymentStatus: row.paymentStatus,
     razorpayOrderId: row.razorpayOrderId,
     razorpayPaymentId: row.razorpayPaymentId,
@@ -281,6 +285,7 @@ async function bookTransaction(
             symptom: body.symptom ?? null,
             feePaise,
             address: body.address ?? {},
+            paymentMode: body.paymentMode ?? 'prepay',
             paymentStatus: 'pending',
             patientName: body.patientName,
             patientPhone: body.patientPhone,
@@ -294,11 +299,13 @@ async function bookTransaction(
           })
           .returning();
         let order: { id: string; amountPaise: number } | null = null;
-        try {
-          order = await createOrder({ amountPaise: feePaise, receipt: bookingId });
-        } catch (err) {
-          if (!(err instanceof Error) || !err.message.includes('not configured')) throw err;
-          // ponytail: razorpay not configured — trial booking proceeds unpaid
+        if ((body.paymentMode ?? 'prepay') === 'prepay') {
+          try {
+            order = await createOrder({ amountPaise: feePaise, receipt: bookingId });
+          } catch (err) {
+            if (!(err instanceof Error) || !err.message.includes('not configured')) throw err;
+            // ponytail: razorpay not configured — trial booking proceeds unpaid
+          }
         }
         if (order) {
           await tx.update(appointments).set({ razorpayOrderId: order.id }).where(eq(appointments.id, row!.id));
@@ -484,23 +491,16 @@ appointmentsRouter.post('/:id/cancel', async (req, res, next) => {
       if (!row) throw new BookingError(404, 'Appointment not found');
       if (row.patientId !== req.user!.id) throw new BookingError(403, 'Forbidden');
       if (row.status !== 'upcoming') throw new BookingError(400, 'Only upcoming appointments can be cancelled');
-      let paymentStatus = row.paymentStatus;
-      if (row.paymentStatus === 'paid') {
-        try {
-          await createRefund({ paymentId: row.razorpayPaymentId! });
-          paymentStatus = 'refunded';
-        } catch {
-          // ponytail: refund failure still cancels; surface + retry via notifications in Phase 5
-        }
-      }
+      // Non-refundable per Terms: a patient-initiated cancellation keeps the payment.
+      // Do not issue a refund here — it would contradict the agreed policy.
       const [updated] = await tx
         .update(appointments)
-        .set({ status: 'cancelled', cancellationReason: body.reason ?? null, paymentStatus })
+        .set({ status: 'cancelled', cancellationReason: body.reason ?? null, paymentStatus: row.paymentStatus })
         .where(eq(appointments.bookingId, req.params.id))
         .returning(appointmentColumns);
       return updated!;
     });
-    await sendBookingNotifications(updated, 'cancelled', { refunded: updated.paymentStatus === 'refunded' });
+    await sendBookingNotifications(updated, 'cancelled', { refunded: false });
     res.json({ appointment: serializeAppointment(updated) });
   } catch (err) {
     if (err instanceof BookingError) {

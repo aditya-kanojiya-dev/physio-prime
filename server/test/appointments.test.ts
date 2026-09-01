@@ -1,13 +1,13 @@
 import { describe, it, beforeAll, afterAll, beforeEach, expect, vi } from 'vitest';
 import request from 'supertest';
-import { and, eq, inArray } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { db } from '../src/db/pool';
 import { runMigrations } from '../src/db/migrate';
 import { seed } from '../src/lib/seed';
 import { createApp } from '../src/index';
-import { appointments, doctors, doctorSchedules } from '../src/db/schema';
-import { buildSlotList, dayOfWeek, nowHHmm, todayStr, type Slot } from '../src/lib/slots';
-import { registerPatient } from './helpers';
+import { doctors } from '../src/db/schema';
+import { getAvailableWindows } from '../src/lib/slots';
+import { futureWeekday, nowHHmm, pickSlot, registerPatient, todayStr } from './helpers';
 
 vi.mock('../src/lib/razorpay', () => ({
   createOrder: vi.fn(),
@@ -23,59 +23,19 @@ const api = request(createApp());
 const DOCTOR = 'doc-tarannum-sayyed';
 const SECOND_DOCTOR = 'doc-pritam-rathod';
 
-const MONDAY = futureDate(1);
-const SUNDAY = futureDate(0);
-
-function futureDate(dayOfWeek: number): string {
-  const d = new Date();
-  let cur = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1);
-  while (cur.getDay() !== dayOfWeek) {
-    cur = new Date(cur.getFullYear(), cur.getMonth(), cur.getDate() + 1);
-  }
-  return `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, '0')}-${String(cur.getDate()).padStart(2, '0')}`;
-}
+const MONDAY = futureWeekday(1);
+const SUNDAY = futureWeekday(0);
 
 const bookPayload = (overrides: Record<string, unknown> = {}) => ({
   doctorSlug: DOCTOR,
   mode: 'online',
   date: MONDAY,
-  slot: '10:00-10:45',
+  slot: 'HH:MM-HH:MM',
   symptom: 'Knee pain',
   patientName: 'Test Patient',
   patientPhone: '9876543210',
   ...overrides,
 });
-
-async function expectedSlots(date: string, slug: string): Promise<Slot[]> {
-  const [doc] = await db.select().from(doctors).where(eq(doctors.slug, slug));
-  if (!doc) return [];
-  const [sched] = await db
-    .select()
-    .from(doctorSchedules)
-    .where(
-      and(
-        eq(doctorSchedules.doctorId, doc.id),
-        eq(doctorSchedules.dayOfWeek, dayOfWeek(date)),
-        eq(doctorSchedules.active, true),
-      ),
-    );
-  if (!sched) return [];
-  const booked = await db
-    .select({ timeSlot: appointments.timeSlot })
-    .from(appointments)
-    .where(
-      and(
-        eq(appointments.doctorId, doc.id),
-        eq(appointments.date, date),
-        inArray(appointments.status, ['upcoming', 'completed']),
-      ),
-    );
-  const bookedStarts = new Set(booked.map((a) => a.timeSlot.split('-')[0]));
-  const now = nowHHmm();
-  return buildSlotList(sched).filter(
-    (s) => !bookedStarts.has(s.start) && !(date === todayStr() && s.start <= now),
-  );
-}
 
 beforeAll(async () => {
   await runMigrations();
@@ -117,8 +77,9 @@ describe('POST /api/v1/appointments', () => {
     const { token } = await registerPatient('apt.book@example.com');
     const doc = await api.get(`/api/v1/doctors/${DOCTOR}`);
     const feePaise = Math.round(doc.body.doctor.fees.online * 100);
+    const slot = await pickSlot(MONDAY, DOCTOR);
 
-    const res = await api.post('/api/v1/appointments').set('Authorization', `Bearer ${token}`).send(bookPayload());
+    const res = await api.post('/api/v1/appointments').set('Authorization', `Bearer ${token}`).send(bookPayload({ slot }));
     expect(res.status).toBe(201);
     expect(res.body.appointment.paymentStatus).toBe('pending');
     expect(res.body.appointment.status).toBe('upcoming');
@@ -135,10 +96,11 @@ describe('POST /api/v1/appointments', () => {
 
   it('stores patient email/gender/age/weight/height and falls back email to the auth email', async () => {
     const { token } = await registerPatient('apt.patientdetails@example.com');
+    const slot = await pickSlot(MONDAY, DOCTOR);
     const res = await api
       .post('/api/v1/appointments')
       .set('Authorization', `Bearer ${token}`)
-      .send(bookPayload({ slot: '14:30-15:15', patientGender: 'female', patientAge: 29, patientWeight: 58.5, patientHeight: 165 }));
+      .send(bookPayload({ slot, patientGender: 'female', patientAge: 29, patientWeight: 58.5, patientHeight: 165 }));
     expect(res.status).toBe(201);
     expect(res.body.appointment.patientEmail).toBe('apt.patientdetails@example.com');
     expect(res.body.appointment.patientGender).toBe('female');
@@ -154,15 +116,16 @@ describe('POST /api/v1/appointments', () => {
 
   it('returns 409 when the same doctor+date+slot is already booked', async () => {
     const { token } = await registerPatient('apt.dup@example.com');
+    const slot = await pickSlot(MONDAY, DOCTOR);
     await api
       .post('/api/v1/appointments')
       .set('Authorization', `Bearer ${token}`)
-      .send(bookPayload({ slot: '12:15-13:00' }))
+      .send(bookPayload({ slot }))
       .expect(201);
     const res = await api
       .post('/api/v1/appointments')
       .set('Authorization', `Bearer ${token}`)
-      .send(bookPayload({ slot: '12:15-13:00' }));
+      .send(bookPayload({ slot }));
     expect(res.status).toBe(409);
   });
 });
@@ -170,10 +133,11 @@ describe('POST /api/v1/appointments', () => {
 describe('POST /api/v1/appointments validation', () => {
   it('returns 404 for an unknown doctor', async () => {
     const { token } = await registerPatient('apt.baddoc@example.com');
+    const slot = await pickSlot(MONDAY, DOCTOR);
     const res = await api
       .post('/api/v1/appointments')
       .set('Authorization', `Bearer ${token}`)
-      .send(bookPayload({ doctorSlug: 'not-a-doctor' }));
+      .send(bookPayload({ doctorSlug: 'not-a-doctor', slot }));
     expect(res.status).toBe(404);
   });
 
@@ -206,10 +170,6 @@ describe('POST /api/v1/appointments validation', () => {
 
   it('returns 400 when the mode is not offered by the doctor', async () => {
     const { token } = await registerPatient('apt.mode@example.com');
-    await db
-      .update(doctors)
-      .set({ fees: { home: 1000, online: 599 } })
-      .where(eq(doctors.slug, SECOND_DOCTOR));
     const res = await api
       .post('/api/v1/appointments')
       .set('Authorization', `Bearer ${token}`)
@@ -219,43 +179,35 @@ describe('POST /api/v1/appointments validation', () => {
 });
 
 describe('GET /api/v1/doctors/:slug/slots', () => {
-  it('returns the weekday 45-min list minus the break band and booked slots', async () => {
+  it('returns the weekday windows with labels, capacities and HH:MM times', async () => {
+    const [doc] = await db.select().from(doctors).where(eq(doctors.slug, DOCTOR));
     const res = await api.get(`/api/v1/doctors/${DOCTOR}/slots?date=${MONDAY}`);
     expect(res.status).toBe(200);
     expect(res.body.date).toBe(MONDAY);
-    expect(res.body.slots).toEqual(await expectedSlots(MONDAY, DOCTOR));
-    expect(res.body.slots).toHaveLength((await expectedSlots(MONDAY, DOCTOR)).length);
-    const [slotDoc] = await db.select().from(doctors).where(eq(doctors.slug, DOCTOR));
-    const [slotSched] = await db
-      .select()
-      .from(doctorSchedules)
-      .where(
-        and(
-          eq(doctorSchedules.doctorId, slotDoc.id),
-          eq(doctorSchedules.dayOfWeek, dayOfWeek(MONDAY)),
-          eq(doctorSchedules.active, true),
-        ),
-      );
-    expect(res.body.total).toBe(buildSlotList(slotSched).length);
-    expect(res.body.slots[0]).toEqual({ start: '07:00', end: '07:45' });
-    expect(res.body.slots[res.body.slots.length - 1]).toEqual({ start: '19:45', end: '20:30' });
-    expect(res.body.slots.some((s: Slot) => s.start === '13:00' || s.start === '13:45')).toBe(false);
-    expect(res.body.slots.some((s: Slot) => s.start === '10:00')).toBe(false);
+    expect(res.body.windows).toEqual(await getAvailableWindows(doc!.id, MONDAY));
+    for (const w of res.body.windows) {
+      expect(w.start).toMatch(/^\d{2}:\d{2}$/);
+      expect(w.end).toMatch(/^\d{2}:\d{2}$/);
+      expect(typeof w.maxPatients).toBe('number');
+      expect(typeof w.bookedCount).toBe('number');
+      expect(typeof w.available).toBe('boolean');
+    }
+    expect(res.body.windows[0]).toMatchObject({ start: '07:00', end: '09:00', label: 'Early Morning' });
   });
 
   it('returns an empty list on Sunday', async () => {
     const res = await api.get(`/api/v1/doctors/${DOCTOR}/slots?date=${SUNDAY}`);
     expect(res.status).toBe(200);
-    expect(res.body.slots).toEqual([]);
+    expect(res.body.windows).toEqual([]);
   });
 
-  it('excludes past times when the date is today', async () => {
-    const today = todayStr();
-    const res = await api.get(`/api/v1/doctors/${DOCTOR}/slots?date=${today}`);
+  it('hides windows that already ended when the date is today', async () => {
+    const before = nowHHmm();
+    const res = await api.get(`/api/v1/doctors/${DOCTOR}/slots?date=${todayStr()}`);
     expect(res.status).toBe(200);
-    expect(res.body.slots).toEqual(await expectedSlots(today, DOCTOR));
-    const now = nowHHmm();
-    expect(res.body.slots.every((s: Slot) => s.start > now)).toBe(true);
+    for (const w of res.body.windows as { end: string }[]) {
+      expect(w.end > before).toBe(true);
+    }
   });
 
   it('returns 404 for an unknown doctor, 400 for a past/invalid date', async () => {
@@ -276,10 +228,11 @@ describe('GET /api/v1/doctors/:slug/slots', () => {
 describe('POST /api/v1/appointments/:id/verify', () => {
   it('marks an appointment paid with a valid signature and is idempotent on repeat', async () => {
     const { token } = await registerPatient('apt.verify@example.com');
+    const slot = await pickSlot(MONDAY, DOCTOR);
     const booked = await api
       .post('/api/v1/appointments')
       .set('Authorization', `Bearer ${token}`)
-      .send(bookPayload({ slot: '15:15-16:00' }))
+      .send(bookPayload({ slot }))
       .expect(201);
     const id = booked.body.appointment.id;
 
@@ -302,10 +255,11 @@ describe('POST /api/v1/appointments/:id/verify', () => {
   it('returns 400 for a bad signature and 403 for a non-owner', async () => {
     const { token } = await registerPatient('apt.badsig@example.com');
     const { token: otherToken } = await registerPatient('apt.other@example.com');
+    const slot = await pickSlot(MONDAY, DOCTOR);
     const booked = await api
       .post('/api/v1/appointments')
       .set('Authorization', `Bearer ${token}`)
-      .send(bookPayload({ slot: '16:00-16:45' }))
+      .send(bookPayload({ slot }))
       .expect(201);
     const id = booked.body.appointment.id;
 
@@ -325,10 +279,11 @@ describe('POST /api/v1/appointments/:id/verify', () => {
 
   it('returns 400 on verify for a cancelled appointment even when still marked paid', async () => {
     const { token } = await registerPatient('apt.verifycancelled@example.com');
+    const slot = await pickSlot(MONDAY, DOCTOR);
     const booked = await api
       .post('/api/v1/appointments')
       .set('Authorization', `Bearer ${token}`)
-      .send(bookPayload({ slot: '11:30-12:15' }))
+      .send(bookPayload({ slot }))
       .expect(201);
     const id = booked.body.appointment.id;
 
@@ -338,7 +293,6 @@ describe('POST /api/v1/appointments/:id/verify', () => {
       .send({ razorpayPaymentId: 'pay_vc', razorpaySignature: 'sig' })
       .expect(200);
 
-    vi.mocked(createRefund).mockRejectedValueOnce(new Error('razorpay down'));
     await api
       .post(`/api/v1/appointments/${id}/cancel`)
       .set('Authorization', `Bearer ${token}`)
@@ -354,20 +308,22 @@ describe('POST /api/v1/appointments/:id/verify', () => {
 
   it('stores patientRelation when booking for someone else', async () => {
     const { token } = await registerPatient('apt.forother@example.com');
+    const slot = await pickSlot(MONDAY, DOCTOR);
     const res = await api
       .post('/api/v1/appointments')
       .set('Authorization', `Bearer ${token}`)
-      .send(bookPayload({ slot: '17:30-18:15', patientRelation: 'Mother' }));
+      .send(bookPayload({ slot, patientRelation: 'Mother' }));
     expect(res.status).toBe(201);
     expect(res.body.appointment.patientRelation).toBe('Mother');
   });
 
   it('stores no relation when booking for self', async () => {
     const { token } = await registerPatient('apt.forself@example.com');
+    const slot = await pickSlot(MONDAY, DOCTOR);
     const res = await api
       .post('/api/v1/appointments')
       .set('Authorization', `Bearer ${token}`)
-      .send(bookPayload({ slot: '18:15-19:00' }));
+      .send(bookPayload({ slot }));
     expect(res.status).toBe(201);
     expect(res.body.appointment.patientRelation).toBeNull();
   });
@@ -376,30 +332,33 @@ describe('POST /api/v1/appointments/:id/verify', () => {
 describe('POST /api/v1/appointments/:id/reschedule', () => {
   it('reschedules to a free slot, 409 on a taken slot, 400 on a cancelled appointment', async () => {
     const { token } = await registerPatient('apt.reschedule@example.com');
+    const takenSlot = await pickSlot(MONDAY, DOCTOR);
     const taken = await api
       .post('/api/v1/appointments')
       .set('Authorization', `Bearer ${token}`)
-      .send(bookPayload({ slot: '09:15-10:00' }))
+      .send(bookPayload({ slot: takenSlot }))
       .expect(201);
 
+    const bookedSlot = await pickSlot(MONDAY, DOCTOR);
     const booked = await api
       .post('/api/v1/appointments')
       .set('Authorization', `Bearer ${token}`)
-      .send(bookPayload({ slot: '08:30-09:15' }))
+      .send(bookPayload({ slot: bookedSlot }))
       .expect(201);
     const id = booked.body.appointment.id;
 
+    const freeSlot = await pickSlot(MONDAY, DOCTOR);
     const ok = await api
       .post(`/api/v1/appointments/${id}/reschedule`)
       .set('Authorization', `Bearer ${token}`)
-      .send({ date: MONDAY, slot: '16:45-17:30' });
+      .send({ date: MONDAY, slot: freeSlot });
     expect(ok.status).toBe(200);
-    expect(ok.body.appointment.timeSlot).toBe('16:45-17:30');
+    expect(ok.body.appointment.timeSlot).toBe(freeSlot);
 
     const conflict = await api
       .post(`/api/v1/appointments/${id}/reschedule`)
       .set('Authorization', `Bearer ${token}`)
-      .send({ date: MONDAY, slot: '09:15-10:00' });
+      .send({ date: MONDAY, slot: takenSlot });
     expect(conflict.status).toBe(409);
 
     await api
@@ -411,36 +370,38 @@ describe('POST /api/v1/appointments/:id/reschedule', () => {
     const cancelled = await api
       .post(`/api/v1/appointments/${taken.body.appointment.id}/reschedule`)
       .set('Authorization', `Bearer ${token}`)
-      .send({ date: MONDAY, slot: '12:15-13:00' });
+      .send({ date: MONDAY, slot: takenSlot });
     expect(cancelled.status).toBe(400);
   });
 
   it('returns 200 unchanged when rescheduling to the identical date+slot', async () => {
     const { token } = await registerPatient('apt.noop@example.com');
+    const slot = await pickSlot(MONDAY, DOCTOR);
     const booked = await api
       .post('/api/v1/appointments')
       .set('Authorization', `Bearer ${token}`)
-      .send(bookPayload({ slot: '10:45-11:30' }))
+      .send(bookPayload({ slot }))
       .expect(201);
     const id = booked.body.appointment.id;
 
     const res = await api
       .post(`/api/v1/appointments/${id}/reschedule`)
       .set('Authorization', `Bearer ${token}`)
-      .send({ date: MONDAY, slot: '10:45-11:30' });
+      .send({ date: MONDAY, slot });
     expect(res.status).toBe(200);
     expect(res.body.appointment.date).toBe(MONDAY);
-    expect(res.body.appointment.timeSlot).toBe('10:45-11:30');
+    expect(res.body.appointment.timeSlot).toBe(slot);
   });
 });
 
 describe('POST /api/v1/appointments/:id/cancel', () => {
   it('cancels a pending appointment and keeps payment pending', async () => {
     const { token } = await registerPatient('apt.cancel@example.com');
+    const slot = await pickSlot(MONDAY, SECOND_DOCTOR);
     const booked = await api
       .post('/api/v1/appointments')
       .set('Authorization', `Bearer ${token}`)
-      .send(bookPayload({ doctorSlug: SECOND_DOCTOR, slot: '09:15-10:00' }))
+      .send(bookPayload({ doctorSlug: SECOND_DOCTOR, slot }))
       .expect(201);
     const id = booked.body.appointment.id;
 
@@ -454,12 +415,13 @@ describe('POST /api/v1/appointments/:id/cancel', () => {
     expect(res.body.appointment.cancellationReason).toBe('no longer needed');
   });
 
-  it('cancels a paid appointment and refunds via razorpay', async () => {
+  it('cancels a paid appointment without refunding (non-refundable per terms)', async () => {
     const { token } = await registerPatient('apt.refund@example.com');
+    const slot = await pickSlot(MONDAY, SECOND_DOCTOR);
     const booked = await api
       .post('/api/v1/appointments')
       .set('Authorization', `Bearer ${token}`)
-      .send(bookPayload({ doctorSlug: SECOND_DOCTOR, slot: '10:45-11:30' }))
+      .send(bookPayload({ doctorSlug: SECOND_DOCTOR, slot }))
       .expect(201);
     const id = booked.body.appointment.id;
 
@@ -475,33 +437,8 @@ describe('POST /api/v1/appointments/:id/cancel', () => {
       .send({ reason: 'cancel after paying' });
     expect(res.status).toBe(200);
     expect(res.body.appointment.status).toBe('cancelled');
-    expect(res.body.appointment.paymentStatus).toBe('refunded');
-    expect(vi.mocked(createRefund)).toHaveBeenCalledWith({ paymentId: 'pay_refund' });
-  });
-
-  it('still cancels when the refund call fails, leaving payment paid', async () => {
-    const { token } = await registerPatient('apt.refundfail@example.com');
-    const booked = await api
-      .post('/api/v1/appointments')
-      .set('Authorization', `Bearer ${token}`)
-      .send(bookPayload({ doctorSlug: SECOND_DOCTOR, slot: '11:30-12:15' }))
-      .expect(201);
-    const id = booked.body.appointment.id;
-
-    await api
-      .post(`/api/v1/appointments/${id}/verify`)
-      .set('Authorization', `Bearer ${token}`)
-      .send({ razorpayPaymentId: 'pay_fail', razorpaySignature: 'sig' })
-      .expect(200);
-
-    vi.mocked(createRefund).mockRejectedValueOnce(new Error('razorpay down'));
-    const res = await api
-      .post(`/api/v1/appointments/${id}/cancel`)
-      .set('Authorization', `Bearer ${token}`)
-      .send({ reason: 'cancel despite refund failure' });
-    expect(res.status).toBe(200);
-    expect(res.body.appointment.status).toBe('cancelled');
     expect(res.body.appointment.paymentStatus).toBe('paid');
+    expect(vi.mocked(createRefund)).not.toHaveBeenCalled();
   });
 });
 
@@ -515,11 +452,12 @@ describe('POST /api/v1/razorpay/webhook', () => {
 
   it('marks an appointment paid on payment.captured with a valid signature', async () => {
     const { token } = await registerPatient('apt.wb1@example.com');
+    const slot = await pickSlot(MONDAY, SECOND_DOCTOR);
     vi.mocked(createOrder).mockResolvedValueOnce({ id: 'order_wb1', amountPaise: 59900 });
     const booked = await api
       .post('/api/v1/appointments')
       .set('Authorization', `Bearer ${token}`)
-      .send(bookPayload({ doctorSlug: SECOND_DOCTOR, slot: '12:15-13:00' }))
+      .send(bookPayload({ doctorSlug: SECOND_DOCTOR, slot }))
       .expect(201);
     const id = booked.body.appointment.id;
 
@@ -536,11 +474,12 @@ describe('POST /api/v1/razorpay/webhook', () => {
 
   it('marks an appointment failed on payment.failed', async () => {
     const { token } = await registerPatient('apt.wb2@example.com');
+    const slot = await pickSlot(MONDAY, SECOND_DOCTOR);
     vi.mocked(createOrder).mockResolvedValueOnce({ id: 'order_wb2', amountPaise: 59900 });
     const booked = await api
       .post('/api/v1/appointments')
       .set('Authorization', `Bearer ${token}`)
-      .send(bookPayload({ doctorSlug: SECOND_DOCTOR, slot: '14:30-15:15' }))
+      .send(bookPayload({ doctorSlug: SECOND_DOCTOR, slot }))
       .expect(201);
     const id = booked.body.appointment.id;
 

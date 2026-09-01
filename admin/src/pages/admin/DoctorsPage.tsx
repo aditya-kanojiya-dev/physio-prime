@@ -28,7 +28,6 @@ const emptyForm = {
   experienceYears: 8,
   feesHome: 800,
   feesOnline: 500,
-  feesClinic: 600,
   area: '',
   city: 'Nagpur',
   gender: 'female' as 'male' | 'female',
@@ -102,7 +101,7 @@ export function DoctorsPage() {
       specialty: form.specialty,
       photo: form.photo || null,
       experienceYears: Number(form.experienceYears),
-      fees: { home: Math.round(form.feesHome * 100), online: Math.round(form.feesOnline * 100), clinic: Math.round(form.feesClinic * 100) },
+      fees: { home: Math.round(form.feesHome), online: Math.round(form.feesOnline) },
       location: { area: form.area, city: form.city, address: `${form.area}, ${form.city}` },
       gender: form.gender,
       verified: form.verified,
@@ -243,7 +242,7 @@ export function DoctorsPage() {
                         <p className="text-[10px] text-slate-500">{d.experienceYears} Years Exp.</p>
                       </td>
                       <td className="p-4 font-bold text-teal-700">
-                        Home: ₹{(d.fees?.home || 0) / 100} | Online: ₹{(d.fees?.online || 0) / 100}
+                        Home: ₹{(d.fees?.home || 0).toLocaleString('en-IN')} | Online: ₹{(d.fees?.online || 0).toLocaleString('en-IN')}
                       </td>
                       <td className="p-4 font-extrabold">
                         <span className="flex items-center gap-1 text-amber-700">
@@ -383,15 +382,12 @@ export function DoctorsPage() {
                 </Field>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <Field label="Home Fee (₹) *">
                   <input type="number" required value={form.feesHome} onChange={(e) => setForm({ ...form, feesHome: Number(e.target.value) })} className={inputCls} />
                 </Field>
                 <Field label="Online Fee (₹) *">
                   <input type="number" required value={form.feesOnline} onChange={(e) => setForm({ ...form, feesOnline: Number(e.target.value) })} className={inputCls} />
-                </Field>
-                <Field label="Clinic Fee (₹)">
-                  <input type="number" value={form.feesClinic} onChange={(e) => setForm({ ...form, feesClinic: Number(e.target.value) })} className={inputCls} />
                 </Field>
               </div>
 

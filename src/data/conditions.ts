@@ -159,13 +159,13 @@ export function getConditionDetail(symptom: Symptom, allSymptoms: Symptom[]): Co
 }
 
 // Shared across every condition page — platform-level comparison, not condition-specific
-export const COMPARISON_ROWS: { label: string; clinic: string; home: string }[] = [
-  { label: 'Typical fee', clinic: '₹500 – ₹1,500 / session', home: '₹600 – ₹2,000 / session' },
-  { label: 'Exact fee', clinic: 'Shown on each profile', home: 'Shown on each profile' },
-  { label: 'Best for', clinic: 'Patients near a clinic who want change of environment', home: 'Busy schedules, post-surgery, mobility-limited patients' },
-  { label: 'Equipment', clinic: 'Full clinic equipment setup', home: 'Portable kit brought by the therapist' },
-  { label: 'Travel', clinic: 'You travel to the clinic', home: 'Therapist travels to you' },
-  { label: 'Booking', clinic: 'Pick a slot & confirm online', home: 'Pick a slot & confirm online' },
+export const COMPARISON_ROWS: { label: string; home: string; online: string }[] = [
+  { label: 'Typical fee', home: '₹600 – ₹2,000 / session', online: '₹400 – ₹1,000 / session' },
+  { label: 'Exact fee', home: 'Shown on each profile', online: 'Shown on each profile' },
+  { label: 'Best for', home: 'Hands-on care, post-surgery, mobility-limited patients', online: 'Follow-ups and quick consults without travel' },
+  { label: 'Equipment', home: 'Portable kit brought by the therapist', online: 'None needed — video call from home' },
+  { label: 'Setup', home: 'Therapist travels to you', online: 'Join a video call anywhere' },
+  { label: 'Booking', home: 'Pick a slot & confirm online', online: 'Pick a slot & confirm online' },
 ];
 
 export const DISCLAIMER_TEXT =

@@ -358,37 +358,49 @@ describe('doctor schedules', () => {
   it('lists the seeded week with HH:MM times (no seconds)', async () => {
     const res = await api.get('/api/v1/doctor/schedules').set('Authorization', `Bearer ${await doctorToken()}`);
     expect(res.status).toBe(200);
-    expect(res.body.schedules).toHaveLength(6);
+    expect(res.body.schedules).toHaveLength(30);
+    const days = new Set<number>();
     for (const s of res.body.schedules) {
-      expect(s.startTime).toMatch(/^\d{2}:\d{2}$/);
-      expect(s.endTime).toMatch(/^\d{2}:\d{2}$/);
+      expect(s.windowStart).toMatch(/^\d{2}:\d{2}$/);
+      expect(s.windowEnd).toMatch(/^\d{2}:\d{2}$/);
+      expect(s.active).toBe(true);
+      days.add(s.dayOfWeek);
     }
+    expect([...days].sort()).toEqual([1, 2, 3, 4, 5, 6]);
   });
 
-  it('replaces the whole week', async () => {
-    const week = Array.from({ length: 7 }, (_, dayOfWeek) => ({
-      dayOfWeek,
-      startTime: '08:00',
-      endTime: '18:00',
-      breakStart: '12:00',
-      breakEnd: '13:00',
-      active: dayOfWeek !== 0,
-    }));
+  it('replaces the whole week (inactive windows are dropped)', async () => {
+    const windows = [
+      ...Array.from({ length: 6 }, (_, i) => ({
+        dayOfWeek: i + 1,
+        windowStart: '08:00',
+        windowEnd: '10:00',
+        maxPatients: 2,
+        active: true,
+      })),
+      { dayOfWeek: 0, windowStart: '08:00', windowEnd: '10:00', maxPatients: 2, active: false },
+    ];
 
-    const res = await api
+    const put = await api
       .put('/api/v1/doctor/schedules')
       .set('Authorization', `Bearer ${await doctorToken()}`)
-      .send({ schedules: week });
-    expect(res.status).toBe(200);
-    expect(res.body.schedules).toHaveLength(7);
-    expect(res.body.schedules.find((s: { dayOfWeek: number }) => s.dayOfWeek === 0).active).toBe(false);
+      .send({ windows });
+    expect(put.status).toBe(200);
+    expect(put.body.schedules).toHaveLength(6);
+
+    const get = await api.get('/api/v1/doctor/schedules').set('Authorization', `Bearer ${await doctorToken()}`);
+    expect(get.status).toBe(200);
+    expect(get.body.schedules).toHaveLength(6);
+    expect(get.body.schedules.every((s: { active: boolean }) => s.active)).toBe(true);
+    expect(get.body.schedules.find((s: { dayOfWeek: number }) => s.dayOfWeek === 0)).toBeUndefined();
+    expect(get.body.schedules[0].windowStart).toBe('08:00');
   });
 
   it('validates time windows', async () => {
     const bad = await api
       .put('/api/v1/doctor/schedules')
       .set('Authorization', `Bearer ${await doctorToken()}`)
-      .send({ schedules: [{ dayOfWeek: 1, startTime: '17:00', endTime: '09:00', active: true }] });
+      .send({ windows: [{ dayOfWeek: 1, windowStart: '08:00', windowEnd: '10:00', maxPatients: 0, active: true }] });
     expect(bad.status).toBe(400);
   });
 });

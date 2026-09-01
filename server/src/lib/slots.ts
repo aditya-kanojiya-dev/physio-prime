@@ -71,22 +71,27 @@ export async function getAvailableWindows(doctorId: number, dateStr: string): Pr
       ),
     );
 
-  return schedules.map((s) => {
-    const bookedCount = booked.filter((b) => {
-      const slotTime = b.timeSlot.split('-')[0];
-      return slotTime >= s.windowStart && slotTime < s.windowEnd;
-    }).length;
+  const now = dateStr === todayStr() ? nowHHmm() : null;
+  return schedules
+    .map((s) => {
+      const start = s.windowStart.slice(0, 5);
+      const end = s.windowEnd.slice(0, 5);
+      const bookedCount = booked.filter((b) => {
+        const slotTime = b.timeSlot.split('-')[0];
+        return slotTime >= start && slotTime < end;
+      }).length;
 
-    const windowDef = WINDOWS.find((w) => w.start === s.windowStart);
-    return {
-      start: s.windowStart,
-      end: s.windowEnd,
-      label: windowDef?.label ?? `${s.windowStart}–${s.windowEnd}`,
-      maxPatients: s.maxPatients,
-      bookedCount,
-      available: bookedCount < s.maxPatients && !(dateStr === todayStr() && s.windowEnd <= nowHHmm()),
-    };
-  });
+      const windowDef = WINDOWS.find((w) => w.start === start);
+      return {
+        start,
+        end,
+        label: windowDef?.label ?? `${start}–${end}`,
+        maxPatients: s.maxPatients,
+        bookedCount,
+        available: bookedCount < s.maxPatients,
+      };
+    })
+    .filter((w) => (now ? w.end > now : true));
 }
 
 export async function getNextFreeSlot(doctorId: number, dateStr: string, windowStart: string, windowEnd: string): Promise<string | null> {
@@ -135,10 +140,12 @@ export function availableFromSchedules(
   const result: Array<{ start: string; end: string }> = [];
 
   for (const s of schedules) {
-    const startMin = toMinutes(s.windowStart);
-    const endMin = toMinutes(s.windowEnd);
+    const start = s.windowStart.slice(0, 5);
+    const end = s.windowEnd.slice(0, 5);
+    const startMin = toMinutes(start);
+    const endMin = toMinutes(end);
     // count booked in this window
-    const bookedInWindow = bookedStarts.filter((b) => b >= s.windowStart && b < s.windowEnd).length;
+    const bookedInWindow = bookedStarts.filter((b) => b >= start && b < end).length;
     if (bookedInWindow >= s.maxPatients) continue;
 
     for (let t = startMin; t + 45 <= endMin; t += 45) {

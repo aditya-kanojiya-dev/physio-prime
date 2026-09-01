@@ -48,12 +48,17 @@ export function DoctorPayoutsPage() {
   })
 
   const updateMutation = useMutation({
-    mutationFn: async ({ id, ...patch }: { id: number; status: string; transactionId?: string | null; notes?: string | null }) =>
+    mutationFn: async ({ id, ...patch }: { id: number; status: string; transactionId?: string; notes?: string | null }) =>
       api.patch(`/admin/payouts/${id}`, patch),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin/payouts'] })
       queryClient.invalidateQueries({ queryKey: ['admin/payouts/summary'] })
       setProcessingId(null)
+    },
+    onError: (err) => {
+      const msg = err instanceof Error ? err.message : 'Request failed'
+      if (processingId) setProcessingId(null)
+      alert(`Could not update payout: ${msg}`)
     },
   })
 
@@ -214,7 +219,7 @@ export function DoctorPayoutsPage() {
           <CompletePayoutModal
             payoutId={processingId}
             onComplete={(transactionId, notes) => {
-              updateMutation.mutate({ id: processingId, status: 'completed', transactionId: transactionId || null, notes: notes || null })
+              updateMutation.mutate({ id: processingId, status: 'completed', transactionId, notes: notes || null })
             }}
             onClose={() => setProcessingId(null)}
           />
@@ -261,15 +266,16 @@ function SummaryCard({ icon, label, value, color }: { icon: React.ReactNode; lab
 function CompletePayoutModal({ payoutId, onComplete, onClose }: { payoutId: number; onComplete: (txId: string, notes: string) => void; onClose: () => void }) {
   const [transactionId, setTransactionId] = useState('')
   const [notes, setNotes] = useState('')
+  const txId = transactionId.trim()
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
       <div className="relative w-full max-w-md mx-4 p-6 rounded-3xl bg-white border border-slate-200 shadow-2xl space-y-4">
         <h3 className="text-lg font-extrabold text-slate-900">Complete Payout</h3>
-        <p className="text-xs text-slate-500">Mark payout #{payoutId} as completed. Optionally enter transaction details.</p>
+        <p className="text-xs text-slate-500">Mark payout #{payoutId} as completed with the UPI ref / bank ref from the transfer.</p>
         <div>
-          <label className="block text-xs font-bold text-slate-600 mb-1.5">Transaction ID (optional)</label>
+          <label className="block text-xs font-bold text-slate-600 mb-1.5">Transaction ID (required)</label>
           <input value={transactionId} onChange={(e) => setTransactionId(e.target.value)} placeholder="UPI ref / bank ref" className="w-full px-4 py-2.5 rounded-xl bg-slate-100 border border-slate-200 text-sm focus:outline-none focus:border-teal-500" />
         </div>
         <div>
@@ -278,7 +284,7 @@ function CompletePayoutModal({ payoutId, onComplete, onClose }: { payoutId: numb
         </div>
         <div className="flex justify-end gap-2">
           <button onClick={onClose} className="px-4 py-2 rounded-xl text-slate-600 text-xs font-bold hover:bg-slate-100 transition-all">Cancel</button>
-          <button onClick={() => onComplete(transactionId, notes)} className="px-4 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-teal-500 text-white text-xs font-bold shadow-md transition-all">
+          <button onClick={() => onComplete(txId, notes)} disabled={!txId} className="px-4 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-teal-500 text-white text-xs font-bold shadow-md transition-all disabled:opacity-50">
             Confirm Complete
           </button>
         </div>

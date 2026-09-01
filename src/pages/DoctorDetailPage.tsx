@@ -5,6 +5,7 @@ import { useDoctorDetail } from '../hooks/queries';
 import { DoctorProfileHeader } from '../components/doctors/DoctorProfileHeader';
 import { DoctorProfileTabs } from '../components/doctors/DoctorProfileTabs';
 import { StickyBookingPanel } from '../components/doctors/StickyBookingPanel';
+import { HomeVisitCoverage } from '../components/doctors/HomeVisitCoverage';
 import { ArrowLeft, AlertCircle, Loader2 } from 'lucide-react';
 
 export const DoctorDetailPage: React.FC = () => {
@@ -74,7 +75,10 @@ export const DoctorDetailPage: React.FC = () => {
         {/* Main Grid: Tabs on Left, Sticky Booking Sidebar on Right */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           <div className="lg:col-span-8">
-            <DoctorProfileTabs doctor={doctor} />
+            <HomeVisitCoverage doctor={doctor} />
+            <div className="mt-8">
+              <DoctorProfileTabs doctor={doctor} />
+            </div>
           </div>
 
           <div className="lg:col-span-4">

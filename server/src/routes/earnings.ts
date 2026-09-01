@@ -2,9 +2,10 @@ import { Router } from 'express';
 import { and, asc, desc, eq, sql, gte, lte, ilike, count } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '../db/pool';
-import { appointments } from '../db/schema';
+import { appointments, doctors } from '../db/schema';
 import { requireAuth, requireRole } from '../middleware/auth';
 import { requireDoctor, noProfile } from '../lib/doctor';
+import { netAmountSql } from '../lib/commission';
 
 export const doctorEarningsRouter = Router();
 
@@ -71,16 +72,17 @@ doctorEarningsRouter.get('/earnings/summary', async (req, res, next) => {
 
     const [totals] = await db
       .select({
-        total: sql<number>`coalesce(sum(case when ${appointments.status} in ('completed') and ${appointments.paymentStatus} in ('paid','pending') then ${appointments.feePaise} else 0 end), 0)`,
-        paid: sql<number>`coalesce(sum(case when ${appointments.paymentStatus} = 'paid' and ${appointments.status} = 'completed' then ${appointments.feePaise} else 0 end), 0)`,
-        pending: sql<number>`coalesce(sum(case when ${appointments.paymentStatus} = 'pending' and ${appointments.status} = 'upcoming' then ${appointments.feePaise} else 0 end), 0)`,
-        refunded: sql<number>`coalesce(sum(case when ${appointments.paymentStatus} = 'refunded' then ${appointments.feePaise} else 0 end), 0)`,
+        total: sql<number>`coalesce(sum(case when ${appointments.status} in ('completed') and ${appointments.paymentStatus} in ('paid','pending') then ${netAmountSql(appointments.feePaise, doctors.platformFeePercent)} else 0 end), 0)`,
+        paid: sql<number>`coalesce(sum(case when ${appointments.paymentStatus} = 'paid' and ${appointments.status} = 'completed' then ${netAmountSql(appointments.feePaise, doctors.platformFeePercent)} else 0 end), 0)`,
+        pending: sql<number>`coalesce(sum(case when ${appointments.paymentStatus} = 'pending' and ${appointments.status} = 'upcoming' then ${netAmountSql(appointments.feePaise, doctors.platformFeePercent)} else 0 end), 0)`,
+        refunded: sql<number>`coalesce(sum(case when ${appointments.paymentStatus} = 'refunded' then ${netAmountSql(appointments.feePaise, doctors.platformFeePercent)} else 0 end), 0)`,
         totalAppointments: count(appointments.id),
         completed: sql<number>`count(*) filter (where ${appointments.status} = 'completed')`,
         cancelled: sql<number>`count(*) filter (where ${appointments.status} = 'cancelled')`,
         noShow: sql<number>`count(*) filter (where ${appointments.status} = 'no_show')`,
       })
       .from(appointments)
+      .innerJoin(doctors, eq(doctors.id, appointments.doctorId))
       .where(base);
 
     // comparison: shift the window back by its length
@@ -94,9 +96,10 @@ doctorEarningsRouter.get('/earnings/summary', async (req, res, next) => {
 
     const [prev] = await db
       .select({
-        prevPaid: sql<number>`coalesce(sum(case when ${appointments.paymentStatus} = 'paid' and ${appointments.status} = 'completed' then ${appointments.feePaise} else 0 end), 0)`,
+        prevPaid: sql<number>`coalesce(sum(case when ${appointments.paymentStatus} = 'paid' and ${appointments.status} = 'completed' then ${netAmountSql(appointments.feePaise, doctors.platformFeePercent)} else 0 end), 0)`,
       })
       .from(appointments)
+      .innerJoin(doctors, eq(doctors.id, appointments.doctorId))
       .where(
         and(
           eq(appointments.doctorId, doctor.id),
@@ -147,10 +150,11 @@ doctorEarningsRouter.get('/earnings/chart', async (req, res, next) => {
     const rows = await db
       .select({
         date: appointments.date,
-        earnings: sql<number>`coalesce(sum(case when ${appointments.status} = 'completed' and ${appointments.paymentStatus} = 'paid' then ${appointments.feePaise} else 0 end), 0)`,
+        earnings: sql<number>`coalesce(sum(case when ${appointments.status} = 'completed' and ${appointments.paymentStatus} = 'paid' then ${netAmountSql(appointments.feePaise, doctors.platformFeePercent)} else 0 end), 0)`,
         count: sql<number>`count(*)`,
       })
       .from(appointments)
+      .innerJoin(doctors, eq(doctors.id, appointments.doctorId))
       .where(
         and(
           eq(appointments.doctorId, doctor.id),

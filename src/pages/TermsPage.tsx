@@ -21,107 +21,63 @@ export const TermsPage: React.FC = () => {
         <p className="text-sm text-slate-400 mb-10">Last updated: August 2026</p>
 
         <div className="prose prose-slate max-w-none space-y-8 text-sm leading-relaxed text-slate-600">
+          <p>
+            Welcome to <strong className="text-slate-900">Physio Prime</strong>. By booking an
+            appointment through our website, you agree to the following Terms &amp; Conditions.
+          </p>
 
           <section>
-            <h2 className="text-lg font-bold text-slate-900 mb-3">1. Acceptance of Terms</h2>
-            <p>By accessing or using PhysioPrime ("the Platform"), you agree to be bound by these Terms of Service. If you do not agree, please do not use our services. These terms apply to all users, including patients, physiotherapists, and visitors.</p>
+            <h2 className="text-lg font-bold text-slate-900 mb-3">1. Appointment Booking</h2>
+            <p>By booking a physiotherapy appointment, you confirm that the information provided by you is accurate and complete. An appointment is considered confirmed once the booking process and, where applicable, payment have been successfully completed.</p>
           </section>
 
           <section>
-            <h2 className="text-lg font-bold text-slate-900 mb-3">2. Description of Services</h2>
-            <p>PhysioPrime is a healthcare marketplace that connects patients with certified physiotherapists for home visits and online video consultations. We facilitate bookings, payments, and communication but do not directly provide medical services. The therapist-patient relationship is between you and the licensed practitioner.</p>
+            <h2 className="text-lg font-bold text-slate-900 mb-3">2. Appointment Cancellation &amp; Refund Policy</h2>
+            <p>Once an appointment has been booked and payment has been made, the appointment amount is <strong className="text-slate-700">non-refundable if the patient cancels the appointment</strong>.</p>
+            <p>This means that if you book a physiotherapy session and subsequently cancel it for any reason, the amount paid for that appointment <strong className="text-slate-700">will not be refunded</strong>.</p>
+            <p>We strongly recommend that you review your appointment date, time, and other booking details carefully before completing your payment.</p>
           </section>
 
           <section>
-            <h2 className="text-lg font-bold text-slate-900 mb-3">3. User Accounts</h2>
-            <ul className="list-disc pl-5 space-y-1.5">
-              <li>You must be at least 18 years old to create an account.</li>
-              <li>You are responsible for maintaining the confidentiality of your account credentials.</li>
-              <li>You must provide accurate and complete information during registration.</li>
-              <li>You must notify us immediately of any unauthorized use of your account.</li>
-              <li>One account per person; duplicate accounts may be suspended.</li>
-            </ul>
+            <h2 className="text-lg font-bold text-slate-900 mb-3">3. Rescheduling</h2>
+            <p>If you are unable to attend your scheduled appointment, you may contact the physiotherapist to request a rescheduling, subject to availability and the clinic's rescheduling policy.</p>
+            <p>Rescheduling is not guaranteed and may be subject to applicable conditions.</p>
           </section>
 
           <section>
-            <h2 className="text-lg font-bold text-slate-900 mb-3">4. Bookings & Consultations</h2>
-            <ul className="list-disc pl-5 space-y-1.5">
-              <li>Bookings are confirmed only after payment processing and therapist acceptance.</li>
-              <li>Therapists may cancel bookings due to emergencies; you will receive a full refund.</li>
-              <li>Online consultations are conducted via our secure video platform. Recording is prohibited without mutual consent.</li>
-              <li>Home visit therapists will arrive at the scheduled time; please ensure safe access to your premises.</li>
-            </ul>
+            <h2 className="text-lg font-bold text-slate-900 mb-3">4. Late Arrival</h2>
+            <p>Patients are requested to arrive on time for their scheduled appointment. Arriving late may reduce the available treatment time and may not entitle the patient to a refund or reduction in the appointment fee.</p>
           </section>
 
           <section>
-            <h2 className="text-lg font-bold text-slate-900 mb-3">5. Payments & Refunds</h2>
-            <ul className="list-disc pl-5 space-y-1.5">
-              <li>All payments are processed through Razorpay in Indian Rupees (INR).</li>
-              <li><strong className="text-slate-700">Cancellation by Patient:</strong> Full refund if cancelled 24+ hours before the appointment. 50% refund for cancellations within 24 hours. No refund for no-shows.</li>
-              <li><strong className="text-slate-700">Cancellation by Therapist:</strong> Full refund issued automatically.</li>
-              <li><strong className="text-slate-700">Refund Processing:</strong> Refunds are credited to the original payment method within 5-7 business days.</li>
-              <li>Service fees and platform charges are non-refundable after consultation delivery.</li>
-            </ul>
+            <h2 className="text-lg font-bold text-slate-900 mb-3">5. No-Show</h2>
+            <p>If a patient does not attend the scheduled appointment without prior notice, the appointment will be treated as a <strong className="text-slate-700">no-show</strong>, and the amount paid for the appointment will <strong className="text-slate-700">not be refunded</strong>.</p>
           </section>
 
           <section>
-            <h2 className="text-lg font-bold text-slate-900 mb-3">6. User Conduct</h2>
-            <p>You agree not to:</p>
-            <ul className="list-disc pl-5 mt-2 space-y-1.5">
-              <li>Use the Platform for any unlawful purpose or in violation of medical regulations.</li>
-              <li>Impersonate another person or misrepresent your identity.</li>
-              <li>Attempt to access other users' accounts or data without authorization.</li>
-              <li>Interfere with the proper functioning of the Platform.</li>
-              <li>Transmit harmful, abusive, or inappropriate content through our messaging systems.</li>
-              <li>Circumvent booking or payment processes to avoid platform fees.</li>
-            </ul>
+            <h2 className="text-lg font-bold text-slate-900 mb-3">6. Clinic Cancellation or Changes</h2>
+            <p>If the patient needs to cancel or reschedule an appointment due to circumstances on the clinic's side, the clinic may offer the patient an alternative appointment or, where applicable, a refund of the amount paid.</p>
           </section>
 
           <section>
-            <h2 className="text-lg font-bold text-slate-900 mb-3">7. Intellectual Property</h2>
-            <p>All content on the Platform, including text, graphics, logos, software, and design, is the property of PhysioPrime or its licensors and is protected by Indian copyright and trademark laws. You may not reproduce, distribute, or create derivative works without our written consent.</p>
+            <h2 className="text-lg font-bold text-slate-900 mb-3">7. Physiotherapy Services</h2>
+            <p>Physiotherapy treatment and outcomes may vary from person to person. Booking an appointment does not guarantee a particular treatment outcome or recovery period.</p>
+            <p>The physiotherapist will assess the patient's condition and recommend an appropriate treatment plan based on the assessment.</p>
           </section>
 
           <section>
-            <h2 className="text-lg font-bold text-slate-900 mb-3">8. Limitation of Liability</h2>
-            <p>PhysioPrime acts as an intermediary platform. We are not liable for:</p>
-            <ul className="list-disc pl-5 mt-2 space-y-1.5">
-              <li>The quality, outcome, or appropriateness of medical advice provided by therapists.</li>
-              <li>Any injury, loss, or damage resulting from consultations arranged through the Platform.</li>
-              <li>Technical failures, service interruptions, or data breaches beyond our reasonable control.</li>
-            </ul>
-            <p className="mt-2">Our total liability shall not exceed the amount paid by you for the specific service giving rise to the claim.</p>
+            <h2 className="text-lg font-bold text-slate-900 mb-3">8. Acceptance of Terms</h2>
+            <p>By completing an appointment booking, you acknowledge that you have read, understood, and agreed to these Terms &amp; Conditions, including the <strong className="text-slate-700">non-refundable cancellation policy</strong>.</p>
           </section>
 
-          <section>
-            <h2 className="text-lg font-bold text-slate-900 mb-3">9. Indemnification</h2>
-            <p>You agree to indemnify and hold PhysioPrime, its directors, employees, and partners harmless from any claims, losses, or damages arising from your use of the Platform, violation of these Terms, or infringement of any third-party rights.</p>
-          </section>
-
-          <section>
-            <h2 className="text-lg font-bold text-slate-900 mb-3">10. Termination</h2>
-            <p>We may suspend or terminate your account at our discretion if you violate these Terms, engage in fraudulent activity, or if required by law. Upon termination, your right to use the Platform ceases immediately. We will retain data as required by our Privacy Policy.</p>
-          </section>
-
-          <section>
-            <h2 className="text-lg font-bold text-slate-900 mb-3">11. Governing Law</h2>
-            <p>These Terms are governed by the laws of India. Any disputes shall be subject to the exclusive jurisdiction of the courts in Nagpur, Maharashtra.</p>
-          </section>
-
-          <section>
-            <h2 className="text-lg font-bold text-slate-900 mb-3">12. Changes to These Terms</h2>
-            <p>We reserve the right to modify these Terms at any time. Material changes will be communicated via email or in-app notification at least 30 days before taking effect. Continued use of the Platform after changes constitutes acceptance.</p>
-          </section>
-
-          <section>
-            <h2 className="text-lg font-bold text-slate-900 mb-3">13. Contact</h2>
-            <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
-              <p className="font-semibold text-slate-900">PhysioPrime Legal Team</p>
-              <p>Email: <a href="mailto:legal@physioprime.health" className="text-teal-600 hover:underline">legal@physioprime.health</a></p>
-              <p>Address: IT Park, South Ambazari Road, Nagpur, MH 440022</p>
-            </div>
-          </section>
-
+          <div className="p-4 rounded-xl bg-teal-50 border border-teal-200">
+            <p className="font-semibold text-teal-800 mb-2">Mandatory Consent Checkbox</p>
+            <p className="text-teal-900">
+              ☐ I have read and agree to the Terms &amp; Conditions. I understand that once I book
+              and pay for a physiotherapy appointment, the payment is non-refundable if I cancel the
+              appointment.
+            </p>
+          </div>
         </div>
       </div>
     </div>

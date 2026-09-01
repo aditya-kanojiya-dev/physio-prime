@@ -4,7 +4,9 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/server.ts",
+    "start": "tsx src/main.ts",
     "build": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
     "lint": "oxlint",
     "test": "vitest run",
     "db:generate": "drizzle-kit generate",

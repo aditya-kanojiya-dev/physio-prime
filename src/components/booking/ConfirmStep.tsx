@@ -98,12 +98,32 @@ export const ConfirmStep: React.FC<ConfirmStepProps> = ({
   const [address, setAddress] = useState('');
   const [problemDescription, setProblemDescription] = useState('');
   const [agreed, setAgreed] = useState(false);
+  const [paymentMode, setPaymentMode] = useState<'prepay' | 'postpay'>('prepay');
 
   const [processing, setProcessing] = useState(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
   const [createdAppointment, setCreatedAppointment] = useState<Awaited<ReturnType<typeof createAppointment>>['appointment'] | null>(null);
 
+  const [attempted, setAttempted] = useState(false);
+
   const fee = doctor.fees[mode];
+
+  const errors = useMemo(() => {
+    const e: Record<string, string> = {};
+    if (!patientName.trim()) e.name = 'Full name is required';
+    if (!patientEmail.trim()) e.email = 'Email is required';
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(patientEmail.trim())) e.email = 'Enter a valid email address';
+    if (!patientPhone.trim()) e.phone = 'Phone number is required';
+    else if (!/^\d{10}$/.test(patientPhone.trim())) e.phone = 'Enter a valid 10-digit phone number';
+    if (!patientGender) e.gender = 'Select a gender';
+    if (!patientAge.trim()) e.age = 'Age is required';
+    else {
+      const ageInt = parseInt(patientAge);
+      if (ageInt < 1 || ageInt > 100) e.age = 'Age must be between 1 and 100';
+    }
+    if (forOther && !relation) e.relation = 'Select who this appointment is for';
+    return e;
+  }, [patientName, patientEmail, patientPhone, patientGender, patientAge, forOther, relation]);
 
   function prefillSelf() {
     if (!user) return;
@@ -132,15 +152,13 @@ export const ConfirmStep: React.FC<ConfirmStepProps> = ({
   const ageNum = parseInt(patientAge);
   const canSubmit = useMemo(() => {
     if (!user) return false;
-    if (!patientName || !patientPhone || !patientEmail || !patientGender) return false;
-    if (!patientAge || ageNum < 1 || ageNum > 100) return false;
-    if (!patientWeight || !patientHeight) return false;
-    if (forOther && !relation) return false;
+    if (Object.keys(errors).length > 0) return false;
     if (!agreed) return false;
     return true;
-  }, [user, patientName, patientPhone, patientEmail, patientGender, patientAge, patientWeight, patientHeight, forOther, relation, agreed]);
+  }, [user, errors, agreed]);
 
   const handlePay = async () => {
+    setAttempted(true);
     setProcessing(true);
     setPaymentError(null);
     try {
@@ -155,12 +173,17 @@ export const ConfirmStep: React.FC<ConfirmStepProps> = ({
         patientEmail,
         patientGender,
         patientAge,
-        patientWeight,
-        patientHeight,
+        patientWeight: patientWeight.trim() ? patientWeight : undefined,
+        patientHeight: patientHeight.trim() ? patientHeight : undefined,
         patientRelation: forOther ? relation : undefined,
         address: mode === 'home' ? address : undefined,
+        paymentMode,
       });
       setCreatedAppointment(appointment);
+
+      if (paymentMode === 'postpay') {
+        return;
+      }
 
       const key = import.meta.env.VITE_RAZORPAY_KEY_ID;
       if (!key || !razorpayOrder) {
@@ -246,7 +269,7 @@ export const ConfirmStep: React.FC<ConfirmStepProps> = ({
                   <p className="font-extrabold text-blue-600 capitalize">{MODE_LABELS[mode]}</p>
                 </div>
                 <div>
-                  <span className="text-slate-400 font-semibold">Total Paid</span>
+                  <span className="text-slate-400 font-semibold">Total {paymentMode === 'prepay' ? 'Paid' : 'Payable'}</span>
                   <p className="font-extrabold text-slate-900">{'\u20B9'}{fee}</p>
                 </div>
               </div>
@@ -396,13 +419,16 @@ export const ConfirmStep: React.FC<ConfirmStepProps> = ({
                 <select
                   value={relation}
                   onChange={e => setRelation(e.target.value)}
-                  className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 focus:outline-none focus:border-blue-600 shadow-sm"
+                  className={`w-full px-4 py-3 bg-white border ${attempted && errors.relation ? 'border-red-400 border-2' : 'border-slate-200'} rounded-xl text-sm font-semibold text-slate-900 focus:outline-none focus:border-blue-600 shadow-sm`}
                 >
                   <option value="">Select relation</option>
                   {RELATIONS.map(r => (
                     <option key={r} value={r}>{r}</option>
                   ))}
                 </select>
+                {attempted && errors.relation && (
+                  <p className="text-[11px] font-semibold text-red-600">{errors.relation}</p>
+                )}
               </div>
             )}
 
@@ -415,8 +441,11 @@ export const ConfirmStep: React.FC<ConfirmStepProps> = ({
                   value={patientName}
                   onChange={e => setPatientName(e.target.value)}
                   placeholder="Enter full name"
-                  className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 shadow-sm"
+                  className={`w-full px-4 py-3 bg-white border ${attempted && errors.name ? 'border-red-400 border-2' : 'border-slate-200'} rounded-xl text-sm font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 shadow-sm`}
                 />
+                {attempted && errors.name && (
+                  <p className="text-[11px] font-semibold text-red-600">{errors.name}</p>
+                )}
               </div>
 
               <div className="space-y-1">
@@ -426,8 +455,11 @@ export const ConfirmStep: React.FC<ConfirmStepProps> = ({
                   value={patientEmail}
                   onChange={e => setPatientEmail(e.target.value)}
                   placeholder="Enter email address"
-                  className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 shadow-sm"
+                  className={`w-full px-4 py-3 bg-white border ${attempted && errors.email ? 'border-red-400 border-2' : 'border-slate-200'} rounded-xl text-sm font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 shadow-sm`}
                 />
+                {attempted && errors.email && (
+                  <p className="text-[11px] font-semibold text-red-600">{errors.email}</p>
+                )}
               </div>
 
               <div className="space-y-1">
@@ -437,8 +469,11 @@ export const ConfirmStep: React.FC<ConfirmStepProps> = ({
                   value={patientPhone}
                   onChange={e => setPatientPhone(e.target.value)}
                   placeholder="Enter phone number"
-                  className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 shadow-sm"
+                  className={`w-full px-4 py-3 bg-white border ${attempted && errors.phone ? 'border-red-400 border-2' : 'border-slate-200'} rounded-xl text-sm font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 shadow-sm`}
                 />
+                {attempted && errors.phone && (
+                  <p className="text-[11px] font-semibold text-red-600">{errors.phone}</p>
+                )}
               </div>
 
               <div className="space-y-1">
@@ -463,21 +498,22 @@ export const ConfirmStep: React.FC<ConfirmStepProps> = ({
                   value={patientAge}
                   onChange={e => {
                     const value = e.target.value;
-                    if (value === '' || (parseInt(value) >= 1 && parseInt(value) <= 100)) {
-                      setPatientAge(value);
-                    }
+                    setPatientAge(value);
                   }}
                   onKeyDown={e => {
                     if (e.key === '-' || e.key === 'e' || e.key === 'E') e.preventDefault();
                   }}
                   inputMode="numeric"
                   placeholder="Enter age (1-100)"
-                  className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 shadow-sm"
+                  className={`w-full px-4 py-3 bg-white border ${attempted && errors.age ? 'border-red-400 border-2' : 'border-slate-200'} rounded-xl text-sm font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 shadow-sm`}
                 />
+                {attempted && errors.age && (
+                  <p className="text-[11px] font-semibold text-red-600">{errors.age}</p>
+                )}
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-700">Weight (kg) *</label>
+                <label className="text-xs font-bold text-slate-700">Weight (kg) <span className="font-normal text-slate-400">(optional)</span></label>
                 <input
                   type="number"
                   value={patientWeight}
@@ -488,7 +524,7 @@ export const ConfirmStep: React.FC<ConfirmStepProps> = ({
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-700">Height (cm) *</label>
+                <label className="text-xs font-bold text-slate-700">Height (cm) <span className="font-normal text-slate-400">(optional)</span></label>
                 <input
                   type="number"
                   value={patientHeight}
@@ -534,15 +570,48 @@ export const ConfirmStep: React.FC<ConfirmStepProps> = ({
           {/* Payment Section */}
           <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-sm space-y-3">
             <p className="text-xs font-bold text-blue-600 uppercase tracking-wider">Payment</p>
-            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center flex-shrink-0">
-                <ShieldCheck className="w-4 h-4" />
-              </div>
-              <p className="text-xs text-slate-600 leading-relaxed">
-                Pay securely with <strong>UPI, Cards or Net Banking</strong> via Razorpay.
-                You will be taken to the payment window after confirming.
-              </p>
+
+            <div className="flex items-center gap-1 p-1 bg-slate-100 border border-slate-200 rounded-xl">
+              <button
+                type="button"
+                onClick={() => setPaymentMode('prepay')}
+                className={`flex-1 px-4 py-2.5 rounded-lg font-extrabold text-xs transition-all ${
+                  paymentMode === 'prepay' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                Pay Now Online
+              </button>
+              <button
+                type="button"
+                onClick={() => setPaymentMode('postpay')}
+                className={`flex-1 px-4 py-2.5 rounded-lg font-extrabold text-xs transition-all ${
+                  paymentMode === 'postpay' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                Pay at Visit
+              </button>
             </div>
+
+            {paymentMode === 'prepay' ? (
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center flex-shrink-0">
+                  <ShieldCheck className="w-4 h-4" />
+                </div>
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  Pay securely with <strong>UPI, Cards or Net Banking</strong> via Razorpay.
+                  You will be taken to the payment window after confirming.
+                </p>
+              </div>
+            ) : (
+              <div className="p-4 rounded-2xl bg-teal-50 border border-teal-200 flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-teal-600 text-white flex items-center justify-center flex-shrink-0">
+                  <CreditCard className="w-4 h-4" />
+                </div>
+                <p className="text-xs text-teal-700 leading-relaxed">
+                  Reserve the slot now and pay <strong>by UPI or cash to the Doctor</strong> after your session.
+                </p>
+              </div>
+            )}
             <div className="p-4 rounded-2xl bg-blue-50 border border-blue-200 flex justify-between items-center">
               <span className="text-xs font-bold text-slate-700">Total Payable</span>
               <span className="text-base font-extrabold text-blue-600">{'\u20B9'}{fee}</span>
@@ -566,8 +635,19 @@ export const ConfirmStep: React.FC<ConfirmStepProps> = ({
                 className="mt-0.5 w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-600/20"
               />
               <span className="text-xs text-slate-600 leading-relaxed">
-                I agree to the <strong className="text-slate-900">consultation terms</strong> and{' '}
-                <strong className="text-slate-900">cancellation policy</strong>
+                I have read and agree to the{' '}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate('/terms');
+                  }}
+                  className="font-bold text-blue-600 underline underline-offset-2 hover:text-blue-700"
+                >
+                  Terms &amp; Conditions
+                </button>
+                . I understand that once I book and pay for a physiotherapy appointment, the
+                payment is non-refundable if I cancel the appointment.
               </span>
             </label>
 
@@ -580,10 +660,12 @@ export const ConfirmStep: React.FC<ConfirmStepProps> = ({
               {processing ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Processing Payment...</span>
+                  <span>{paymentMode === 'prepay' ? 'Processing Payment...' : 'Reserving Slot...'}</span>
                 </>
-              ) : (
+              ) : paymentMode === 'prepay' ? (
                 <span>Confirm & Pay {'\u20B9'}{fee}</span>
+              ) : (
+                <span>Confirm & Book (Pay at Visit)</span>
               )}
             </button>
           </div>

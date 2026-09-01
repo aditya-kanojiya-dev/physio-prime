@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { db } from '../db/pool';
 import { doctors, categories, symptoms, doctorLocations } from '../db/schema';
 import { getAvailableWindows, isPast, isValidDate } from '../lib/slots';
+import { SERVICE_AREAS, SERVICE_CITIES, PAN_INDIA } from '../lib/locations';
 
 export const doctorsRouter = Router();
 
@@ -13,7 +14,7 @@ const querySchema = z.object({
   q: z.string().trim().max(200).optional(),
   category: z.string().max(200).optional(),
   symptom: z.string().max(200).optional(),
-  mode: z.enum(['home', 'online', 'clinic']).optional(),
+  mode: z.enum(['home', 'online']).optional(),
   gender: z.enum(['male', 'female']).optional(),
   maxFee: z.coerce.number().int().positive().optional(),
   sort: z.enum(['recommended', 'price_low', 'rating', 'experience']).optional(),
@@ -220,12 +221,29 @@ doctorsRouter.get('/areas', async (_req, res) => {
   res.json({ areas: rows.map((r) => r.area).filter(Boolean) });
 });
 
+// Master list of serviceable locations (fixed, single source of truth).
+doctorsRouter.get('/locations/master', (_req, res) => {
+  res.json({ areas: SERVICE_AREAS, cities: SERVICE_CITIES, panIndia: PAN_INDIA });
+});
+
 doctorsRouter.get('/:slug', async (req, res) => {
   const [row] = await db.select().from(doctors).where(eq(doctors.slug, req.params.slug));
   if (!row) {
     res.status(404).json({ error: { message: 'Doctor not found' } });
     return;
   }
+  const locRows = await db
+    .select({
+      id: doctorLocations.id,
+      name: doctorLocations.name,
+      area: doctorLocations.area,
+      city: doctorLocations.city,
+      active: doctorLocations.active,
+      isPrimary: doctorLocations.isPrimary,
+    })
+    .from(doctorLocations)
+    .where(eq(doctorLocations.doctorId, row.id));
+
   res.json({
     doctor: {
       id: row.slug,
@@ -251,6 +269,8 @@ doctorsRouter.get('/:slug', async (req, res) => {
       registration: row.registration,
       expertise: row.expertise,
       treatments: row.treatments,
+      homeVisitsEnabled: row.homeVisitsEnabled,
+      locations: locRows,
     },
   });
 });

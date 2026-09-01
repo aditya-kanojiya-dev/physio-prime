@@ -22,6 +22,7 @@ export interface CreateAppointmentParams {
   patientHeight?: string;
   patientRelation?: string;
   address?: string;
+  paymentMode?: 'prepay' | 'postpay';
 }
 
 interface BookingContextType {
@@ -88,6 +89,7 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
         patientHeight: data.patientHeight,
         patientRelation: data.patientRelation,
         address: data.address ? { text: data.address } : undefined,
+        paymentMode: data.paymentMode,
       });
       return { appointment: toAppointment(result.appointment), razorpayOrder: result.razorpayOrder };
     },

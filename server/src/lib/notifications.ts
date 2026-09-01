@@ -18,6 +18,10 @@ async function sendTwilioMessage(params: { to: string; body: string; whatsapp: b
   const from = params.whatsapp
     ? config.TWILIO_WHATSAPP_FROM
     : config.TWILIO_FROM_NUMBER;
+  if (!accountSid || !authToken || !from) {
+    // ponytail: Twilio not configured — skip silently, notifications are best-effort
+    return;
+  }
   const res = await fetch(
     `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`,
     {
@@ -75,7 +79,7 @@ export const templates = {
     subject: `Appointment cancelled — ${ctx.doctorName}`,
     body:
       `Hi ${ctx.patientName}, your ${ctx.mode} appointment with ${ctx.doctorName} on ${ctx.date} at ${ctx.timeSlot} ` +
-      `(Booking ${ctx.bookingId}) has been cancelled.${ctx.refunded ? ' Your payment has been refunded.' : ''}`,
+      `(Booking ${ctx.bookingId}) has been cancelled.${ctx.refunded ? ' Your payment has been refunded.' : ' As per our Terms, the payment is non-refundable.'}`,
   }),
   appointmentReminder: (ctx: NotificationCtx) => ({
     subject: `Reminder: appointment with ${ctx.doctorName} tomorrow`,

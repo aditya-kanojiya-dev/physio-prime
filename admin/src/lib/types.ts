@@ -34,13 +34,17 @@ export type AppointmentStatus = 'upcoming' | 'completed' | 'cancelled' | 'no_sho
 export interface Appointment {
   id: string;
   bookingId: string;
-  mode: 'home' | 'online' | 'clinic';
+  mode: 'home' | 'online';
   date: string;
   timeSlot: string;
   status: AppointmentStatus;
   symptom?: string | null;
   feePaise: number;
   paymentStatus: string;
+  paymentMode?: string | null;
+  paymentMethod?: string | null;
+  sessionStartedAt?: string | null;
+  sessionCompletedAt?: string | null;
   patientName: string;
   patientPhone?: string | null;
   patientRelation?: string | null;

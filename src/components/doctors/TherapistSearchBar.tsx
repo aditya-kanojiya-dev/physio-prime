@@ -14,6 +14,9 @@ interface TherapistSearchBarProps {
   onSearchChange: (v: string) => void;
   location: string;
   onLocationChange: (v: string) => void;
+  area?: string;
+  onAreaChange?: (v: string) => void;
+  areasByCity?: Record<string, string[]>;
   onSearch?: () => void;
   onInputFocus?: () => void;
   placeholder?: string;
@@ -26,8 +29,11 @@ const LocationPicker: React.FC<{
   location: string;
   onSelect: (city: string) => void;
   cities?: string[];
+  area?: string;
+  onAreaSelect?: (v: string) => void;
+  areasByCity?: Record<string, string[]>;
   onUseMyLocation?: () => void;
-}> = ({ location, onSelect, cities = [], onUseMyLocation }) => {
+}> = ({ location, onSelect, cities = [], area = '', onAreaSelect, areasByCity = {}, onUseMyLocation }) => {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const ref = useRef<HTMLDivElement>(null);
@@ -47,6 +53,7 @@ const LocationPicker: React.FC<{
   }, [open]);
 
   const filtered = cities.filter(c => c.toLowerCase().includes(query.trim().toLowerCase()));
+  const selectedAreas = areasByCity[location] ?? [];
 
   return (
     <div ref={ref} className="relative">
@@ -59,6 +66,7 @@ const LocationPicker: React.FC<{
         <MapPin className="w-5 h-5 text-teal-500 absolute left-4 pointer-events-none" />
         <span className={`flex-1 text-left truncate ${location ? '' : 'text-slate-400 font-medium'}`}>
           {location || 'Location'}
+          {location && area && <span className="text-slate-400"> · {area}</span>}
         </span>
         <ChevronDown className={`w-4 h-4 text-slate-400 shrink-0 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
       </button>
@@ -77,7 +85,7 @@ const LocationPicker: React.FC<{
                 type="text"
                 value={query}
                 onChange={e => setQuery(e.target.value)}
-                placeholder="Search city or area"
+                placeholder="Search city"
                 autoFocus
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-8 pr-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:bg-white transition-colors"
               />
@@ -92,6 +100,9 @@ const LocationPicker: React.FC<{
                 Use my location
               </button>
             )}
+
+            {/* Cities */}
+            <p className="px-3 pt-1 pb-1 text-[10px] font-extrabold text-slate-400 uppercase tracking-wide">City</p>
             <div className="max-h-48 overflow-y-auto">
               {!query.trim() && (
                 <button
@@ -104,25 +115,60 @@ const LocationPicker: React.FC<{
                   All cities
                 </button>
               )}
-              {filtered.map(city => (
+              {filtered.map(cityItem => (
                 <button
-                  key={city}
+                  key={cityItem}
                   type="button"
-                  onClick={() => { onSelect(city); setOpen(false); }}
+                  onClick={() => { onSelect(cityItem); setQuery(''); }}
                   className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-sm text-left transition-colors ${
-                    location === city
+                    location === cityItem
                       ? 'bg-blue-50 text-blue-700 font-semibold'
                       : 'text-slate-600 hover:bg-slate-50'
                   }`}
                 >
-                  <span className="truncate">{city}</span>
-                  {location === city && <span className="w-1.5 h-1.5 rounded-full bg-blue-600 shrink-0" />}
+                  <span className="truncate">{cityItem}</span>
+                  {location === cityItem && <span className="w-1.5 h-1.5 rounded-full bg-blue-600 shrink-0" />}
                 </button>
               ))}
               {query.trim() && filtered.length === 0 && (
                 <p className="px-3 py-2 text-xs text-slate-400">No matches</p>
               )}
             </div>
+
+            {/* Areas sub-dropdown for the selected city */}
+            {location && selectedAreas.length > 0 && (
+              <>
+                <div className="my-2 border-t border-slate-100" />
+                <p className="px-3 pb-1 text-[10px] font-extrabold text-slate-400 uppercase tracking-wide">
+                  Area in {location}
+                </p>
+                <div className="max-h-48 overflow-y-auto grid grid-cols-1 sm:grid-cols-2 gap-0.5">
+                  <button
+                    type="button"
+                    onClick={() => { onAreaSelect?.(''); setOpen(false); }}
+                    className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-sm text-left transition-colors ${
+                      area === '' ? 'bg-teal-50 text-teal-700 font-semibold' : 'text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    <span>All {location}</span>
+                    {area === '' && <span className="w-1.5 h-1.5 rounded-full bg-teal-600 shrink-0" />}
+                  </button>
+                  {selectedAreas.map(a => (
+                    <button
+                      key={a}
+                      type="button"
+                      onClick={() => { onAreaSelect?.(a); setOpen(false); }}
+                      className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-sm text-left transition-colors ${
+                        area === a ? 'bg-teal-50 text-teal-700 font-semibold' : 'text-slate-600 hover:bg-slate-50'
+                      }`}
+                    >
+                      <span className="truncate">{a}</span>
+                      {area === a && <span className="w-1.5 h-1.5 rounded-full bg-teal-600 shrink-0" />}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
@@ -135,6 +181,9 @@ export const TherapistSearchBar: React.FC<TherapistSearchBarProps> = ({
   onSearchChange,
   location,
   onLocationChange,
+  area = '',
+  onAreaChange,
+  areasByCity = {},
   onSearch,
   placeholder = 'Search by name, specialty, or condition',
   cities = [],
@@ -184,6 +233,9 @@ export const TherapistSearchBar: React.FC<TherapistSearchBarProps> = ({
               location={location}
               onSelect={onLocationChange}
               cities={cities}
+              area={area}
+              onAreaSelect={onAreaChange}
+              areasByCity={areasByCity}
               onUseMyLocation={onUseMyLocation}
             />
           </div>

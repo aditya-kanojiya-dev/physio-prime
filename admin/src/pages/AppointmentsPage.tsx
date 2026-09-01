@@ -22,7 +22,6 @@ const NO_SHOW_REASONS = [
 const MODE_COLORS: Record<string, string> = {
   online: 'bg-emerald-100 text-emerald-700 border-emerald-200',
   home: 'bg-blue-100 text-blue-700 border-blue-200',
-  clinic: 'bg-purple-100 text-purple-700 border-purple-200',
 }
 
 function todayStr() {
@@ -45,6 +44,8 @@ export function AppointmentsPage() {
   const [detailModal, setDetailModal] = useState<{ open: boolean; appointmentId: string; detail: DoctorAppointmentDetail | null; isLoading: boolean }>({
     open: false, appointmentId: '', detail: null, isLoading: false,
   })
+  const [collect, setCollect] = useState<{ open: boolean; appointmentId: string }>({ open: false, appointmentId: '' })
+  const [qr, setQr] = useState<{ id: string; image: string; shortUrl: string; closeBy: number } | null>(null)
 
   const { data, isLoading } = useQuery({
     queryKey: ['doctor/appointments', date, filter],
@@ -89,6 +90,35 @@ export function AppointmentsPage() {
       qc.invalidateQueries({ queryKey: ['doctor/appointments'] })
     },
     onError: (err) => setError(err instanceof ApiError ? err.message : 'Update failed'),
+  })
+
+  const startSession = useMutation({
+    mutationFn: (id: string) => api.post<{ appointment: Appointment }>(`/doctor/appointments/${id}/session/start`, {}),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['doctor/appointments'] }),
+    onError: (err) => setError(err instanceof ApiError ? err.message : 'Could not start session'),
+  })
+
+  const completeSession = useMutation({
+    mutationFn: (id: string) => api.post<{ appointment: Appointment }>(`/doctor/appointments/${id}/session/complete`, {}),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['doctor/appointments'] }),
+    onError: (err) => setError(err instanceof ApiError ? err.message : 'Could not complete session'),
+  })
+
+  const collectUpi = useMutation({
+    mutationFn: (id: string) =>
+      api.post<{ qr: { id: string; image: string; shortUrl: string; closeBy: number } }>(`/doctor/appointments/${id}/collect/upi`, {}),
+    onSuccess: (res) => setQr(res.qr),
+    onError: (err) => setError(err instanceof ApiError ? err.message : 'Could not generate UPI QR'),
+  })
+
+  const collectCash = useMutation({
+    mutationFn: (id: string) => api.post<{ appointment: Appointment }>(`/doctor/appointments/${id}/collect/cash`, {}),
+    onSuccess: () => {
+      setCollect({ open: false, appointmentId: '' })
+      setQr(null)
+      qc.invalidateQueries({ queryKey: ['doctor/appointments'] })
+    },
+    onError: (err) => setError(err instanceof ApiError ? err.message : 'Could not record cash payment'),
   })
 
   return (
@@ -154,7 +184,25 @@ export function AppointmentsPage() {
                     <div className="flex items-center gap-3 mt-1 text-xs text-slate-500">
                       <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{a.timeSlot}</span>
                       <span className="font-bold text-slate-700">{formatFee(a.feePaise)}</span>
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                        a.paymentStatus === 'paid'
+                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                          : a.paymentMode === 'postpay'
+                            ? 'bg-amber-50 text-amber-700 border-amber-200'
+                            : 'bg-slate-100 text-slate-600 border-slate-200'
+                      }`}>
+                        {a.paymentStatus === 'paid'
+                          ? `Paid${a.paymentMethod === 'cash' ? ' (cash)' : ''}`
+                          : a.paymentMode === 'postpay'
+                            ? 'Pay after visit'
+                            : 'Prepay'}
+                      </span>
                     </div>
+                    {a.paymentMode === 'postpay' && a.sessionStartedAt && (
+                      <div className="mt-1 text-[10px] font-bold text-teal-700">
+                        Session in progress{` (started ${new Date(a.sessionStartedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})`}
+                      </div>
+                    )}
                     {isCompleted && (
                       <div className="mt-2 flex items-center gap-2">
                         <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
@@ -201,13 +249,43 @@ export function AppointmentsPage() {
                         >
                           <CalendarDays className="w-3 h-3" /> Change time
                         </button>
-                        <button
-                          onClick={() => update.mutate({ id: a.id, status: 'completed' })}
-                          disabled={update.isPending}
-                          className="bg-gradient-to-r from-teal-600 to-blue-600 text-white rounded-xl px-3 py-1.5 font-bold text-[10px] transition-all disabled:opacity-50 flex items-center gap-1"
-                        >
-                          <CheckCircle className="w-3 h-3" /> Done
-                        </button>
+                        {a.paymentMode === 'postpay' && a.paymentStatus !== 'paid' && (
+                          <button
+                            onClick={() => {
+                              setCollect({ open: true, appointmentId: a.id })
+                              setQr(null)
+                            }}
+                            disabled={collectCash.isPending || collectUpi.isPending}
+                            className="px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 font-bold text-[10px] transition-all disabled:opacity-50 flex items-center gap-1"
+                          >
+                            <FileText className="w-3 h-3" /> Collect Payment
+                          </button>
+                        )}
+                        {a.paymentMode === 'postpay' && a.sessionStartedAt ? (
+                          <button
+                            onClick={() => completeSession.mutate(a.id)}
+                            disabled={completeSession.isPending}
+                            className="bg-gradient-to-r from-teal-600 to-blue-600 text-white rounded-xl px-3 py-1.5 font-bold text-[10px] transition-all disabled:opacity-50 flex items-center gap-1"
+                          >
+                            <CheckCircle className="w-3 h-3" /> Complete Session
+                          </button>
+                        ) : a.paymentMode === 'postpay' ? (
+                          <button
+                            onClick={() => startSession.mutate(a.id)}
+                            disabled={startSession.isPending}
+                            className="bg-gradient-to-r from-teal-600 to-blue-600 text-white rounded-xl px-3 py-1.5 font-bold text-[10px] transition-all disabled:opacity-50 flex items-center gap-1"
+                          >
+                            <CheckCircle className="w-3 h-3" /> Start Session
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => update.mutate({ id: a.id, status: 'completed' })}
+                            disabled={update.isPending}
+                            className="bg-gradient-to-r from-teal-600 to-blue-600 text-white rounded-xl px-3 py-1.5 font-bold text-[10px] transition-all disabled:opacity-50 flex items-center gap-1"
+                          >
+                            <CheckCircle className="w-3 h-3" /> Done
+                          </button>
+                        )}
                       </>
                     )}
                     {a.status !== 'upcoming' && !isCompleted && !isNoShow && (
@@ -288,6 +366,18 @@ export function AppointmentsPage() {
           onClose={() => setReschedule({ open: false, appointmentId: '', currentDate: '' })}
           onConfirm={(d, ws, we) => rescheduleMut.mutate({ id: reschedule.appointmentId, date: d, windowStart: ws, windowEnd: we })}
           isPending={rescheduleMut.isPending}
+        />
+      )}
+
+      {collect.open && (
+        <CollectPaymentModal
+          appointmentId={collect.appointmentId}
+          qr={qr}
+          onClose={() => { setCollect({ open: false, appointmentId: '' }); setQr(null) }}
+          onGenerateUpi={(id) => collectUpi.mutate(id)}
+          onCash={(id) => collectCash.mutate(id)}
+          upiPending={collectUpi.isPending}
+          cashPending={collectCash.isPending}
         />
       )}
     </AdminLayout>
@@ -381,6 +471,100 @@ function RescheduleModal({
         >
           {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Confirm Reschedule'}
         </button>
+      </div>
+    </div>
+  )
+}
+
+function CollectPaymentModal({
+  appointmentId,
+  qr,
+  onClose,
+  onGenerateUpi,
+  onCash,
+  upiPending,
+  cashPending,
+}: {
+  appointmentId: string
+  qr: { id: string; image: string; shortUrl: string; closeBy: number } | null
+  onClose: () => void
+  onGenerateUpi: (id: string) => void
+  onCash: (id: string) => void
+  upiPending: boolean
+  cashPending: boolean
+}) {
+  const [tab, setTab] = useState<'upi' | 'cash'>('upi')
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+      <div className="bg-white border border-slate-200 rounded-3xl max-w-sm w-full p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-extrabold text-slate-900">Collect Payment</h3>
+          <button onClick={onClose} className="text-slate-500 hover:text-slate-900">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="grid grid-cols-2 gap-1.5 p-1 bg-slate-100 rounded-2xl">
+          {(['upi', 'cash'] as const).map((t) => (
+            <button
+              key={t}
+              onClick={() => setTab(t)}
+              className={`py-2 rounded-xl text-xs font-extrabold capitalize transition-all ${
+                tab === t ? 'bg-white text-teal-700 shadow-sm' : 'text-slate-500'
+              }`}
+            >
+              {t === 'upi' ? 'UPI Scan' : 'Cash'}
+            </button>
+          ))}
+        </div>
+
+        {tab === 'upi' ? (
+          <div className="space-y-3 text-center">
+            {!qr ? (
+              <>
+                <p className="text-xs text-slate-500">
+                  Show this QR to the patient to scan and pay. The payment is confirmed automatically via webhook.
+                </p>
+                <button
+                  onClick={() => onGenerateUpi(appointmentId)}
+                  disabled={upiPending}
+                  className="w-full py-2.5 bg-gradient-to-r from-teal-600 to-blue-600 text-white font-extrabold text-sm rounded-2xl transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {upiPending ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Generate QR'}
+                </button>
+              </>
+            ) : (
+              <>
+                {qr.image && (
+                  <img src={qr.image} alt="UPI QR" className="mx-auto w-56 h-56 bg-white rounded-2xl border border-slate-200 p-2" />
+                )}
+                {qr.shortUrl && (
+                  <a href={qr.shortUrl} target="_blank" rel="noreferrer" className="block text-xs font-bold text-teal-600 underline break-all">
+                    Open payment link
+                  </a>
+                )}
+                <p className="text-[10px] text-slate-400">
+                  Expires {new Date(qr.closeBy * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}.
+                  Refresh to generate a fresh QR if it expires.
+                </p>
+              </>
+            )}
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <p className="text-xs text-slate-500">
+              Confirm the patient paid (e.g. cash at the home visit). This records the collection and marks the appointment paid.
+            </p>
+            <button
+              onClick={() => onCash(appointmentId)}
+              disabled={cashPending}
+              className="w-full py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-extrabold text-sm rounded-2xl transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {cashPending ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Confirm Cash Received'}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   )

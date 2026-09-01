@@ -2,13 +2,13 @@ import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useBooking } from '../context/BookingContext';
+import { useLocationContext } from '../context/LocationContext';
 import { useDoctors, useSymptoms, useCategories } from '../hooks/queries';
 import { ConsultationMode } from '../types';
 import { TherapistSearchBar } from '../components/doctors/TherapistSearchBar';
 import { DoctorListCard } from '../components/doctors/DoctorListCard';
 import {
   SlidersHorizontal,
-  MapPin,
   ArrowUpDown,
   ChevronDown,
   X,
@@ -17,7 +17,6 @@ import {
   Wallet,
   Check,
   Loader2,
-  LocateFixed,
   Sparkles,
   Users,
 } from 'lucide-react';
@@ -120,10 +119,6 @@ const FilterSelect: React.FC<FilterSelectProps> = ({ value, onChange, placeholde
 };
 
 interface FilterPanelProps {
-  cityInput: string;
-  setCityInput: (v: string) => void;
-  areaInput: string;
-  setAreaInput: (v: string) => void;
   maxPrice: number;
   setMaxPrice: (n: number) => void;
   selectedSymptom: string | null;
@@ -135,14 +130,9 @@ interface FilterPanelProps {
   selectedGender: 'all' | 'male' | 'female';
   setSelectedGender: (g: 'all' | 'male' | 'female') => void;
   resetFilters: () => void;
-  defaultCity: string;
 }
 
 const FilterPanel: React.FC<FilterPanelProps> = ({
-  cityInput,
-  setCityInput,
-  areaInput,
-  setAreaInput,
   maxPrice,
   setMaxPrice,
   selectedSymptom,
@@ -154,7 +144,6 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
   selectedGender,
   setSelectedGender,
   resetFilters,
-  defaultCity,
 }) => {
   const { data: categories = [] } = useCategories();
   const { data: symptoms = [] } = useSymptoms();
@@ -245,55 +234,6 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
         </div>
       </div>
 
-      <div className="space-y-2">
-        <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
-          <MapPin className="w-3.5 h-3.5 text-blue-600" />
-          Location
-        </label>
-        {/* ponytail: no geocoding backend — "use my location" snaps to the primary served city */}
-        <button
-          onClick={() => setCityInput(defaultCity)}
-          className="w-full inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-sm font-medium text-slate-700 transition-colors"
-        >
-          <LocateFixed className="w-4 h-4 text-blue-600" />
-          Use my location
-        </button>
-        <div className="relative">
-          <input
-            type="text"
-            value={cityInput}
-            onChange={e => setCityInput(e.target.value)}
-            placeholder="Enter city"
-            className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 pr-14 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
-          />
-          {cityInput && (
-            <button
-              onClick={() => setCityInput('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-blue-600 hover:text-blue-700"
-            >
-              Clear
-            </button>
-          )}
-        </div>
-      </div>
-
-      <div className="space-y-2">
-        <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
-          <Home className="w-3.5 h-3.5 text-blue-600" />
-          Area (home visits)
-        </label>
-        <input
-          type="text"
-          value={areaInput}
-          onChange={e => setAreaInput(e.target.value)}
-          placeholder={`Any area in ${cityInput.trim() || defaultCity}`}
-          className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
-        />
-        <p className="text-[11px] text-slate-400 leading-relaxed">
-          Shows home-visit physios who cover this area.
-        </p>
-      </div>
-
       <div className="space-y-3">
         <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
           <Wallet className="w-3.5 h-3.5 text-blue-600" />
@@ -332,6 +272,8 @@ export const FindDoctorsPage: React.FC = () => {
     setSearchQuery,
   } = useBooking();
 
+  const { city, setCity, area, setArea, cities, areaByCity, panIndia, doctorServesHome } =
+    useLocationContext();
   const { data: doctors = [], isLoading: doctorsLoading } = useDoctors();
   const { data: symptoms = [] } = useSymptoms();
   const { data: categories = [] } = useCategories();
@@ -342,8 +284,6 @@ export const FindDoctorsPage: React.FC = () => {
   );
   const [selectedCategory, setSelectedCategory] = useState<string | null>(selectedCategorySlug);
   const [maxPrice, setMaxPrice] = useState<number>(2000);
-  const [cityInput, setCityInput] = useState('');
-  const [areaInput, setAreaInput] = useState('');
   // ponytail: seed from hero CTA's ?mode= once at mount, 'all' fallback
   const [selectedMode, setSelectedMode] = useState<ConsultationMode | 'all'>(() => {
     const mode = new URLSearchParams(window.location.search).get('mode');
@@ -355,11 +295,6 @@ export const FindDoctorsPage: React.FC = () => {
 
   const defaultCity = useMemo(
     () => [...new Set(doctors.map(d => d.location.city))][0] ?? 'your city',
-    [doctors]
-  );
-
-  const cities = useMemo(
-    () => [...new Set(doctors.map(d => d.location.city).filter(Boolean))],
     [doctors]
   );
 
@@ -385,14 +320,8 @@ export const FindDoctorsPage: React.FC = () => {
         if (!fullMatch && !terms.some(t => hay.includes(t))) return false;
       }
 
-      if (cityInput.trim() && !doc.location.city.toLowerCase().includes(cityInput.trim().toLowerCase())) return false;
-
-      if (areaInput.trim()) {
-        const a = areaInput.trim().toLowerCase();
-        const covered = [doc.location.area, ...(doc.locations ?? []).map(l => l.area)]
-          .filter(Boolean)
-          .some(area => area!.toLowerCase().includes(a));
-        if (!covered) return false;
+      if (city && city !== panIndia && doc.location.city.toLowerCase() !== city.toLowerCase()) {
+        return false;
       }
 
       if (selectedMode !== 'all') {
@@ -411,7 +340,7 @@ export const FindDoctorsPage: React.FC = () => {
       if (sortBy === 'experience') return b.experienceYears - a.experienceYears;
       return 0;
     });
-  }, [doctors, searchQuery, symptomTitle, categoryTitle, cityInput, areaInput, maxPrice, sortBy, selectedMode, selectedGender]);
+  }, [doctors, searchQuery, symptomTitle, categoryTitle, city, panIndia, maxPrice, sortBy, selectedMode, selectedGender]);
 
   const resetFilters = () => {
     setSearchQuery('');
@@ -420,8 +349,7 @@ export const FindDoctorsPage: React.FC = () => {
     setSelectedCategorySlug(null);
     setSelectedSymptomSlug(null);
     setMaxPrice(2000);
-    setCityInput('');
-    setAreaInput('');
+    setArea('');
     setSelectedMode('all');
     setSelectedGender('all');
   };
@@ -431,13 +359,12 @@ export const FindDoctorsPage: React.FC = () => {
     !!selectedSymptom,
     !!selectedCategory,
     maxPrice < 2000,
-    !!cityInput.trim(),
-    !!areaInput.trim(),
+    !!area,
     selectedMode !== 'all',
     selectedGender !== 'all',
   ].filter(Boolean).length;
 
-  const cityLabel = cityInput.trim() || defaultCity;
+  const cityLabel = city || defaultCity;
 
   return (
     <div className="pt-28 pb-20 min-h-screen">
@@ -447,10 +374,13 @@ export const FindDoctorsPage: React.FC = () => {
         <TherapistSearchBar
           searchValue={searchQuery}
           onSearchChange={setSearchQuery}
-          location={cityInput || defaultCity}
-          onLocationChange={setCityInput}
+          location={city || defaultCity}
+          onLocationChange={setCity}
           cities={cities}
-          onUseMyLocation={() => setCityInput(defaultCity)}
+          area={area}
+          onAreaChange={setArea}
+          areasByCity={areaByCity}
+          onUseMyLocation={() => setCity(defaultCity)}
         />
 
         {/* Top bar */}
@@ -506,29 +436,36 @@ export const FindDoctorsPage: React.FC = () => {
         {/* Main layout */}
         <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-6 items-start">
 
-          {/* Desktop sidebar */}
-          {filtersOpen && (
-            <aside className="hidden lg:block bg-white rounded-2xl border border-slate-200/80 shadow-sm p-5 lg:sticky lg:top-24">
-              <FilterPanel
-                cityInput={cityInput}
-                setCityInput={setCityInput}
-                areaInput={areaInput}
-                setAreaInput={setAreaInput}
-                maxPrice={maxPrice}
-                setMaxPrice={setMaxPrice}
-                selectedSymptom={selectedSymptom}
-                setSelectedSymptom={setSelectedSymptom}
-                selectedCategory={selectedCategory}
-                setSelectedCategory={setSelectedCategory}
-                selectedMode={selectedMode}
-                setSelectedMode={setSelectedMode}
-                selectedGender={selectedGender}
-                setSelectedGender={setSelectedGender}
-                resetFilters={resetFilters}
-                defaultCity={defaultCity}
-              />
-            </aside>
-          )}
+          {/* Desktop sidebar — column always reserved so results never stretch */}
+          <aside className="hidden lg:block rounded-2xl lg:sticky lg:top-24">
+            {filtersOpen ? (
+              <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-5">
+                <FilterPanel
+                  maxPrice={maxPrice}
+                  setMaxPrice={setMaxPrice}
+                  selectedSymptom={selectedSymptom}
+                  setSelectedSymptom={setSelectedSymptom}
+                  selectedCategory={selectedCategory}
+                  setSelectedCategory={setSelectedCategory}
+                  selectedMode={selectedMode}
+                  setSelectedMode={setSelectedMode}
+                  selectedGender={selectedGender}
+                  setSelectedGender={setSelectedGender}
+                  resetFilters={resetFilters}
+                />
+              </div>
+            ) : (
+              <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-5 h-full flex items-center justify-center">
+                <button
+                  onClick={() => setFiltersOpen(true)}
+                  className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-full bg-slate-100 hover:bg-slate-200 text-sm font-bold text-slate-700 transition-colors"
+                >
+                  <SlidersHorizontal className="w-4 h-4 text-blue-600" />
+                  Show filters
+                </button>
+              </div>
+            )}
+          </aside>
 
           {/* Mobile drawer */}
           <AnimatePresence>
@@ -559,10 +496,6 @@ export const FindDoctorsPage: React.FC = () => {
                       </button>
                     </div>
                     <FilterPanel
-                      cityInput={cityInput}
-                      setCityInput={setCityInput}
-                      areaInput={areaInput}
-                      setAreaInput={setAreaInput}
                       maxPrice={maxPrice}
                       setMaxPrice={setMaxPrice}
                       selectedSymptom={selectedSymptom}
@@ -574,7 +507,6 @@ export const FindDoctorsPage: React.FC = () => {
                       selectedGender={selectedGender}
                       setSelectedGender={setSelectedGender}
                       resetFilters={resetFilters}
-                      defaultCity={defaultCity}
                     />
                   </div>
                 </motion.aside>
@@ -601,6 +533,11 @@ export const FindDoctorsPage: React.FC = () => {
                   ...(doctor.fees.home > 0 ? ['home'] : []),
                   ...(doctor.fees.online > 0 ? ['online'] : []),
                 ];
+                const servesHome = doctorServesHome(doctor);
+                const availabilityNote =
+                  !servesHome ? `Not available for home visits in ${area}` : undefined;
+                const onlineNote =
+                  doctor.fees.online > 0 ? `Online (${panIndia}) — available anywhere in India` : undefined;
                 return (
                   <DoctorListCard
                     key={doctor.id}
@@ -614,6 +551,8 @@ export const FindDoctorsPage: React.FC = () => {
                     sessionFee={doctor.fees.home}
                     visitTypes={visitTypes}
                     locationTags={areas}
+                    availabilityNote={availabilityNote}
+                    onlineNote={onlineNote}
                     profileUrl={`/doctor/${doctor.id}`}
                     onBookHomeVisit={() => navigate('/book', { state: { doctor, mode: 'home' } })}
                     onBookOnline={() => navigate('/book', { state: { doctor, mode: 'online' } })}

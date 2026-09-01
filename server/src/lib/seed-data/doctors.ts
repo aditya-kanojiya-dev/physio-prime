@@ -18,7 +18,6 @@ export interface SeedDoctor {
   fees: {
     home: number;
     online: number;
-    clinic: number;
   };
   nextAvailable: string;
   verified: boolean;
@@ -61,7 +60,6 @@ export const DOCTORS_DATA: SeedDoctor[] = [
     fees: {
       home: 1000,
       online: 599,
-      clinic: 800
     },
     nextAvailable: 'Today 03:00 PM',
     verified: true,
@@ -123,7 +121,6 @@ export const DOCTORS_DATA: SeedDoctor[] = [
     fees: {
       home: 899,
       online: 499,
-      clinic: 650
     },
     nextAvailable: 'Today 04:30 PM',
     verified: true,
@@ -170,7 +167,6 @@ export const DOCTORS_DATA: SeedDoctor[] = [
     fees: {
       home: 799,
       online: 449,
-      clinic: 550
     },
     nextAvailable: 'Tomorrow 10:00 AM',
     verified: true,
@@ -213,7 +209,6 @@ export const DOCTORS_DATA: SeedDoctor[] = [
     fees: {
       home: 899,
       online: 549,
-      clinic: 700
     },
     nextAvailable: 'Today 05:00 PM',
     verified: true,
@@ -256,7 +251,6 @@ export const DOCTORS_DATA: SeedDoctor[] = [
     fees: {
       home: 950,
       online: 599,
-      clinic: 750
     },
     nextAvailable: 'Today 02:00 PM',
     verified: true,
@@ -299,7 +293,6 @@ export const DOCTORS_DATA: SeedDoctor[] = [
     fees: {
       home: 850,
       online: 499,
-      clinic: 650
     },
     nextAvailable: 'Tomorrow 11:30 AM',
     verified: true,

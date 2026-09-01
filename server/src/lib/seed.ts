@@ -2,7 +2,7 @@ import bcrypt from 'bcryptjs';
 import { sql } from 'drizzle-orm';
 import { db, pool } from '../db/pool';
 import { runMigrations } from '../db/migrate';
-import { appointments, categories, communityCategories, communityPosts, communityReplies, communityVotes, conversations, doctorApplications, doctorLocations, doctorNotifications, doctorPayouts, doctors, doctorSchedules, messages, patientProfiles, prescriptions, reviews, symptoms, users } from '../db/schema';
+import { appointments, blogCategories, blogPosts, blogPostTags, blogTags, categories, communityCategories, communityPosts, communityReplies, communityVotes, conversations, doctorApplications, doctorCashLedger, doctorLocations, doctorNotifications, doctorPayouts, doctors, doctorSchedules, messages, patientProfiles, paymentTransactions, prescriptions, refunds, reviews, settlements, symptoms, users } from '../db/schema';
 import { CATEGORIES_DATA } from './seed-data/categories';
 import { SYMPTOMS_DATA } from './seed-data/symptoms';
 import { DOCTORS_DATA } from './seed-data/doctors';
@@ -11,7 +11,7 @@ import { DOCTORS_DATA } from './seed-data/doctors';
 // this list once real registrations land in later phases.
 export async function seed(): Promise<void> {
   await db.execute(
-    sql`TRUNCATE users, doctors, doctor_applications, categories, symptoms, patient_profiles, appointments, reviews, prescriptions, community_categories, doctor_locations, doctor_payouts, community_posts, community_replies, community_votes, conversations, messages, doctor_notifications RESTART IDENTITY CASCADE`,
+    sql`TRUNCATE users, doctors, doctor_applications, categories, symptoms, patient_profiles, appointments, reviews, prescriptions, community_categories, doctor_locations, doctor_payouts, community_posts, community_replies, community_votes, conversations, messages, doctor_notifications, payment_transactions, doctor_cash_ledger, refunds, payment_webhooks, settlements, blog_categories, blog_tags, blog_posts, blog_post_tags RESTART IDENTITY CASCADE`,
   );
 
   const passwordHash = bcrypt.hashSync('physio123', 10);
@@ -89,7 +89,7 @@ export async function seed(): Promise<void> {
     })),
   );
 
-  await seedShowcase(insertedDoctors);
+  const seededAppointments = await seedShowcase(insertedDoctors);
 
   await db.insert(categories).values(CATEGORIES_DATA);
   await db.insert(symptoms).values(SYMPTOMS_DATA);
@@ -114,7 +114,7 @@ export async function seed(): Promise<void> {
     insertedDoctors.flatMap((d, i) => [
       {
         doctorId: d.id,
-        name: `${d.id <= 3 ? 'Clinic' : 'Home Office'} - Main`,
+        name: `Home Visit - ${nagpurAreas[i % nagpurAreas.length]}`,
         address: `${100 + i * 10}, Main Road`,
         area: nagpurAreas[i % nagpurAreas.length],
         city: 'Nagpur',
@@ -126,46 +126,37 @@ export async function seed(): Promise<void> {
         isPrimary: true,
         active: true,
       },
-      ...(i < 3 ? [{
-        doctorId: d.id,
-        name: `Satellite Office`,
-        address: `${200 + i * 10}, Ring Road`,
-        area: nagpurAreas[(i + 2) % nagpurAreas.length],
-        city: 'Nagpur',
-        state: 'Maharashtra',
-        pincode: '440002',
-        lat: String(21.12 + (i * 0.01)),
-        lng: String(79.10 + (i * 0.01)),
-        radiusKm: '5',
-        isPrimary: false,
-        active: true,
-      }] : []),
     ]),
   );
 
   // Seed doctor payouts (some completed, some pending)
-  await db.insert(doctorPayouts).values(
-    insertedDoctors.slice(0, 4).flatMap((d) => [
-      {
-        doctorId: d.id,
-        amountPaise: 1500000, // ₹15,000
-        status: 'completed',
-        paymentMethod: 'bank_transfer',
-        transactionId: `TXN${d.id}001`,
-        notes: 'Monthly payout',
-        processedAt: new Date(),
-      },
-      {
-        doctorId: d.id,
-        amountPaise: 800000, // ₹8,000
-        status: 'pending',
-        paymentMethod: 'upi',
-        transactionId: null,
-        notes: 'Pending processing',
-        processedAt: null,
-      },
-    ]),
-  );
+  const insertedPayouts = await db
+    .insert(doctorPayouts)
+    .values(
+      insertedDoctors.slice(0, 4).flatMap((d) => [
+        {
+          doctorId: d.id,
+          amountPaise: 1500000, // ₹15,000
+          status: 'completed',
+          paymentMethod: 'bank_transfer',
+          transactionId: `TXN${d.id}001`,
+          notes: 'Monthly payout',
+          processedAt: new Date(),
+        },
+        {
+          doctorId: d.id,
+          amountPaise: 800000, // ₹8,000
+          status: 'pending',
+          paymentMethod: 'upi',
+          transactionId: null,
+          notes: 'Pending processing',
+          processedAt: null,
+        },
+      ]),
+    )
+    .returning({ id: doctorPayouts.id, doctorId: doctorPayouts.doctorId, status: doctorPayouts.status });
+
+  await seedPayments(insertedDoctors, seededAppointments, insertedPayouts);
 
   // Seed community posts
   const insertedPosts = await db.insert(communityPosts).values([
@@ -285,6 +276,183 @@ export async function seed(): Promise<void> {
       read: true,
     },
   ]);
+
+  await seedBlog(insertedDoctors.map((d) => d.id));
+}
+
+async function seedBlog(doctorIds: number[]): Promise<void> {
+  const insertedCategories = await db
+    .insert(blogCategories)
+    .values([
+      { name: 'Physiotherapy', slug: 'physiotherapy', description: 'Physiotherapy techniques, tips and recovery guidance', color: '#10b981', sortOrder: 0 },
+      { name: 'Pain Management', slug: 'pain-management', description: 'Managing chronic and acute pain', color: '#f59e0b', sortOrder: 1 },
+      { name: 'Sport & Fitness', slug: 'sport-fitness', description: 'Injury prevention and sports rehab', color: '#3b82f6', sortOrder: 2 },
+      { name: 'Home Care', slug: 'home-care', description: 'Home visits and self-care advice', color: '#8b5cf6', sortOrder: 3 },
+    ])
+    .returning({ id: blogCategories.id, slug: blogCategories.slug });
+  const categoryId = (slug: string) => insertedCategories.find((c) => c.slug === slug)!.id;
+
+  const insertedTags = await db
+    .insert(blogTags)
+    .values([
+      { name: 'Back Pain', slug: 'back-pain', color: '#ef4444' },
+      { name: 'Exercises', slug: 'exercises', color: '#10b981' },
+      { name: 'Rehab', slug: 'rehab', color: '#3b82f6' },
+      { name: 'Home Visits', slug: 'home-visits', color: '#8b5cf6' },
+      { name: 'Sports Injury', slug: 'sports-injury', color: '#f59e0b' },
+    ])
+    .returning({ id: blogTags.id, slug: blogTags.slug });
+  const tagId = (slug: string) => insertedTags.find((t) => t.slug === slug)!.id;
+
+  const insertedPosts = await db
+    .insert(blogPosts)
+    .values([
+      {
+        title: '5 exercises for lower back pain you can do at home',
+        slug: 'lower-back-pain-exercises-at-home',
+        excerpt: 'Simple, safe exercises to ease chronic lower back pain without leaving your home.',
+        content: '## Lower back pain exercises\n\n1. **Pelvic tilt** – lie on your back, flatten your spine.\n2. **Knee to chest** – hold each knee gently toward the chest.\n3. **Cat-cow stretch** – alternate arching and rounding the back.\n4. **Child’s pose** – rest knees wide, reach the arms forward.\n5. **Bird-dog** – extend opposite arm and leg while keeping the core stable.\n\nRepeat each 10 times, twice a day. Stop if any movement increases pain.',
+        status: 'published',
+        authorType: 'admin',
+        authorId: 1,
+        categoryId: categoryId('pain-management'),
+        publishedAt: new Date(),
+      },
+      {
+        title: 'Returning to sport after an ACL injury',
+        slug: 'acl-rehab-return-to-sport',
+        excerpt: 'A phased approach to ACL rehabilitation before you get back on the field.',
+        content: '## ACL return-to-sport plan\n\nRecovery is gradual. Focus on:\n\n- Restoring full knee range of motion.\n- Rebuilding quadriceps and hamstring strength.\n- Balance and proprioception drills.\n- Sport-specific movements before full play.\n\nWork with your physiotherapist to track milestones before returning to sport.',
+        status: 'published',
+        authorType: 'doctor',
+        authorId: doctorIds[0],
+        categoryId: categoryId('sport-fitness'),
+        publishedAt: new Date(),
+      },
+    ])
+    .returning({ id: blogPosts.id, slug: blogPosts.slug });
+  const postId = (slug: string) => insertedPosts.find((p) => p.slug === slug)!.id;
+
+  await db.insert(blogPostTags).values([
+    { postId: postId('lower-back-pain-exercises-at-home'), tagId: tagId('back-pain') },
+    { postId: postId('lower-back-pain-exercises-at-home'), tagId: tagId('exercises') },
+    { postId: postId('acl-rehab-return-to-sport'), tagId: tagId('rehab') },
+    { postId: postId('acl-rehab-return-to-sport'), tagId: tagId('sports-injury') },
+  ]);
+}
+
+interface SeedAppointmentRow {
+  id: number;
+  bookingId: string;
+  doctorId: number;
+  patientId: number;
+  feePaise: number;
+  paymentMode: string;
+  paymentMethod: string | null;
+  paymentStatus: string;
+  status: string;
+}
+
+async function seedPayments(
+  _insertedDoctors: { id: number }[],
+  appointments: SeedAppointmentRow[],
+  payouts: { id: number; doctorId: number; status: string }[],
+): Promise<void> {
+  const platformPct = 0.3;
+  const fee = (paise: number) => {
+    const platformFeePaise = Math.round(paise * platformPct);
+    return { platformFeePaise, doctorEarningsPaise: paise - platformFeePaise };
+  };
+  const txId = (i: number) => `TXNSEED${String(i + 1).padStart(5, '0')}`;
+
+  const paid = appointments.filter((a) => a.paymentStatus === 'paid' && a.status === 'completed');
+  const refunded = appointments.find((a) => a.paymentStatus === 'refunded');
+
+  const txRows = paid.map((a, i) => ({
+    transactionId: txId(i),
+    appointmentId: a.id,
+    patientId: a.patientId,
+    doctorId: a.doctorId,
+    transactionType: a.paymentMode === 'prepay' ? 'patient_prepay' : 'patient_postpay_cash',
+    status: 'captured',
+    amountPaise: a.feePaise,
+    platformFeePaise: fee(a.feePaise).platformFeePaise,
+    doctorEarningsPaise: fee(a.feePaise).doctorEarningsPaise,
+    gatewayFeePaise: 0,
+    netAmountPaise: fee(a.feePaise).doctorEarningsPaise,
+    paymentMethod: a.paymentMethod,
+  }));
+
+  if (refunded) {
+    txRows.push({
+      transactionId: txId(paid.length),
+      appointmentId: refunded.id,
+      patientId: refunded.patientId,
+      doctorId: refunded.doctorId,
+      transactionType: 'cancellation_refund',
+      status: 'refunded',
+      amountPaise: -refunded.feePaise,
+      platformFeePaise: 0,
+      doctorEarningsPaise: 0,
+      gatewayFeePaise: 0,
+      netAmountPaise: -refunded.feePaise,
+      paymentMethod: refunded.paymentMethod,
+    });
+  }
+
+  const insertedTx = await db
+    .insert(paymentTransactions)
+    .values(txRows)
+    .returning({ id: paymentTransactions.id, appointmentId: paymentTransactions.appointmentId });
+  const txByApt = new Map(insertedTx.map((t) => [t.appointmentId, t.id]));
+
+  const cashCollected = paid.filter((a) => a.paymentMode === 'postpay' && a.paymentMethod === 'cash');
+  await db.insert(doctorCashLedger).values(
+    cashCollected.flatMap((a) => {
+      const f = fee(a.feePaise);
+      return [
+        { doctorId: a.doctorId, appointmentId: a.id, entryType: 'collection', amountPaise: a.feePaise, platformFeePaise: f.platformFeePaise, reference: `postpay cash ${a.bookingId}` },
+        { doctorId: a.doctorId, appointmentId: a.id, entryType: 'obligation', amountPaise: f.platformFeePaise, platformFeePaise: f.platformFeePaise, reference: `platform share ${a.bookingId}` },
+      ];
+    }),
+  );
+
+  const completedPayouts = payouts.filter((p) => p.status === 'completed').slice(0, 2);
+  if (completedPayouts.length) {
+    await db.insert(settlements).values(
+      completedPayouts.map((p, i) => {
+        const docApts = paid.filter((a) => a.doctorId === p.doctorId);
+        const gross = docApts.reduce((s, a) => s + a.feePaise, 0);
+        const platform = docApts.reduce((s, a) => s + fee(a.feePaise).platformFeePaise, 0);
+        return {
+          settlementId: `STLSEED${String(i + 1).padStart(4, '0')}`,
+          doctorId: p.doctorId,
+          periodStart: '2026-08-01',
+          periodEnd: '2026-08-31',
+          grossAmountPaise: gross,
+          platformFeePaise: platform,
+          gatewayFeePaise: 0,
+          netAmountPaise: gross - platform,
+          status: 'paid',
+          payoutId: p.id,
+          notes: 'August 2026 settlement',
+        };
+      }),
+    );
+  }
+
+  if (refunded) {
+    const cancelTxId = txByApt.get(refunded.id);
+    await db.insert(refunds).values({
+      refundId: `RFDSEED${refunded.bookingId}`,
+      appointmentId: refunded.id,
+      paymentTransactionId: cancelTxId ?? null,
+      paymentId: `pay_seed_${refunded.id}`,
+      amountPaise: refunded.feePaise,
+      status: 'processed',
+      reason: 'Canceled by patient',
+    });
+  }
 }
 
 interface DemoPatient {
@@ -385,42 +553,45 @@ interface AppointmentSpec {
   bookingId: string;
   doctor: number;
   patient: keyof typeof DEMO_PATIENTS;
-  mode: 'home' | 'online' | 'clinic';
+  mode: 'home' | 'online';
   days: number;
   slot: string;
   status: 'upcoming' | 'completed' | 'cancelled';
   symptom: string;
   feePaise: number;
+  paymentMode: 'prepay' | 'postpay';
+  paymentMethod: 'upi' | 'card' | 'netbanking' | 'cash';
   paymentStatus: 'pending' | 'paid' | 'refunded';
   relation?: string;
+  collectedBySelf?: boolean;
 }
 
 const APPOINTMENT_SPECS: AppointmentSpec[] = [
-  { bookingId: 'APT-100001', doctor: 0, patient: 'ravi', mode: 'home', days: 0, slot: '11:00-11:45', status: 'upcoming', symptom: 'Lower back pain after lifting weights', feePaise: 100000, paymentStatus: 'paid' },
-  { bookingId: 'APT-100002', doctor: 1, patient: 'ravi', mode: 'online', days: 2, slot: '16:00-16:45', status: 'upcoming', symptom: 'Knee pain after running', feePaise: 49900, paymentStatus: 'paid' },
-  { bookingId: 'APT-100003', doctor: 4, patient: 'ravi', mode: 'clinic', days: 4, slot: '10:00-10:45', status: 'upcoming', symptom: 'Wrist pain from long hours of typing', feePaise: 75000, paymentStatus: 'pending' },
-  { bookingId: 'APT-100004', doctor: 0, patient: 'ravi', mode: 'home', days: -6, slot: '18:00-18:45', status: 'completed', symptom: 'Chronic shoulder stiffness', feePaise: 100000, paymentStatus: 'paid' },
-  { bookingId: 'APT-100005', doctor: 5, patient: 'ravi', mode: 'online', days: -13, slot: '09:00-09:45', status: 'completed', symptom: 'Post-fracture wrist stiffness', feePaise: 49900, paymentStatus: 'paid', relation: 'mother' },
-  { bookingId: 'APT-100006', doctor: 3, patient: 'ravi', mode: 'clinic', days: -20, slot: '17:00-17:45', status: 'completed', symptom: 'Sciatica pain in left leg', feePaise: 70000, paymentStatus: 'paid' },
-  { bookingId: 'APT-100007', doctor: 2, patient: 'ravi', mode: 'clinic', days: -8, slot: '15:00-15:45', status: 'cancelled', symptom: 'Postpartum back pain', feePaise: 55000, paymentStatus: 'refunded' },
-  { bookingId: 'APT-100008', doctor: 2, patient: 'priya', mode: 'home', days: -3, slot: '10:00-10:45', status: 'completed', symptom: 'Pregnancy-related pelvic girdle pain', feePaise: 79900, paymentStatus: 'paid' },
-  { bookingId: 'APT-100009', doctor: 1, patient: 'priya', mode: 'clinic', days: -10, slot: '18:30-19:15', status: 'completed', symptom: 'Hamstring strain while sprinting', feePaise: 65000, paymentStatus: 'paid' },
-  { bookingId: 'APT-100010', doctor: 4, patient: 'priya', mode: 'home', days: 3, slot: '17:00-17:45', status: 'upcoming', symptom: 'Carpal tunnel discomfort', feePaise: 95000, paymentStatus: 'paid' },
-  { bookingId: 'APT-100011', doctor: 5, patient: 'kavita', mode: 'online', days: -4, slot: '11:30-12:15', status: 'completed', symptom: 'Chronic neck pain and stiffness', feePaise: 49900, paymentStatus: 'paid' },
-  { bookingId: 'APT-100012', doctor: 2, patient: 'kavita', mode: 'home', days: 1, slot: '16:00-16:45', status: 'upcoming', symptom: 'Lower back pain during pregnancy', feePaise: 79900, paymentStatus: 'paid' },
-  { bookingId: 'APT-100013', doctor: 1, patient: 'amit', mode: 'clinic', days: -2, slot: '12:00-12:45', status: 'completed', symptom: 'Ankle sprain while playing football', feePaise: 65000, paymentStatus: 'paid' },
-  { bookingId: 'APT-100014', doctor: 3, patient: 'amit', mode: 'clinic', days: 5, slot: '19:00-19:45', status: 'upcoming', symptom: 'Cervical disc pain', feePaise: 70000, paymentStatus: 'pending' },
-  { bookingId: 'APT-100015', doctor: 4, patient: 'sneha', mode: 'home', days: -7, slot: '09:00-09:45', status: 'completed', symptom: 'Shoulder impingement from gym', feePaise: 95000, paymentStatus: 'paid' },
-  { bookingId: 'APT-100016', doctor: 0, patient: 'sneha', mode: 'clinic', days: 2, slot: '18:00-18:45', status: 'upcoming', symptom: 'Tennis elbow', feePaise: 80000, paymentStatus: 'paid' },
-  { bookingId: 'APT-100017', doctor: 3, patient: 'mohan', mode: 'clinic', days: -15, slot: '11:00-11:45', status: 'completed', symptom: 'Knee osteoarthritis', feePaise: 70000, paymentStatus: 'paid' },
-  { bookingId: 'APT-100018', doctor: 5, patient: 'mohan', mode: 'home', days: -9, slot: '14:00-14:45', status: 'completed', symptom: 'Stiffness after hip replacement', feePaise: 85000, paymentStatus: 'paid' },
-  { bookingId: 'APT-100019', doctor: 1, patient: 'mohan', mode: 'online', days: 6, slot: '10:00-10:45', status: 'upcoming', symptom: 'Balance issues after stroke', feePaise: 49900, paymentStatus: 'pending' },
-  { bookingId: 'APT-100020', doctor: 2, patient: 'fatima', mode: 'home', days: -11, slot: '17:30-18:15', status: 'completed', symptom: 'Diastasis recti recovery', feePaise: 79900, paymentStatus: 'paid' },
-  { bookingId: 'APT-100021', doctor: 0, patient: 'fatima', mode: 'clinic', days: 3, slot: '12:00-12:45', status: 'upcoming', symptom: 'Migraine with neck tension', feePaise: 80000, paymentStatus: 'paid' },
-  { bookingId: 'APT-100022', doctor: 5, patient: 'fatima', mode: 'online', days: -18, slot: '15:00-15:45', status: 'completed', symptom: 'Posture correction', feePaise: 49900, paymentStatus: 'paid', relation: 'mother' },
+  { bookingId: 'APT-100001', doctor: 0, patient: 'ravi', mode: 'home', days: 0, slot: '11:00-11:45', status: 'upcoming', symptom: 'Lower back pain after lifting weights', feePaise: 100000, paymentMode: 'prepay', paymentMethod: 'upi', paymentStatus: 'paid' },
+  { bookingId: 'APT-100002', doctor: 1, patient: 'ravi', mode: 'online', days: 2, slot: '16:00-16:45', status: 'upcoming', symptom: 'Knee pain after running', feePaise: 49900, paymentMode: 'prepay', paymentMethod: 'upi', paymentStatus: 'paid' },
+  { bookingId: 'APT-100003', doctor: 4, patient: 'ravi', mode: 'home', days: 4, slot: '10:00-10:45', status: 'upcoming', symptom: 'Wrist pain from long hours of typing', feePaise: 95000, paymentMode: 'postpay', paymentMethod: 'cash', paymentStatus: 'pending', collectedBySelf: true },
+  { bookingId: 'APT-100004', doctor: 0, patient: 'ravi', mode: 'home', days: -6, slot: '18:00-18:45', status: 'completed', symptom: 'Chronic shoulder stiffness', feePaise: 100000, paymentMode: 'prepay', paymentMethod: 'card', paymentStatus: 'paid' },
+  { bookingId: 'APT-100005', doctor: 5, patient: 'ravi', mode: 'online', days: -13, slot: '09:00-09:45', status: 'completed', symptom: 'Post-fracture wrist stiffness', feePaise: 49900, paymentMode: 'prepay', paymentMethod: 'netbanking', paymentStatus: 'paid', relation: 'mother' },
+  { bookingId: 'APT-100006', doctor: 3, patient: 'ravi', mode: 'home', days: -20, slot: '17:00-17:45', status: 'completed', symptom: 'Sciatica pain in left leg', feePaise: 89900, paymentMode: 'postpay', paymentMethod: 'cash', paymentStatus: 'paid', collectedBySelf: true },
+  { bookingId: 'APT-100007', doctor: 2, patient: 'ravi', mode: 'home', days: -8, slot: '15:00-15:45', status: 'cancelled', symptom: 'Postpartum back pain', feePaise: 79900, paymentMode: 'prepay', paymentMethod: 'upi', paymentStatus: 'refunded' },
+  { bookingId: 'APT-100008', doctor: 2, patient: 'priya', mode: 'home', days: -3, slot: '10:00-10:45', status: 'completed', symptom: 'Pregnancy-related pelvic girdle pain', feePaise: 79900, paymentMode: 'prepay', paymentMethod: 'upi', paymentStatus: 'paid' },
+  { bookingId: 'APT-100009', doctor: 1, patient: 'priya', mode: 'home', days: -10, slot: '18:30-19:15', status: 'completed', symptom: 'Hamstring strain while sprinting', feePaise: 89900, paymentMode: 'postpay', paymentMethod: 'cash', paymentStatus: 'paid', collectedBySelf: true },
+  { bookingId: 'APT-100010', doctor: 4, patient: 'priya', mode: 'home', days: 3, slot: '17:00-17:45', status: 'upcoming', symptom: 'Carpal tunnel discomfort', feePaise: 95000, paymentMode: 'postpay', paymentMethod: 'cash', paymentStatus: 'pending', collectedBySelf: true },
+  { bookingId: 'APT-100011', doctor: 5, patient: 'kavita', mode: 'online', days: -4, slot: '11:30-12:15', status: 'completed', symptom: 'Chronic neck pain and stiffness', feePaise: 49900, paymentMode: 'prepay', paymentMethod: 'card', paymentStatus: 'paid' },
+  { bookingId: 'APT-100012', doctor: 2, patient: 'kavita', mode: 'home', days: 1, slot: '16:00-16:45', status: 'upcoming', symptom: 'Lower back pain during pregnancy', feePaise: 79900, paymentMode: 'prepay', paymentMethod: 'upi', paymentStatus: 'paid' },
+  { bookingId: 'APT-100013', doctor: 1, patient: 'amit', mode: 'home', days: -2, slot: '12:00-12:45', status: 'completed', symptom: 'Ankle sprain while playing football', feePaise: 89900, paymentMode: 'postpay', paymentMethod: 'cash', paymentStatus: 'paid', collectedBySelf: true },
+  { bookingId: 'APT-100014', doctor: 3, patient: 'amit', mode: 'home', days: 5, slot: '19:00-19:45', status: 'upcoming', symptom: 'Cervical disc pain', feePaise: 89900, paymentMode: 'prepay', paymentMethod: 'upi', paymentStatus: 'pending' },
+  { bookingId: 'APT-100015', doctor: 4, patient: 'sneha', mode: 'home', days: -7, slot: '09:00-09:45', status: 'completed', symptom: 'Shoulder impingement from gym', feePaise: 95000, paymentMode: 'prepay', paymentMethod: 'netbanking', paymentStatus: 'paid' },
+  { bookingId: 'APT-100016', doctor: 0, patient: 'sneha', mode: 'home', days: 2, slot: '18:00-18:45', status: 'upcoming', symptom: 'Tennis elbow', feePaise: 100000, paymentMode: 'postpay', paymentMethod: 'cash', paymentStatus: 'pending', collectedBySelf: true },
+  { bookingId: 'APT-100017', doctor: 3, patient: 'mohan', mode: 'home', days: -15, slot: '11:00-11:45', status: 'completed', symptom: 'Knee osteoarthritis', feePaise: 89900, paymentMode: 'prepay', paymentMethod: 'card', paymentStatus: 'paid' },
+  { bookingId: 'APT-100018', doctor: 5, patient: 'mohan', mode: 'home', days: -9, slot: '14:00-14:45', status: 'completed', symptom: 'Stiffness after hip replacement', feePaise: 85000, paymentMode: 'postpay', paymentMethod: 'cash', paymentStatus: 'paid', collectedBySelf: true },
+  { bookingId: 'APT-100019', doctor: 1, patient: 'mohan', mode: 'online', days: 6, slot: '10:00-10:45', status: 'upcoming', symptom: 'Balance issues after stroke', feePaise: 49900, paymentMode: 'prepay', paymentMethod: 'upi', paymentStatus: 'pending' },
+  { bookingId: 'APT-100020', doctor: 2, patient: 'fatima', mode: 'home', days: -11, slot: '17:30-18:15', status: 'completed', symptom: 'Diastasis recti recovery', feePaise: 79900, paymentMode: 'postpay', paymentMethod: 'cash', paymentStatus: 'paid', collectedBySelf: true },
+  { bookingId: 'APT-100021', doctor: 0, patient: 'fatima', mode: 'home', days: 3, slot: '12:00-12:45', status: 'upcoming', symptom: 'Migraine with neck tension', feePaise: 100000, paymentMode: 'prepay', paymentMethod: 'upi', paymentStatus: 'paid' },
+  { bookingId: 'APT-100022', doctor: 5, patient: 'fatima', mode: 'online', days: -18, slot: '15:00-15:45', status: 'completed', symptom: 'Posture correction', feePaise: 49900, paymentMode: 'prepay', paymentMethod: 'card', paymentStatus: 'paid', relation: 'mother' },
 ];
 
-async function seedShowcase(insertedDoctors: { id: number }[]): Promise<void> {
+async function seedShowcase(insertedDoctors: { id: number }[]): Promise<SeedAppointmentRow[]> {
   const passwordHash = bcrypt.hashSync('physio123', 10);
 
   const patients = await db
@@ -464,7 +635,11 @@ async function seedShowcase(insertedDoctors: { id: number }[]): Promise<void> {
           symptom: a.symptom,
           feePaise: a.feePaise,
           address: p.address,
+          paymentMode: a.paymentMode,
+          paymentMethod: a.paymentMethod,
           paymentStatus: a.paymentStatus,
+          paymentCollectedByDoctorId: a.paymentMode === 'postpay' && a.paymentMethod === 'cash' ? insertedDoctors[a.doctor].id : null,
+          cashCollectedAt: a.paymentMode === 'postpay' && a.paymentMethod === 'cash' && a.paymentStatus === 'paid' ? new Date(shiftDate(a.days) + 'T' + a.slot.slice(0, 5) + ':00Z') : null,
           patientName: p.name,
           patientPhone: p.phone,
           patientEmail: p.email,
@@ -478,14 +653,14 @@ async function seedShowcase(insertedDoctors: { id: number }[]): Promise<void> {
         };
       }),
     )
-    .returning({ id: appointments.id, bookingId: appointments.bookingId, doctorId: appointments.doctorId });
+    .returning({ id: appointments.id, bookingId: appointments.bookingId, doctorId: appointments.doctorId, patientId: appointments.patientId, feePaise: appointments.feePaise, paymentMode: appointments.paymentMode, paymentMethod: appointments.paymentMethod, paymentStatus: appointments.paymentStatus, status: appointments.status });
 
   const byBooking = new Map(rows.map((r) => [r.bookingId, r]));
 
   const REVIEWS: Record<string, { rating: number; comment: string }> = {
     'APT-100004': { rating: 5, comment: 'Dr. Tarannum is incredibly thorough. My shoulder feels better after just three sessions. Highly recommended.' },
     'APT-100005': { rating: 5, comment: 'Very patient and gentle with my elderly mother. The exercises were easy to follow even over video.' },
-    'APT-100006': { rating: 4, comment: 'Felt immediate relief from the sciatica pain. Slightly long wait at the clinic, but worth it.' },
+    'APT-100006': { rating: 4, comment: 'Felt immediate relief from the sciatica pain. Slightly long wait, but worth it.' },
     'APT-100008': { rating: 5, comment: 'So reassuring during my pregnancy. She explained everything clearly and the pain is gone.' },
     'APT-100009': { rating: 5, comment: 'Got me back on the track within two weeks. Clear rehab plan and great follow-up.' },
     'APT-100011': { rating: 5, comment: 'The video session was surprisingly effective. My desk-work neck pain is finally manageable.' },
@@ -606,6 +781,8 @@ async function seedShowcase(insertedDoctors: { id: number }[]): Promise<void> {
       };
     }),
   );
+
+  return rows;
 }
 
 function shiftDate(days: number): string {

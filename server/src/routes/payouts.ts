@@ -2,30 +2,39 @@ import { Router } from 'express';
 import { and, eq, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '../db/pool';
-import { appointments, doctorPayouts } from '../db/schema';
+import { appointments, doctorPayouts, doctors } from '../db/schema';
 import { requireAuth, requireRole } from '../middleware/auth';
 import { requireDoctor, noProfile } from '../lib/doctor';
+import { netAmountSql } from '../lib/commission';
 
 export const doctorPayoutsRouter = Router();
 
 doctorPayoutsRouter.use(requireAuth, requireRole('doctor'));
 
-async function getAvailableBalance(doctorId: number) {
+// Net money a doctor has earned (gross - platform fee), matching the payment ledger.
+export async function getEarnedNet(doctorId: number) {
   const [earned] = await db
     .select({
-      total: sql<number>`coalesce(sum(case when ${appointments.paymentStatus} = 'paid' and ${appointments.status} = 'completed' then ${appointments.feePaise} else 0 end), 0)`,
+      total: sql<number>`coalesce(sum(case when ${appointments.paymentStatus} = 'paid' and ${appointments.status} = 'completed' then ${netAmountSql(appointments.feePaise, doctors.platformFeePercent)} else 0 end), 0)`,
     })
     .from(appointments)
+    .innerJoin(doctors, eq(doctors.id, appointments.doctorId))
     .where(eq(appointments.doctorId, doctorId));
+  return Number(earned?.total ?? 0);
+}
 
-  const [paidOut] = await db
+// Money the doctor can actually request: net earnings minus payouts already made
+// or earmarked. Earmarked payouts (pending/processing) count so the same money
+// can't be requested twice before the first request resolves.
+export async function getAvailableBalance(doctorId: number) {
+  const [reserved] = await db
     .select({
-      total: sql<number>`coalesce(sum(case when ${doctorPayouts.status} = 'completed' then ${doctorPayouts.amountPaise} else 0 end), 0)`,
+      total: sql<number>`coalesce(sum(case when ${doctorPayouts.status} in ('pending', 'processing', 'completed') then ${doctorPayouts.amountPaise} else 0 end), 0)`,
     })
     .from(doctorPayouts)
     .where(eq(doctorPayouts.doctorId, doctorId));
 
-  return Number(earned?.total ?? 0) - Number(paidOut?.total ?? 0);
+  return (await getEarnedNet(doctorId)) - Number(reserved?.total ?? 0);
 }
 
 // --- GET /payouts/summary ---
@@ -37,13 +46,6 @@ doctorPayoutsRouter.get('/payouts/summary', async (req, res, next) => {
       res.status(noProfile.status).json({ error: { message: noProfile.message } });
       return;
     }
-
-    const [earned] = await db
-      .select({
-        total: sql<number>`coalesce(sum(case when ${appointments.paymentStatus} = 'paid' and ${appointments.status} = 'completed' then ${appointments.feePaise} else 0 end), 0)`,
-      })
-      .from(appointments)
-      .where(eq(appointments.doctorId, doctor.id));
 
     const [paidOut] = await db
       .select({
@@ -67,7 +69,7 @@ doctorPayoutsRouter.get('/payouts/summary', async (req, res, next) => {
       .limit(1);
 
     res.json({
-      availableBalancePaise: Number(earned?.total ?? 0) - Number(paidOut?.total ?? 0),
+      availableBalancePaise: await getAvailableBalance(doctor.id),
       pendingPayoutPaise: Number(pending?.total ?? 0),
       totalPaidPaise: Number(paidOut?.total ?? 0),
       lastPayoutDate: lastPayout?.createdAt?.toISOString().slice(0, 10) ?? null,

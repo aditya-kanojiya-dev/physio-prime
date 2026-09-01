@@ -74,6 +74,7 @@ export const doctors = pgTable('doctors', {
   employeeId: text('employee_id'),
   department: text('department'),
   address: jsonb('address').notNull().default({}),
+  platformFeePercent: integer('platform_fee_percent').notNull().default(30),
 });
 
 export const doctorSchedules = pgTable(
@@ -102,9 +103,17 @@ export const appointments = pgTable('appointments', {
   symptom: text('symptom'),
   feePaise: integer('fee_paise').notNull(),
   address: jsonb('address').notNull().default({}),
+  paymentMode: text('payment_mode').notNull().default('prepay'), // prepay | postpay
   paymentStatus: text('payment_status').notNull().default('pending'),
+  paymentMethod: text('payment_method'), // upi | card | netbanking | cash
+  paymentCollectedByDoctorId: integer('payment_collected_by_doctor_id').references(() => doctors.id),
+  cashCollectedAt: timestamp('cash_collected_at', { withTimezone: true }),
+  sessionStartedAt: timestamp('session_started_at', { withTimezone: true }),
+  sessionCompletedAt: timestamp('session_completed_at', { withTimezone: true }),
+  sessionDurationSec: integer('session_duration_sec'),
   razorpayOrderId: text('razorpay_order_id'),
   razorpayPaymentId: text('razorpay_payment_id'),
+  razorpayQrId: text('razorpay_qr_id'),
   patientName: text('patient_name').notNull(),
   patientPhone: text('patient_phone').notNull(),
   patientEmail: text('patient_email'),
@@ -348,3 +357,90 @@ export const blogPostTags = pgTable(
   },
   (t) => [primaryKey({ columns: [t.postId, t.tagId] })],
 );
+
+// --- payments -----------------------------------------------------------
+
+// Immutable ledger of every money movement. Single source of truth for money.
+// Never updated in place; corrections are new rows (transactionType 'adjustment').
+export const paymentTransactions = pgTable('payment_transactions', {
+  id: serial('id').primaryKey(),
+  transactionId: text('transaction_id').notNull().unique(),
+  appointmentId: integer('appointment_id').references(() => appointments.id, { onDelete: 'set null' }),
+  patientId: integer('patient_id').references(() => users.id),
+  doctorId: integer('doctor_id').references(() => doctors.id),
+  transactionType: text('transaction_type').notNull(), // patient_prepay | patient_postpay_upi | patient_postpay_cash | doctor_cash_remittance | refund | adjustment | cancellation_refund
+  status: text('status').notNull().default('pending'), // pending | authorized | captured | completed | failed | refunded | voided
+  amountPaise: integer('amount_paise').notNull().default(0),
+  platformFeePaise: integer('platform_fee_paise').notNull().default(0),
+  doctorEarningsPaise: integer('doctor_earnings_paise').notNull().default(0),
+  gatewayFeePaise: integer('gateway_fee_paise').notNull().default(0),
+  netAmountPaise: integer('net_amount_paise').notNull().default(0),
+  currency: text('currency').notNull().default('INR'),
+  gateway: text('gateway').notNull().default('razorpay'),
+  gatewayOrderId: text('gateway_order_id'),
+  gatewayPaymentId: text('gateway_payment_id'),
+  gatewayTransferId: text('gateway_transfer_id'),
+  gatewayRefundId: text('gateway_refund_id'),
+  paymentMethod: text('payment_method'), // upi | card | netbanking | cash
+  settledAt: timestamp('settled_at', { withTimezone: true }),
+  createdBy: integer('created_by').references(() => users.id),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  metadata: jsonb('metadata').notNull().default({}),
+});
+
+// Cash collected by a doctor at the clinic. Tracks the obligation to remit the
+// platform's share + gateway-independent disbursement back into the settlement pool.
+export const doctorCashLedger = pgTable('doctor_cash_ledger', {
+  id: serial('id').primaryKey(),
+  doctorId: integer('doctor_id').notNull().references(() => doctors.id),
+  appointmentId: integer('appointment_id').references(() => appointments.id, { onDelete: 'set null' }),
+  entryType: text('entry_type').notNull(), // collection | obligation | remittance | adjustment
+  amountPaise: integer('amount_paise').notNull().default(0),
+  platformFeePaise: integer('platform_fee_paise').notNull().default(0),
+  reference: text('reference'),
+  recordedBy: integer('recorded_by').references(() => users.id),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const refunds = pgTable('refunds', {
+  id: serial('id').primaryKey(),
+  refundId: text('refund_id').notNull().unique(),
+  appointmentId: integer('appointment_id').references(() => appointments.id, { onDelete: 'set null' }),
+  paymentTransactionId: integer('payment_transaction_id').references(() => paymentTransactions.id),
+  paymentId: text('payment_id'),
+  amountPaise: integer('amount_paise').notNull(),
+  status: text('status').notNull().default('pending'), // pending | processed | failed
+  reason: text('reason'),
+  gatewayRefundId: text('gateway_refund_id'),
+  createdBy: integer('created_by').references(() => users.id),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// Every Razorpay webhook we receive, stored verbatim for audit + idempotency.
+export const paymentWebhooks = pgTable('payment_webhooks', {
+  id: serial('id').primaryKey(),
+  event: text('event').notNull(),
+  eventId: text('event_id').notNull().unique(),
+  paymentId: text('payment_id'),
+  orderId: text('order_id'),
+  entity: jsonb('entity').notNull(),
+  processed: boolean('processed').notNull().default(false),
+  processedAt: timestamp('processed_at', { withTimezone: true }),
+  receivedAt: timestamp('received_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const settlements = pgTable('settlements', {
+  id: serial('id').primaryKey(),
+  settlementId: text('settlement_id').notNull().unique(),
+  doctorId: integer('doctor_id').notNull().references(() => doctors.id),
+  periodStart: date('period_start').notNull(),
+  periodEnd: date('period_end').notNull(),
+  grossAmountPaise: integer('gross_amount_paise').notNull().default(0),
+  platformFeePaise: integer('platform_fee_paise').notNull().default(0),
+  gatewayFeePaise: integer('gateway_fee_paise').notNull().default(0),
+  netAmountPaise: integer('net_amount_paise').notNull().default(0),
+  status: text('status').notNull().default('pending'), // pending | approved | paid | rejected
+  payoutId: integer('payout_id').references(() => doctorPayouts.id),
+  notes: text('notes'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});

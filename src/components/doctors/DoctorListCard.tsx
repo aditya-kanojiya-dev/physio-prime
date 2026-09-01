@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { BadgeCheck, Calendar, Share2, Check, Home, Video } from 'lucide-react';
+import { BadgeCheck, Calendar, Share2, Check, Home, Video, MapPin } from 'lucide-react';
 import primeBadge from '../../assets/prime-badge.png';
 
 export interface DoctorListCardProps {
@@ -19,6 +19,8 @@ export interface DoctorListCardProps {
   onBookHomeVisit?: () => void;
   onBookOnline?: () => void;
   shareUrl?: string;
+  availabilityNote?: string;
+  onlineNote?: string;
 }
 
 function initialsOf(name: string) {
@@ -40,6 +42,8 @@ export const DoctorListCard: React.FC<DoctorListCardProps> = ({
   onBookHomeVisit,
   onBookOnline,
   shareUrl,
+  availabilityNote,
+  onlineNote,
 }) => {
   const navigate = useNavigate();
   const [copied, setCopied] = useState(false);
@@ -75,6 +79,18 @@ export const DoctorListCard: React.FC<DoctorListCardProps> = ({
       animate={{ opacity: 1, y: 0 }}
       className="bg-white rounded-2xl border border-slate-200/80 shadow-sm hover:shadow-lg transition-all duration-300 p-4 sm:p-5"
     >
+      {availabilityNote && (
+        <div className="mb-3 rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 text-[11px] font-semibold text-slate-600 flex items-center gap-1.5">
+          <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+          {availabilityNote}
+        </div>
+      )}
+      {onlineNote && (
+        <div className="mb-3 rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-2 text-[11px] font-semibold text-emerald-700 flex items-center gap-1.5">
+          <Video className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+          {onlineNote}
+        </div>
+      )}
       {/* Info left · fee right */}
       <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
         <div className="flex items-center gap-4 min-w-0">

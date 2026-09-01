@@ -104,7 +104,7 @@ export function DoctorLedgerPage() {
   // Profile form state
   const [profileForm, setProfileForm] = useState<Record<string, unknown>>({})
   // Fees form state
-  const [feesForm, setFeesForm] = useState({ home: 0, online: 0, clinic: 0 })
+  const [feesForm, setFeesForm] = useState({ home: 0, online: 0 })
   // Location form state
   const [locForm, setLocForm] = useState({ area: '', city: '' })
 
@@ -160,9 +160,8 @@ export function DoctorLedgerPage() {
 
   function startEditFees() {
     setFeesForm({
-      home: (doctor.fees?.home || 0) / 100,
-      online: (doctor.fees?.online || 0) / 100,
-      clinic: (doctor.fees?.clinic || 0) / 100,
+      home: Number(doctor.fees?.home) || 0,
+      online: Number(doctor.fees?.online) || 0,
     })
     setEditingSection('fees')
     setError2(null)
@@ -190,7 +189,7 @@ export function DoctorLedgerPage() {
 
   function saveFees() {
     saveMutation.mutate({
-      fees: { home: Math.round(feesForm.home * 100), online: Math.round(feesForm.online * 100), clinic: Math.round(feesForm.clinic * 100) },
+      fees: { home: Math.round(feesForm.home), online: Math.round(feesForm.online) },
     })
   }
 
@@ -304,17 +303,15 @@ export function DoctorLedgerPage() {
           <Section title="Fees & Location" onEdit={startEditFees} editing={editingSection === 'fees'} onSave={saveFees} onCancel={() => setEditingSection(null)} saving={saving}>
             {editingSection === 'fees' ? (
               <div className="space-y-3">
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-2 gap-3">
                   <Field label="Home Fee (₹)"><input type="number" value={feesForm.home} onChange={(e) => setFeesForm({ ...feesForm, home: Number(e.target.value) })} className={inputCls} /></Field>
                   <Field label="Online Fee (₹)"><input type="number" value={feesForm.online} onChange={(e) => setFeesForm({ ...feesForm, online: Number(e.target.value) })} className={inputCls} /></Field>
-                  <Field label="Clinic Fee (₹)"><input type="number" value={feesForm.clinic} onChange={(e) => setFeesForm({ ...feesForm, clinic: Number(e.target.value) })} className={inputCls} /></Field>
                 </div>
               </div>
             ) : (
               <div className="space-y-0">
-                <InfoRow label="Home Visit Fee" value={doctor.fees?.home ? formatFee(doctor.fees.home) : '—'} />
-                <InfoRow label="Online Fee" value={doctor.fees?.online ? formatFee(doctor.fees.online) : '—'} />
-                <InfoRow label="Clinic Fee" value={doctor.fees?.clinic ? formatFee(doctor.fees.clinic) : '—'} />
+                <InfoRow label="Home Visit Fee" value={doctor.fees?.home ? `₹${Number(doctor.fees.home).toLocaleString('en-IN')}` : '—'} />
+                <InfoRow label="Online Fee" value={doctor.fees?.online ? `₹${Number(doctor.fees.online).toLocaleString('en-IN')}` : '—'} />
               </div>
             )}
           </Section>

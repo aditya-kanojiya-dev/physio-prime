@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { motion, AnimatePresence, MotionConfig } from 'framer-motion';
 import { BookingProvider } from './context/BookingContext';
 import { AuthProvider } from './context/AuthContext';
+import { LocationProvider } from './context/LocationContext';
 import { Navbar } from './components/layout/Navbar';
 import { Footer } from './components/layout/Footer';
 import { HomePage } from './pages/HomePage';
@@ -96,15 +97,17 @@ export function App() {
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
           <BookingProvider>
-            <MotionConfig reducedMotion="user">
-              <div className="min-h-screen flex flex-col">
-                <ScrollToTop />
-                <Navbar />
-                <AnimatedRoutes />
-                <ChatbotButton />
-                <Footer />
-              </div>
-            </MotionConfig>
+            <LocationProvider>
+              <MotionConfig reducedMotion="user">
+                <div className="min-h-screen flex flex-col">
+                  <ScrollToTop />
+                  <Navbar />
+                  <AnimatedRoutes />
+                  <ChatbotButton />
+                  <Footer />
+                </div>
+              </MotionConfig>
+            </LocationProvider>
           </BookingProvider>
         </AuthProvider>
       </QueryClientProvider>
