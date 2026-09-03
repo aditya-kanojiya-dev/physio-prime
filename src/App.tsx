@@ -28,6 +28,10 @@ import { PricingPage } from './pages/PricingPage';
 import { PrivacyPolicyPage } from './pages/PrivacyPolicyPage';
 import { TermsPage } from './pages/TermsPage';
 import { CompliancePage } from './pages/CompliancePage';
+import { NotFoundPage } from './pages/NotFoundPage';
+import { ResetPasswordPage } from './pages/ResetPasswordPage';
+import { ErrorBoundary } from './components/ErrorBoundary';
+import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import { ChatbotButton } from './components/chatbot/ChatbotButton';
 import { pageVariants } from './lib/motion';
 
@@ -52,15 +56,16 @@ function AnimatedRoutes() {
   const location = useLocation();
   return (
     <main className="flex-1">
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={location.pathname}
-          variants={pageVariants}
-          initial="initial"
-          animate="enter"
-          exit="exit"
-        >
-          <Routes location={location}>
+      <ErrorBoundary variant="page" resetKey={location.pathname}>
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={location.pathname}
+            variants={pageVariants}
+            initial="initial"
+            animate="enter"
+            exit="exit"
+          >
+            <Routes location={location}>
             <Route path="/" element={<HomePage />} />
             <Route path="/home" element={<Navigate to="/" replace />} />
             <Route path="/doctors" element={<FindDoctorsPage />} />
@@ -69,8 +74,8 @@ function AnimatedRoutes() {
             <Route path="/categories/:slug" element={<CategoryDetailPage />} />
             <Route path="/conditions" element={<ConditionsHubPage />} />
             <Route path="/conditions/:slug" element={<ConditionDetailPage />} />
-            <Route path="/appointments" element={<AppointmentsPage />} />
-            <Route path="/dashboard" element={<DashboardPage />} />
+<Route path="/appointments" element={<ProtectedRoute><AppointmentsPage /></ProtectedRoute>} />
+<Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
             <Route path="/about" element={<AboutPage />} />
             <Route path="/career" element={<Career />} />
             <Route path="/booking-slots" element={<BookingSlotsPage />} />
@@ -83,10 +88,12 @@ function AnimatedRoutes() {
             <Route path="/privacy" element={<PrivacyPolicyPage />} />
             <Route path="/terms" element={<TermsPage />} />
             <Route path="/compliance" element={<CompliancePage />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </motion.div>
-      </AnimatePresence>
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
+            <Route path="*" element={<NotFoundPage />} />
+            </Routes>
+          </motion.div>
+        </AnimatePresence>
+      </ErrorBoundary>
     </main>
   );
 }
