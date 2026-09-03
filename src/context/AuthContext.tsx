@@ -18,6 +18,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   register: (name: string, email: string, password: string) => Promise<boolean>;
   loginWithGoogle: () => Promise<void>;
+  requestPasswordReset: (email: string) => Promise<void>;
   updateProfile: (patch: ProfilePatch) => Promise<void>;
   logout: () => void;
   authModalOpen: boolean;
@@ -48,7 +49,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     let cancelled = false;
-    supabase.auth.onAuthStateChange(() => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event) => {
+      // Recovery session is only for setting a new password — do not treat it as an app login.
+      if (event === 'PASSWORD_RECOVERY') {
+        if (!cancelled) setHydrated(true);
+        return;
+      }
       syncUserFromSession()
         .then(u => {
           if (!cancelled) {
@@ -66,6 +74,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
     return () => {
       cancelled = true;
+      subscription.unsubscribe();
     };
   }, []);
 
@@ -87,6 +96,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const loginWithGoogle = useCallback(async () => {
     await supabase.auth.signInWithOAuth({ provider: 'google' });
+  }, []);
+
+  const requestPasswordReset = useCallback(async (email: string) => {
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    if (error) throw error;
   }, []);
 
   const updateProfile = useCallback(async (patch: ProfilePatch) => {
@@ -114,13 +130,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       login,
       register,
       loginWithGoogle,
+      requestPasswordReset,
       updateProfile,
       logout,
       authModalOpen,
       openAuthModal,
       closeAuthModal,
     }),
-    [user, hydrated, login, register, loginWithGoogle, updateProfile, logout, authModalOpen, openAuthModal, closeAuthModal]
+    [user, hydrated, login, register, loginWithGoogle, requestPasswordReset, updateProfile, logout, authModalOpen, openAuthModal, closeAuthModal]
   );
 
   return (

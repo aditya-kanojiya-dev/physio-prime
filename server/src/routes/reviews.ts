@@ -8,7 +8,7 @@ import { requireAuth, requireRole } from '../middleware/auth';
 export const reviewsRouter = Router();
 
 const createSchema = z.object({
-  appointmentId: z.coerce.number().int().positive(),
+  appointmentId: z.union([z.number().int().positive(), z.string().min(1)]),
   rating: z.coerce.number().int().min(1).max(5),
   comment: z.string().trim().max(1000).optional(),
 });
@@ -22,7 +22,11 @@ function isUniqueViolation(err: unknown): boolean {
 reviewsRouter.post('/reviews', requireAuth, requireRole('patient'), async (req, res, next) => {
   try {
     const body = createSchema.parse(req.body);
-    const [apt] = await db.select().from(appointments).where(eq(appointments.id, body.appointmentId));
+    const ref = body.appointmentId;
+    const [apt] =
+      typeof ref === 'number' || /^\d+$/.test(String(ref))
+        ? await db.select().from(appointments).where(eq(appointments.id, Number(ref)))
+        : await db.select().from(appointments).where(eq(appointments.bookingId, String(ref)));
     if (!apt) {
       res.status(404).json({ error: { message: 'Appointment not found' } });
       return;

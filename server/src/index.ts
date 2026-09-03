@@ -1,5 +1,10 @@
 import express from 'express';
 import cors from 'cors';
+import { JSON_BODY_LIMIT } from './lib/body-limit';
+import { createCorsOptions } from './lib/cors';
+import { createApiLimiter, createAuthLimiter } from './lib/rate-limit';
+import { securityHeaders } from './lib/security-headers';
+import { trustProxyHops } from './lib/trust-proxy';
 import { errorHandler } from './middleware/error';
 import { healthRouter } from './routes/health';
 import { authRouter } from './routes/auth';
@@ -25,11 +30,15 @@ import { publicBlogRouter } from './routes/public-blog';
 
 export function createApp() {
   const app = express();
-  app.use(cors({ origin: true, credentials: true }));
+  app.set('trust proxy', trustProxyHops());
+  app.use(securityHeaders());
+  app.use(cors(createCorsOptions()));
   // raw-body for the razorpay webhook must run before express.json() so the
   // signature can be verified against the exact bytes received
-  app.post('/api/v1/razorpay/webhook', express.raw({ type: 'application/json' }));
-  app.use(express.json());
+  app.post('/api/v1/razorpay/webhook', express.raw({ type: 'application/json', limit: JSON_BODY_LIMIT }));
+  app.use(express.json({ limit: JSON_BODY_LIMIT }));
+  app.use('/api/v1/auth', createAuthLimiter());
+  app.use('/api/v1', createApiLimiter());
   app.use('/api/v1/health', healthRouter);
   app.use('/api/v1/auth', authRouter);
   app.use('/api/v1/doctors', doctorsRouter);

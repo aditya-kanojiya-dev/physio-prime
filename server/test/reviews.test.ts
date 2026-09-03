@@ -117,6 +117,17 @@ describe('POST /api/v1/reviews', () => {
     expect(second.status).toBe(409);
   });
 
+  it('accepts a booking id as appointmentId', async () => {
+    const patient = await registerPatient('rev.bookingid@example.com');
+    const apt = await insertAppointment(patient.id, 'completed');
+
+    const res = await api
+      .post('/api/v1/reviews')
+      .set('Authorization', `Bearer ${patient.token}`)
+      .send({ appointmentId: apt.bookingId, rating: 4 });
+    expect(res.status).toBe(201);
+  });
+
   it('validates rating range and requires appointmentId', async () => {
     const patient = await registerPatient('rev.bad@example.com');
     const apt = await insertAppointment(patient.id, 'completed');

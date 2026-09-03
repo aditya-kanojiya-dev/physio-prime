@@ -13,15 +13,17 @@ const inputClass =
   'w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 placeholder-slate-400 outline-none transition-all shadow-sm focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20';
 
 export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
-  const { login, register, loginWithGoogle } = useAuth();
+  const { login, register, loginWithGoogle, requestPasswordReset } = useAuth();
   const reduce = useReducedMotion();
   const [isLogin, setIsLogin] = useState(true);
+  const [forgot, setForgot] = useState(false);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [confirmationSent, setConfirmationSent] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldError, setFieldError] = useState<string | null>(null);
 
@@ -36,9 +38,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
 
   const switchMode = (next: boolean) => {
     setIsLogin(next);
+    setForgot(false);
     setError(null);
     setFieldError(null);
     setConfirmationSent(false);
+    setResetSent(false);
     setPassword('');
   };
 
@@ -46,6 +50,18 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
     e.preventDefault();
     setError(null);
     setFieldError(null);
+    if (forgot) {
+      setLoading(true);
+      try {
+        await requestPasswordReset(email);
+        setResetSent(true);
+      } catch (err) {
+        setError(err instanceof ApiError ? err.message : (err as Error)?.message || 'Could not send reset email. Please try again.');
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
     if (!isLogin && password.length < 8) {
       setFieldError('Password must be at least 8 characters.');
       return;
@@ -93,7 +109,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
             className="relative flex max-h-[calc(100dvh-2rem)] w-full max-w-md flex-col overflow-hidden overflow-y-auto rounded-3xl border border-slate-200 bg-white shadow-2xl"
             role="dialog"
             aria-modal="true"
-            aria-label={isLogin ? 'Log in' : 'Create account'}
+            aria-label={forgot ? 'Reset password' : isLogin ? 'Log in' : 'Create account'}
           >
             <button
               onClick={onClose}
@@ -109,15 +125,19 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                 <ShieldCheck className="h-6 w-6" />
               </div>
               <h2 className="text-2xl font-extrabold tracking-tight text-slate-900">
-                {isLogin ? 'Welcome back' : 'Create your account'}
+                {forgot ? 'Reset your password' : isLogin ? 'Welcome back' : 'Create your account'}
               </h2>
               <p className="mt-1 text-sm font-medium text-slate-500">
-                {isLogin ? 'Book and manage your physiotherapy care.' : 'Join PhysioPrime for personalized recovery.'}
+                {forgot
+                  ? 'We will email you a link to choose a new password.'
+                  : isLogin
+                    ? 'Book and manage your physiotherapy care.'
+                    : 'Join PhysioPrime for personalized recovery.'}
               </p>
             </div>
 
             <div className="px-8 pb-8">
-              {/* Segmented tabs */}
+              {!forgot && (
               <div className="mb-6 flex gap-6 border-b border-slate-200">
                 {(
                   [
@@ -142,9 +162,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                   </button>
                 ))}
               </div>
+              )}
 
-              <form key={String(isLogin)} onSubmit={handleSubmit} className="animate-auth-enter space-y-4">
-                {!isLogin && (
+              <form key={forgot ? 'forgot' : String(isLogin)} onSubmit={handleSubmit} className="animate-auth-enter space-y-4">
+                {!isLogin && !forgot && (
                   <div className="space-y-1">
                     <label className="ml-1 text-xs font-bold text-slate-700">Full name</label>
                     <div className="relative">
@@ -178,6 +199,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                   </div>
                 </div>
 
+                {!forgot && (
                 <div className="space-y-1">
                   <label className="ml-1 text-xs font-bold text-slate-700">Password</label>
                   <div className="relative">
@@ -205,7 +227,31 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                     </button>
                   </div>
                   {fieldError && <p className="ml-1 mt-1 text-xs font-semibold text-red-600">{fieldError}</p>}
+                  {isLogin && (
+                    <div className="text-right">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setForgot(true);
+                          setError(null);
+                          setFieldError(null);
+                          setResetSent(false);
+                        }}
+                        className="text-xs font-bold text-teal-700 hover:text-teal-800"
+                      >
+                        Forgot your password?
+                      </button>
+                    </div>
+                  )}
                 </div>
+                )}
+
+                {resetSent && (
+                  <div className="flex items-start gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-xs font-semibold text-emerald-700">
+                    <MailCheck className="mt-0.5 h-4 w-4 shrink-0" />
+                    If an account exists for that email, we sent a reset link. Check your inbox and spam folder.
+                  </div>
+                )}
 
                 {confirmationSent && (
                   <div className="flex items-start gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-xs font-semibold text-emerald-700">
@@ -231,14 +277,27 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                       <Loader2 className="h-4 w-4 animate-spin" />
                       Please wait…
                     </span>
+                  ) : forgot ? (
+                    'Send reset link'
                   ) : isLogin ? (
                     'Log in'
                   ) : (
                     'Create account'
                   )}
                 </button>
+                {forgot && (
+                  <button
+                    type="button"
+                    onClick={() => switchMode(true)}
+                    className="w-full text-center text-xs font-bold text-slate-500 hover:text-slate-700"
+                  >
+                    Back to log in
+                  </button>
+                )}
               </form>
 
+              {!forgot && (
+              <>
               <div className="relative my-6 flex items-center justify-center">
                 <div className="absolute w-full border-t border-slate-200" />
                 <span className="relative bg-white px-3 text-[10px] font-bold uppercase tracking-wider text-slate-400">
@@ -260,6 +319,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                 </svg>
                 Continue with Google
               </button>
+              </>
+              )}
             </div>
           </motion.div>
         </motion.div>

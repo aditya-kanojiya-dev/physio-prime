@@ -145,6 +145,7 @@ const doctorSummary = {
 function serializeAppointment(row: AppointmentView) {
   return {
     id: row.bookingId,
+    appointmentId: row.id,
     doctorId: row.doctorId,
     doctor: row.doctor
       ? {

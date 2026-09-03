@@ -13,6 +13,9 @@ export default defineConfig({
     hookTimeout: 30000,
     env: {
       PG_POOL_MAX: '1',
+      // Keep the real middleware mounted without 429ing suites that share one createApp().
+      RATE_LIMIT_AUTH_MAX: '10000',
+      RATE_LIMIT_API_MAX: '10000',
     },
   },
 });
