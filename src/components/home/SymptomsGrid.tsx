@@ -52,7 +52,7 @@ export const SymptomsGrid: React.FC = () => {
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {symptoms.slice(0, 8).map((symptom, idx) => (
+            {symptoms.filter((s) => (s.image ?? '').startsWith('http')).slice(0, 8).map((symptom, idx) => (
               <motion.div
                 key={symptom.id}
                 initial={{ opacity: 0, y: 20 }}
