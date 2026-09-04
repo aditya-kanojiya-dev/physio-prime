@@ -35,7 +35,20 @@ export const patientProfiles = pgTable('patient_profiles', {
 
 export const doctorApplications = pgTable('doctor_applications', {
   id: serial('id').primaryKey(),
-  userId: integer('user_id').notNull().unique().references(() => users.id),
+  userId: integer('user_id').references(() => users.id),
+  candidateName: text('candidate_name').notNull(),
+  candidateEmail: text('candidate_email').notNull(),
+  phone: text('phone'),
+  position: text('position'),
+  specializations: text('specializations').array().notNull().default([]),
+  qualification: text('qualification'),
+  experience: text('experience'),
+  currentOrganization: text('current_organization'),
+  certifications: text('certifications'),
+  resumeUrl: text('resume_url'),
+  coverLetter: text('cover_letter'),
+  joiningDate: text('joining_date'),
+  consent: boolean('consent').notNull().default(false),
   status: text('status').notNull().default('pending'),
   appliedAt: timestamp('applied_at', { withTimezone: true }).notNull().defaultNow(),
   reviewedAt: timestamp('reviewed_at', { withTimezone: true }),
@@ -124,6 +137,20 @@ export const appointments = pgTable('appointments', {
   patientRelation: text('patient_relation'),
   videoCallLink: text('video_call_link'),
   cancellationReason: text('cancellation_reason'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// One row per session-OTP. startOtp / endOtp are sent together to the patient
+// (matches the approved DLT template) and gate session start / complete.
+export const sessionOtps = pgTable('session_otps', {
+  id: serial('id').primaryKey(),
+  appointmentId: integer('appointment_id').notNull().unique().references(() => appointments.id, { onDelete: 'cascade' }),
+  startHash: text('start_hash').notNull(),
+  endHash: text('end_hash').notNull(),
+  startExpiresAt: timestamp('start_expires_at', { withTimezone: true }).notNull(),
+  endExpiresAt: timestamp('end_expires_at', { withTimezone: true }).notNull(),
+  startVerified: boolean('start_verified').notNull().default(false),
+  endVerified: boolean('end_verified').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 

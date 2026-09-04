@@ -27,7 +27,7 @@ export async function seed(): Promise<void> {
         phone: d.phone || null,
       })),
     )
-    .returning({ id: users.id });
+    .returning({ id: users.id, email: users.email });
 
   await db
     .insert(users)
@@ -83,8 +83,10 @@ export async function seed(): Promise<void> {
   );
 
   await db.insert(doctorApplications).values(
-    DOCTORS_DATA.map((_, i) => ({
+    DOCTORS_DATA.map((d, i) => ({
       userId: insertedUsers[i].id,
+      candidateName: d.name,
+      candidateEmail: insertedUsers[i].email,
       status: 'approved',
     })),
   );

@@ -46,6 +46,9 @@ export function AppointmentsPage() {
   })
   const [collect, setCollect] = useState<{ open: boolean; appointmentId: string }>({ open: false, appointmentId: '' })
   const [qr, setQr] = useState<{ id: string; image: string; shortUrl: string; closeBy: number } | null>(null)
+  const [otpModal, setOtpModal] = useState<{ open: boolean; appointmentId: string; kind: 'start' | 'complete'; phase: 'sending' | 'waiting'; otp: string }>({
+    open: false, appointmentId: '', kind: 'start', phase: 'waiting', otp: '',
+  })
 
   const { data, isLoading } = useQuery({
     queryKey: ['doctor/appointments', date, filter],
@@ -93,15 +96,38 @@ export function AppointmentsPage() {
   })
 
   const startSession = useMutation({
-    mutationFn: (id: string) => api.post<{ appointment: Appointment }>(`/doctor/appointments/${id}/session/start`, {}),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['doctor/appointments'] }),
-    onError: (err) => setError(err instanceof ApiError ? err.message : 'Could not start session'),
+    mutationFn: ({ id, otp }: { id: string; otp: string }) =>
+      api.post<{ appointment: Appointment }>(`/doctor/appointments/${id}/session/start`, { otp }),
+    onSuccess: () => {
+      setOtpModal({ open: false, appointmentId: '', kind: 'start', phase: 'waiting', otp: '' })
+      qc.invalidateQueries({ queryKey: ['doctor/appointments'] })
+    },
+    onError: (err) => {
+      setError(err instanceof ApiError ? err.message : 'Could not start session')
+      setOtpModal((m) => ({ ...m, otp: '' }))
+    },
   })
 
   const completeSession = useMutation({
-    mutationFn: (id: string) => api.post<{ appointment: Appointment }>(`/doctor/appointments/${id}/session/complete`, {}),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['doctor/appointments'] }),
-    onError: (err) => setError(err instanceof ApiError ? err.message : 'Could not complete session'),
+    mutationFn: ({ id, otp }: { id: string; otp: string }) =>
+      api.post<{ appointment: Appointment }>(`/doctor/appointments/${id}/session/complete`, { otp }),
+    onSuccess: () => {
+      setOtpModal({ open: false, appointmentId: '', kind: 'complete', phase: 'waiting', otp: '' })
+      qc.invalidateQueries({ queryKey: ['doctor/appointments'] })
+    },
+    onError: (err) => {
+      setError(err instanceof ApiError ? err.message : 'Could not complete session')
+      setOtpModal((m) => ({ ...m, otp: '' }))
+    },
+  })
+
+  const sendOtp = useMutation({
+    mutationFn: (id: string) => api.post<{ ok: boolean }>(`/doctor/appointments/${id}/session/send-otp`, {}),
+    onSuccess: () => setOtpModal((m) => ({ ...m, phase: 'waiting' })),
+    onError: (err) => {
+      setError(err instanceof ApiError ? err.message : 'Could not send OTP')
+      setOtpModal({ open: false, appointmentId: '', kind: 'start', phase: 'waiting', otp: '' })
+    },
   })
 
   const collectUpi = useMutation({
@@ -263,7 +289,7 @@ export function AppointmentsPage() {
                         )}
                         {a.paymentMode === 'postpay' && a.sessionStartedAt ? (
                           <button
-                            onClick={() => completeSession.mutate(a.id)}
+                            onClick={() => setOtpModal({ open: true, appointmentId: a.id, kind: 'complete', phase: 'waiting', otp: '' })}
                             disabled={completeSession.isPending}
                             className="bg-gradient-to-r from-teal-600 to-blue-600 text-white rounded-xl px-3 py-1.5 font-bold text-[10px] transition-all disabled:opacity-50 flex items-center gap-1"
                           >
@@ -271,7 +297,11 @@ export function AppointmentsPage() {
                           </button>
                         ) : a.paymentMode === 'postpay' ? (
                           <button
-                            onClick={() => startSession.mutate(a.id)}
+                            onClick={() => {
+                              setOtpModal({ open: true, appointmentId: a.id, kind: 'start', phase: 'sending', otp: '' })
+                              setError(null)
+                              sendOtp.mutate(a.id)
+                            }}
                             disabled={startSession.isPending}
                             className="bg-gradient-to-r from-teal-600 to-blue-600 text-white rounded-xl px-3 py-1.5 font-bold text-[10px] transition-all disabled:opacity-50 flex items-center gap-1"
                           >
@@ -380,7 +410,81 @@ export function AppointmentsPage() {
           cashPending={collectCash.isPending}
         />
       )}
+
+      {otpModal.open && (
+        <OtpModal
+          kind={otpModal.kind}
+          phase={otpModal.phase}
+          otp={otpModal.otp}
+          onOtp={(v) => setOtpModal((m) => ({ ...m, otp: v }))}
+          onClose={() => setOtpModal({ open: false, appointmentId: '', kind: 'start', phase: 'waiting', otp: '' })}
+          onConfirm={() =>
+            otpModal.kind === 'start'
+              ? startSession.mutate({ id: otpModal.appointmentId, otp: otpModal.otp })
+              : completeSession.mutate({ id: otpModal.appointmentId, otp: otpModal.otp })
+          }
+        />
+      )}
     </AdminLayout>
+  )
+}
+
+function OtpModal({
+  kind,
+  phase,
+  otp,
+  onOtp,
+  onClose,
+  onConfirm,
+}: {
+  kind: 'start' | 'complete'
+  phase: 'sending' | 'waiting'
+  otp: string
+  onOtp: (v: string) => void
+  onClose: () => void
+  onConfirm: () => void
+}) {
+  return (
+    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+      <div className="bg-white border border-slate-200 rounded-3xl max-w-sm w-full p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-extrabold text-slate-900">
+            {kind === 'start' ? 'Start Session' : 'Complete Session'}
+          </h3>
+          <button onClick={onClose} className="text-slate-500 hover:text-slate-900">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {phase === 'sending' ? (
+          <div className="flex items-center justify-center gap-2 py-6 text-sm font-bold text-slate-600">
+            <Loader2 className="w-5 h-5 animate-spin text-teal-500" /> Sending OTP to patient…
+          </div>
+        ) : (
+          <>
+            <p className="text-xs text-slate-500">
+              Ask the patient for the {kind === 'start' ? 'start' : 'end'} OTP they received by SMS, then enter it below.
+            </p>
+            <input
+              inputMode="numeric"
+              pattern="[0-9]*"
+              maxLength={6}
+              value={otp}
+              onChange={(e) => onOtp(e.target.value.replace(/\D/g, ''))}
+              placeholder="6-digit OTP"
+              className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-900 text-center tracking-[0.5em] focus:outline-none focus:border-teal-500"
+            />
+            <button
+              onClick={onConfirm}
+              disabled={otp.length !== 6}
+              className="w-full py-2.5 rounded-xl bg-gradient-to-r from-teal-600 to-blue-600 text-white font-bold text-sm transition-all disabled:opacity-50"
+            >
+              Confirm {kind === 'start' ? 'Start' : 'Complete'}
+            </button>
+          </>
+        )}
+      </div>
+    </div>
   )
 }
 

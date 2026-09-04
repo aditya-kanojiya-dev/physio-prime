@@ -67,6 +67,9 @@ const doctorColumns = {
   employeeId: doctors.employeeId,
   department: doctors.department,
   address: doctors.address,
+  homeVisitsEnabled: doctors.homeVisitsEnabled,
+  maxRadiusKm: doctors.maxRadiusKm,
+  platformFeePercent: doctors.platformFeePercent,
 };
 
 const appointmentColumns = {
@@ -206,6 +209,99 @@ adminRouter.get('/doctors', async (_req, res, next) => {
   }
 });
 
+const doctorCreateSchema = z.object({
+  name: z.string().min(1).max(100),
+  email: z.string().email(),
+  title: z.string().max(200).optional(),
+  specialty: z.string().max(200).optional(),
+  photo: z.string().url().nullable().optional(),
+  experienceYears: z.number().int().nonnegative().optional(),
+  patientsTreated: z.number().int().nonnegative().optional(),
+  languages: z.array(z.string()).optional(),
+  location: z.record(z.string(), z.unknown()).optional(),
+  fees: z.record(z.string(), z.number().nonnegative()).optional(),
+  nextAvailable: isDate.nullable().optional(),
+  verified: z.boolean().optional(),
+  featured: z.boolean().optional(),
+  gender: z.string().max(20).optional(),
+  bio: z.string().max(5000).nullable().optional(),
+  expertise: z.array(z.string()).optional(),
+  treatments: z.array(z.string()).optional(),
+  education: z.array(z.string()).optional(),
+  experience: z.array(z.record(z.string(), z.unknown())).optional(),
+  registration: z.record(z.string(), z.unknown()).optional(),
+  phone: z.string().max(20).nullable().optional(),
+  designation: z.string().max(100).nullable().optional(),
+  employeeId: z.string().max(50).nullable().optional(),
+  department: z.string().max(100).nullable().optional(),
+  address: z.record(z.string(), z.unknown()).optional(),
+  homeVisitsEnabled: z.boolean().optional(),
+  maxRadiusKm: z.string().optional(),
+  platformFeePercent: z.number().int().min(0).max(100).optional(),
+});
+
+adminRouter.post('/doctors', async (req, res, next) => {
+  try {
+    const body = doctorCreateSchema.parse(req.body);
+    const { email, ...doctorFields } = body;
+
+    // find or create the user
+    let [user] = await db.select().from(users).where(eq(users.email, email));
+    if (!user) {
+      [user] = await db
+        .insert(users)
+        .values({ email, passwordHash: '', role: 'doctor', name: body.name, phone: body.phone ?? null })
+        .returning();
+    }
+
+    const [existing] = await db.select({ id: doctors.id }).from(doctors).where(eq(doctors.userId, user.id));
+    if (existing) {
+      res.status(409).json({ error: { message: 'Doctor profile already exists for this user' } });
+      return;
+    }
+
+    const slug = slugify(body.name, user.id);
+    const [doctor] = await db
+      .insert(doctors)
+      .values({
+        userId: user.id,
+        name: body.name,
+        slug,
+        title: doctorFields.title ?? null,
+        specialty: doctorFields.specialty ?? null,
+        photo: doctorFields.photo ?? null,
+        experienceYears: doctorFields.experienceYears ?? null,
+        patientsTreated: doctorFields.patientsTreated ?? null,
+        languages: doctorFields.languages ?? [],
+        location: doctorFields.location ?? {},
+        fees: doctorFields.fees ?? {},
+        nextAvailable: doctorFields.nextAvailable ?? null,
+        verified: doctorFields.verified ?? false,
+        featured: doctorFields.featured ?? false,
+        gender: doctorFields.gender ?? null,
+        bio: doctorFields.bio ?? null,
+        expertise: doctorFields.expertise ?? [],
+        treatments: doctorFields.treatments ?? [],
+        education: doctorFields.education ?? [],
+        experience: doctorFields.experience ?? [],
+        registration: doctorFields.registration ?? {},
+        phone: doctorFields.phone ?? null,
+        designation: doctorFields.designation ?? null,
+        employeeId: doctorFields.employeeId ?? null,
+        department: doctorFields.department ?? null,
+        address: doctorFields.address ?? {},
+        homeVisitsEnabled: doctorFields.homeVisitsEnabled ?? false,
+        maxRadiusKm: doctorFields.maxRadiusKm ?? '10',
+        platformFeePercent: doctorFields.platformFeePercent ?? 30,
+      })
+      .returning(doctorColumns);
+
+    res.status(201).json({ doctor });
+  } catch (err) {
+    next(err);
+  }
+});
+
 const doctorPatchSchema = z.object({
   name: z.string().min(1).max(100).optional(),
   title: z.string().max(200).optional(),
@@ -267,6 +363,18 @@ adminRouter.get('/doctor-applications', async (_req, res, next) => {
       .select({
         id: doctorApplications.id,
         userId: doctorApplications.userId,
+        candidateName: doctorApplications.candidateName,
+        candidateEmail: doctorApplications.candidateEmail,
+        phone: doctorApplications.phone,
+        position: doctorApplications.position,
+        specializations: doctorApplications.specializations,
+        qualification: doctorApplications.qualification,
+        experience: doctorApplications.experience,
+        currentOrganization: doctorApplications.currentOrganization,
+        certifications: doctorApplications.certifications,
+        coverLetter: doctorApplications.coverLetter,
+        joiningDate: doctorApplications.joiningDate,
+        consent: doctorApplications.consent,
         status: doctorApplications.status,
         appliedAt: doctorApplications.appliedAt,
         reviewedAt: doctorApplications.reviewedAt,
@@ -275,7 +383,7 @@ adminRouter.get('/doctor-applications', async (_req, res, next) => {
         name: users.name,
       })
       .from(doctorApplications)
-      .innerJoin(users, eq(users.id, doctorApplications.userId))
+      .leftJoin(users, eq(users.id, doctorApplications.userId))
       .orderBy(asc(doctorApplications.appliedAt));
     res.json({ applications: rows });
   } catch (err) {
@@ -315,13 +423,27 @@ adminRouter.post('/doctor-applications/:id/decide', async (req, res, next) => {
         .set({ status, reviewedAt: new Date(), notes: body.notes ?? null })
         .where(eq(doctorApplications.id, id));
       if (body.approve) {
-        const [user] = await tx.select().from(users).where(eq(users.id, application.userId));
-        const [doctor] = await tx.select({ id: doctors.id }).from(doctors).where(eq(doctors.userId, application.userId));
-        if (!doctor && user) {
+        // find or create user for this application
+        let userId = application.userId;
+        if (!userId) {
+          const [existingUser] = await tx.select().from(users).where(eq(users.email, application.candidateEmail));
+          if (existingUser) {
+            userId = existingUser.id;
+          } else {
+            const [newUser] = await tx
+              .insert(users)
+              .values({ email: application.candidateEmail, passwordHash: '', role: 'doctor', name: application.candidateName, phone: application.phone ?? null })
+              .returning();
+            userId = newUser.id;
+            await tx.update(doctorApplications).set({ userId }).where(eq(doctorApplications.id, id));
+          }
+        }
+        const [doctor] = await tx.select({ id: doctors.id }).from(doctors).where(eq(doctors.userId, userId));
+        if (!doctor) {
           await tx.insert(doctors).values({
-            userId: user.id,
-            name: user.name,
-            slug: slugify(user.name, user.id),
+            userId,
+            name: application.candidateName,
+            slug: slugify(application.candidateName, userId),
             verified: true,
           });
         }
@@ -917,8 +1039,8 @@ adminRouter.put('/cms/:page/:key', async (req, res, next) => {
   try {
     const page = req.params.page;
     const key = req.params.key;
-    if (!['home', 'about', 'footer'].includes(page)) {
-      res.status(400).json({ error: { message: 'page must be home, about or footer' } });
+    if (!['home', 'about', 'footer', 'settings'].includes(page)) {
+      res.status(400).json({ error: { message: 'page must be home, about, footer or settings' } });
       return;
     }
     const body = cmsPutSchema.parse(req.body);

@@ -27,6 +27,7 @@ import { doctorNotificationsRouter } from './routes/doctor-notifications';
 import { blogRouter } from './routes/blog';
 import { doctorBlogRouter } from './routes/doctor-blog';
 import { publicBlogRouter } from './routes/public-blog';
+import { careersRouter } from './routes/careers';
 
 export function createApp() {
   const app = express();
@@ -60,6 +61,7 @@ export function createApp() {
   app.use('/api/v1/admin/blog', blogRouter);
   app.use('/api/v1/doctor/blog', doctorBlogRouter);
   app.use('/api/v1/blog', publicBlogRouter);
+  app.use('/api/v1/careers', careersRouter);
   app.use(errorHandler);
   return app;
 }

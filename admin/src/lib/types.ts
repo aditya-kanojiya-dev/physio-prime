@@ -96,17 +96,32 @@ export interface AdminDoctor {
   employeeId: string | null;
   department: string | null;
   address: Record<string, unknown>;
+  homeVisitsEnabled: boolean;
+  maxRadiusKm: string;
+  platformFeePercent: number;
 }
 
 export interface AdminApplication {
   id: number;
-  userId: number;
+  userId: number | null;
   status: 'pending' | 'approved' | 'rejected';
   appliedAt: string;
   reviewedAt: string | null;
   notes: string | null;
   email: string;
   name: string;
+  candidateName: string;
+  candidateEmail: string;
+  phone: string | null;
+  position: string | null;
+  specializations: string[];
+  qualification: string | null;
+  experience: string | null;
+  currentOrganization: string | null;
+  certifications: string | null;
+  coverLetter: string | null;
+  joiningDate: string | null;
+  consent: boolean;
 }
 
 export interface AdminPatient {

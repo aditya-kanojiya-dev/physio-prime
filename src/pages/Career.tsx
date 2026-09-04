@@ -122,34 +122,52 @@ export const Career: React.FC = () => {
     }
   };
 
-  // ponytail: simulated submit, no backend yet — wire to API when careers endpoint exists
-  const handleSubmit = (e: React.FormEvent) => {
+  // ponytail: wired to POST /api/v1/careers — resume upload deferred (needs storage infra)
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    
-    setTimeout(() => {
-      setIsLoading(false);
+
+    try {
+      const res = await fetch('/api/v1/careers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fullName: formData.fullName,
+          email: formData.email,
+          phone: formData.phone,
+          position: formData.position,
+          specialization: formData.specialization,
+          qualification: formData.qualification,
+          experience: formData.experience,
+          currentOrganization: formData.currentOrganization,
+          certifications: formData.certifications,
+          coverLetter: formData.coverLetter,
+          joiningDate: formData.joiningDate,
+          consent: formData.consent,
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.error?.message ?? 'Submission failed');
+      }
+
       setIsSubmitted(true);
       setTimeout(() => {
         setIsSubmitted(false);
         setFormData({
-          fullName: '',
-          email: '',
-          phone: '',
-          position: '',
-          specialization: [],
-          qualification: '',
-          experience: '',
-          currentOrganization: '',
-          certifications: '',
-          resume: null,
-          coverLetter: '',
-          joiningDate: '',
-          consent: false
+          fullName: '', email: '', phone: '', position: '', specialization: [],
+          qualification: '', experience: '', currentOrganization: '',
+          certifications: '', resume: null, coverLetter: '', joiningDate: '',
+          consent: false,
         });
         setFileName('');
       }, 3000);
-    }, 1500);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Something went wrong');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (

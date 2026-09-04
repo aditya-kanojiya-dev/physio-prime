@@ -30,6 +30,7 @@ import { TermsPage } from './pages/TermsPage';
 import { CompliancePage } from './pages/CompliancePage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { ResetPasswordPage } from './pages/ResetPasswordPage';
+import { VerifyEmailPage } from './pages/VerifyEmailPage';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import { ChatbotButton } from './components/chatbot/ChatbotButton';
@@ -89,6 +90,7 @@ function AnimatedRoutes() {
             <Route path="/terms" element={<TermsPage />} />
             <Route path="/compliance" element={<CompliancePage />} />
             <Route path="/reset-password" element={<ResetPasswordPage />} />
+            <Route path="/verify" element={<VerifyEmailPage />} />
             <Route path="*" element={<NotFoundPage />} />
             </Routes>
           </motion.div>

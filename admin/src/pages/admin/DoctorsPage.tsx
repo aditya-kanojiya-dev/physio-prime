@@ -4,6 +4,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   AlertCircle,
   CheckCircle,
+  ChevronDown,
+  ChevronUp,
   FileText,
   Loader2,
   MapPin,
@@ -22,6 +24,7 @@ import { ImageUpload } from '../../components/admin/ImageUpload'
 
 const emptyForm = {
   name: '',
+  email: '',
   title: 'Senior Physiotherapist',
   specialty: '',
   photo: '',
@@ -30,10 +33,29 @@ const emptyForm = {
   feesOnline: 500,
   area: '',
   city: 'Nagpur',
+  state: '',
+  pincode: '',
   gender: 'female' as 'male' | 'female',
   verified: true,
   featured: false,
   bio: '',
+  phone: '',
+  designation: '',
+  employeeId: '',
+  department: '',
+  languages: '',
+  expertise: '',
+  treatments: '',
+  education: '',
+  experienceEntries: '' as string,
+  registrationNumber: '',
+  registrationCouncil: '',
+  registrationValidTill: '',
+  homeVisitsEnabled: false,
+  maxRadiusKm: '10',
+  platformFeePercent: 30,
+  patientsTreated: 0,
+  nextAvailable: '',
 }
 
 export function DoctorsPage() {
@@ -44,6 +66,7 @@ export function DoctorsPage() {
   const [error, setError] = useState<string | null>(null)
   const [appError, setAppError] = useState<string | null>(null)
   const [clientsDoctor, setClientsDoctor] = useState<AdminDoctor | null>(null)
+  const [expandedApp, setExpandedApp] = useState<number | null>(null)
 
   const { data: doctors, isLoading } = useQuery({
     queryKey: ['admin/doctors'],
@@ -97,16 +120,40 @@ export function DoctorsPage() {
     setError(null)
     saveDoctor.mutate({
       name: form.name,
+      email: form.email,
       title: form.title,
       specialty: form.specialty,
       photo: form.photo || null,
       experienceYears: Number(form.experienceYears),
+      patientsTreated: Number(form.patientsTreated),
       fees: { home: Math.round(form.feesHome), online: Math.round(form.feesOnline) },
-      location: { area: form.area, city: form.city, address: `${form.area}, ${form.city}` },
+      location: { area: form.area, city: form.city, state: form.state, pincode: form.pincode, address: `${form.area}, ${form.city}` },
+      address: { area: form.area, city: form.city, state: form.state, pincode: form.pincode },
       gender: form.gender,
       verified: form.verified,
       featured: form.featured,
       bio: form.bio,
+      phone: form.phone || null,
+      designation: form.designation || null,
+      employeeId: form.employeeId || null,
+      department: form.department || null,
+      languages: form.languages ? form.languages.split(',').map(s => s.trim()).filter(Boolean) : [],
+      expertise: form.expertise ? form.expertise.split(',').map(s => s.trim()).filter(Boolean) : [],
+      treatments: form.treatments ? form.treatments.split(',').map(s => s.trim()).filter(Boolean) : [],
+      education: form.education ? form.education.split(',').map(s => s.trim()).filter(Boolean) : [],
+      experience: form.experienceEntries ? form.experienceEntries.split('\n').filter(Boolean).map(line => {
+        const [role, institution, period] = line.split('|').map(s => s.trim())
+        return { role: role || '', institution: institution || '', period: period || '' }
+      }) : [],
+      registration: {
+        ...(form.registrationNumber ? { number: form.registrationNumber } : {}),
+        ...(form.registrationCouncil ? { council: form.registrationCouncil } : {}),
+        ...(form.registrationValidTill ? { validTill: form.registrationValidTill } : {}),
+      },
+      homeVisitsEnabled: form.homeVisitsEnabled,
+      maxRadiusKm: form.maxRadiusKm,
+      nextAvailable: form.nextAvailable || null,
+      platformFeePercent: Number(form.platformFeePercent),
     })
   }
 
@@ -155,32 +202,59 @@ export function DoctorsPage() {
             {applications
               .filter((a) => a.status === 'pending')
               .map((a) => (
-                <div key={a.id} className="p-4 rounded-2xl bg-white border border-slate-200 flex items-center justify-between gap-4">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2.5 rounded-xl bg-amber-100 text-amber-700 shrink-0">
-                      <UserRound className="w-5 h-5" />
+                <div key={a.id} className="rounded-2xl bg-white border border-slate-200 overflow-hidden">
+                  <div className="p-4 flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      <div className="p-2.5 rounded-xl bg-amber-100 text-amber-700 shrink-0">
+                        <UserRound className="w-5 h-5" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-extrabold text-slate-900 text-sm">{a.candidateName || a.name}</p>
+                        <p className="text-xs text-slate-500 truncate">{a.candidateEmail || a.email} · {a.position ?? 'No position'} · applied {a.appliedAt.slice(0, 10)}</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-extrabold text-slate-900 text-sm">{a.name}</p>
-                      <p className="text-xs text-slate-500">{a.email} · applied {a.appliedAt.slice(0, 10)}</p>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        onClick={() => setExpandedApp(expandedApp === a.id ? null : a.id)}
+                        className="p-2 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200 transition-all"
+                        title="Toggle details"
+                      >
+                        {expandedApp === a.id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                      </button>
+                      <button
+                        onClick={() => decide.mutate({ id: a.id, approve: true })}
+                        disabled={decide.isPending}
+                        className="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition-all disabled:opacity-50 flex items-center gap-1.5"
+                      >
+                        <CheckCircle className="w-3.5 h-3.5" /> Approve
+                      </button>
+                      <button
+                        onClick={() => decide.mutate({ id: a.id, approve: false })}
+                        disabled={decide.isPending}
+                        className="px-3 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold text-xs transition-all disabled:opacity-50 flex items-center gap-1.5"
+                      >
+                        <X className="w-3.5 h-3.5" /> Reject
+                      </button>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => decide.mutate({ id: a.id, approve: true })}
-                      disabled={decide.isPending}
-                      className="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition-all disabled:opacity-50 flex items-center gap-1.5"
-                    >
-                      <CheckCircle className="w-3.5 h-3.5" /> Approve
-                    </button>
-                    <button
-                      onClick={() => decide.mutate({ id: a.id, approve: false })}
-                      disabled={decide.isPending}
-                      className="px-3 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold text-xs transition-all disabled:opacity-50 flex items-center gap-1.5"
-                    >
-                      <X className="w-3.5 h-3.5" /> Reject
-                    </button>
-                  </div>
+                  {expandedApp === a.id && (
+                    <div className="px-4 pb-4 pt-0 border-t border-slate-100 space-y-3 text-xs">
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-3">
+                        {a.phone && <div><span className="font-bold text-slate-500">Phone</span><p className="text-slate-900 font-semibold">{a.phone}</p></div>}
+                        {a.qualification && <div><span className="font-bold text-slate-500">Qualification</span><p className="text-slate-900 font-semibold">{a.qualification}</p></div>}
+                        {a.experience && <div><span className="font-bold text-slate-500">Experience</span><p className="text-slate-900 font-semibold">{a.experience}</p></div>}
+                        {a.currentOrganization && <div><span className="font-bold text-slate-500">Organization</span><p className="text-slate-900 font-semibold">{a.currentOrganization}</p></div>}
+                        {a.joiningDate && <div><span className="font-bold text-slate-500">Joining Date</span><p className="text-slate-900 font-semibold">{a.joiningDate}</p></div>}
+                        {a.certifications && <div><span className="font-bold text-slate-500">Certifications</span><p className="text-slate-900 font-semibold">{a.certifications}</p></div>}
+                      </div>
+                      {a.specializations && a.specializations.length > 0 && (
+                        <div><span className="font-bold text-slate-500">Specializations</span><div className="flex flex-wrap gap-1 mt-1">{a.specializations.map(s => <span key={s} className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded-full text-[10px] font-bold border border-blue-200">{s}</span>)}</div></div>
+                      )}
+                      {a.coverLetter && (
+                        <div><span className="font-bold text-slate-500">Cover Letter</span><p className="text-slate-700 mt-1 whitespace-pre-wrap">{a.coverLetter}</p></div>
+                      )}
+                    </div>
+                  )}
                 </div>
               ))}
           </div>
@@ -373,43 +447,144 @@ export function DoctorsPage() {
             </div>
 
             <form onSubmit={submit} className="space-y-4 text-xs">
+              {/* Basic Info */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Field label="Doctor Name *">
                   <input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={inputCls} placeholder="Dr. John Doe" />
                 </Field>
-                <Field label="Specialty *">
-                  <input required value={form.specialty} onChange={(e) => setForm({ ...form, specialty: e.target.value })} className={inputCls} placeholder="Sports Injury & Spine Rehabilitation" />
+                <Field label="Email *">
+                  <input required type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className={inputCls} placeholder="doctor@example.com" />
                 </Field>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Field label="Specialty *">
+                  <input required value={form.specialty} onChange={(e) => setForm({ ...form, specialty: e.target.value })} className={inputCls} placeholder="Sports Injury & Spine Rehabilitation" />
+                </Field>
+                <Field label="Title">
+                  <input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className={inputCls} placeholder="Senior Physiotherapist" />
+                </Field>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Field label="Gender">
+                  <select value={form.gender} onChange={(e) => setForm({ ...form, gender: e.target.value as 'male' | 'female' })} className={inputCls}>
+                    <option value="female">Female</option>
+                    <option value="male">Male</option>
+                  </select>
+                </Field>
+                <Field label="Phone">
+                  <input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className={inputCls} placeholder="+91 98765 43210" />
+                </Field>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Field label="Designation">
+                  <input value={form.designation} onChange={(e) => setForm({ ...form, designation: e.target.value })} className={inputCls} placeholder="Consultant Physiotherapist" />
+                </Field>
+                <Field label="Department">
+                  <input value={form.department} onChange={(e) => setForm({ ...form, department: e.target.value })} className={inputCls} placeholder="Rehabilitation" />
+                </Field>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Field label="Employee ID">
+                  <input value={form.employeeId} onChange={(e) => setForm({ ...form, employeeId: e.target.value })} className={inputCls} placeholder="EMP-001" />
+                </Field>
+                <Field label="Experience (Years) *">
+                  <input type="number" required value={form.experienceYears} onChange={(e) => setForm({ ...form, experienceYears: Number(e.target.value) })} className={inputCls} />
+                </Field>
+              </div>
+
+              {/* Fees */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <Field label="Home Fee (₹) *">
                   <input type="number" required value={form.feesHome} onChange={(e) => setForm({ ...form, feesHome: Number(e.target.value) })} className={inputCls} />
                 </Field>
                 <Field label="Online Fee (₹) *">
                   <input type="number" required value={form.feesOnline} onChange={(e) => setForm({ ...form, feesOnline: Number(e.target.value) })} className={inputCls} />
                 </Field>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <ImageUpload value={form.photo} onChange={(url) => setForm({ ...form, photo: url })} folder="doctors" label="Doctor Photo" />
-                <Field label="Experience (Years) *">
-                  <input type="number" required value={form.experienceYears} onChange={(e) => setForm({ ...form, experienceYears: Number(e.target.value) })} className={inputCls} />
+                <Field label="Platform Fee (%)">
+                  <input type="number" value={form.platformFeePercent} onChange={(e) => setForm({ ...form, platformFeePercent: Number(e.target.value) })} className={inputCls} min={0} max={100} />
                 </Field>
               </div>
 
+              {/* Photo & Stats */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <ImageUpload value={form.photo} onChange={(url) => setForm({ ...form, photo: url })} folder="doctors" label="Doctor Photo" />
+                <Field label="Patients Treated">
+                  <input type="number" value={form.patientsTreated} onChange={(e) => setForm({ ...form, patientsTreated: Number(e.target.value) })} className={inputCls} />
+                </Field>
+                <Field label="Next Available">
+                  <input type="date" value={form.nextAvailable} onChange={(e) => setForm({ ...form, nextAvailable: e.target.value })} className={inputCls} />
+                </Field>
+              </div>
+
+              {/* Location */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Field label="Area">
-                  <input type="text" value={form.area} onChange={(e) => setForm({ ...form, area: e.target.value })} className={inputCls} />
+                  <input value={form.area} onChange={(e) => setForm({ ...form, area: e.target.value })} className={inputCls} placeholder="Dharampeth" />
                 </Field>
                 <Field label="City">
-                  <input type="text" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} className={inputCls} />
+                  <input value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} className={inputCls} placeholder="Nagpur" />
+                </Field>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Field label="State">
+                  <input value={form.state} onChange={(e) => setForm({ ...form, state: e.target.value })} className={inputCls} placeholder="Maharashtra" />
+                </Field>
+                <Field label="Pincode">
+                  <input value={form.pincode} onChange={(e) => setForm({ ...form, pincode: e.target.value })} className={inputCls} placeholder="440010" />
                 </Field>
               </div>
 
+              {/* Professional Details */}
+              <Field label="Languages (comma-separated)">
+                <input value={form.languages} onChange={(e) => setForm({ ...form, languages: e.target.value })} className={inputCls} placeholder="English, Hindi, Marathi" />
+              </Field>
+              <Field label="Expertise (comma-separated)">
+                <input value={form.expertise} onChange={(e) => setForm({ ...form, expertise: e.target.value })} className={inputCls} placeholder="Manual Therapy, Dry Needling, Sports Rehab" />
+              </Field>
+              <Field label="Treatments (comma-separated)">
+                <input value={form.treatments} onChange={(e) => setForm({ ...form, treatments: e.target.value })} className={inputCls} placeholder="Back Pain, Knee Rehab, Post-Surgery" />
+              </Field>
+              <Field label="Education (comma-separated)">
+                <input value={form.education} onChange={(e) => setForm({ ...form, education: e.target.value })} className={inputCls} placeholder="BPT - Nagpur University, MPT - Orthopedic" />
+              </Field>
+              <Field label="Experience Entries (one per line: Role | Institution | Period)">
+                <textarea value={form.experienceEntries} onChange={(e) => setForm({ ...form, experienceEntries: e.target.value })} rows={3} className={`${inputCls} resize-none`} placeholder="Senior Physio | City Hospital | 2020-2024&#10;Physio | Rehab Center | 2018-2020" />
+              </Field>
+
+              {/* Registration */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <Field label="Registration Number">
+                  <input value={form.registrationNumber} onChange={(e) => setForm({ ...form, registrationNumber: e.target.value })} className={inputCls} placeholder="A12345" />
+                </Field>
+                <Field label="Registration Council">
+                  <input value={form.registrationCouncil} onChange={(e) => setForm({ ...form, registrationCouncil: e.target.value })} className={inputCls} placeholder="Maharashtra Council" />
+                </Field>
+                <Field label="Registration Valid Till">
+                  <input type="date" value={form.registrationValidTill} onChange={(e) => setForm({ ...form, registrationValidTill: e.target.value })} className={inputCls} />
+                </Field>
+              </div>
+
+              {/* Bio */}
               <Field label="Bio">
                 <textarea value={form.bio} onChange={(e) => setForm({ ...form, bio: e.target.value })} rows={3} className={`${inputCls} resize-none`} placeholder="Brief description of the doctor's expertise..." />
               </Field>
+
+              {/* Settings */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Field label="Max Home Visit Radius (km)">
+                  <input value={form.maxRadiusKm} onChange={(e) => setForm({ ...form, maxRadiusKm: e.target.value })} className={inputCls} />
+                </Field>
+                <div className="flex flex-wrap items-center gap-6 pt-5">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" checked={form.homeVisitsEnabled} onChange={(e) => setForm({ ...form, homeVisitsEnabled: e.target.checked })} className="accent-teal-600 w-4 h-4" />
+                    <span className="font-bold text-slate-600">Home Visits</span>
+                  </label>
+                </div>
+              </div>
 
               <div className="flex flex-wrap items-center gap-6 pt-2">
                 <label className="flex items-center gap-2 cursor-pointer">

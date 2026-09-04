@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { and, desc, eq, inArray } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '../db/pool';
-import { appointments, doctors, doctorSchedules } from '../db/schema';
+import { appointments, doctors, doctorSchedules, users } from '../db/schema';
 import { requireAuth, requireRole } from '../middleware/auth';
 import { availableFromSchedules, dayOfWeek, isPast, isValidDate } from '../lib/slots';
 import { createOrder, verifySignature } from '../lib/razorpay';
@@ -196,6 +196,10 @@ async function sendBookingNotifications(
     const [doctorRow] = row.doctor
       ? []
       : await db.select({ name: doctors.name }).from(doctors).where(eq(doctors.id, row.doctorId));
+    const [patientUser] = await db
+      .select({ email: users.email })
+      .from(users)
+      .where(eq(users.id, row.patientId));
     const ctx: NotificationCtx = {
       patientName: row.patientName,
       doctorName: row.doctor?.name ?? doctorRow?.name ?? 'your physiotherapist',
@@ -211,6 +215,18 @@ async function sendBookingNotifications(
           ? templates.bookingRescheduled(ctx)
           : templates.bookingCancelled({ ...ctx, refunded: extra.refunded });
 
+    // Email is the reliable channel (Twilio WhatsApp/SMS is unconfigured). Best-effort.
+    if (patientUser?.email) {
+      await sendNotification({
+        userId: row.patientId,
+        appointmentId: row.id,
+        channel: 'email',
+        to: patientUser.email,
+        subject: tpl.subject,
+        body: tpl.body,
+        template: kind,
+      });
+    }
     if (row.patientPhone) {
       await sendNotification({
         userId: row.patientId,

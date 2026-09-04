@@ -227,13 +227,12 @@ blogRouter.delete('/tags/:id', async (req, res, next) => {
 blogRouter.get('/posts', async (req, res, next) => {
   try {
     const query = postQuerySchema.parse(req.query);
-    const filters: SQL[] = [];
+    const filters: SQL[] = [eq(blogPosts.status, 'published')];
 
     if (query.q) {
       const q = `%${query.q.trim().toLowerCase()}%`;
       filters.push(or(ilike(blogPosts.title, q), ilike(blogPosts.slug, q), ilike(blogPosts.excerpt, q))!);
     }
-    if (query.status) filters.push(eq(blogPosts.status, query.status));
     if (query.authorType) filters.push(eq(blogPosts.authorType, query.authorType));
     if (query.categoryId) filters.push(eq(blogPosts.categoryId, query.categoryId));
 
@@ -264,7 +263,7 @@ blogRouter.get('/posts/:id', async (req, res, next) => {
       return;
     }
     const post = await getPostWithRelations(id);
-    if (!post) {
+    if (!post || post.status !== 'published') {
       res.status(404).json({ error: { message: 'Post not found' } });
       return;
     }

@@ -160,9 +160,9 @@ export const Navbar: React.FC = () => {
                     Physio<span className="text-gradient">Prime</span>
                   </span>
                 </div>
-                <p className="text-[10px] font-medium text-slate-500 flex items-center gap-1">
+                <div className="text-[10px] font-medium text-slate-500 flex items-center gap-1">
                   <LocationPicker />
-                </p>
+                </div>
               </div>
             </Link>
 

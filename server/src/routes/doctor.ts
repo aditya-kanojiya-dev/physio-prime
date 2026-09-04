@@ -1,14 +1,16 @@
 import { Router } from 'express';
+import { createHash, randomInt } from 'node:crypto';
 import { and, asc, count, desc, eq, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '../db/pool';
-import { appointments, doctors, doctorSchedules, patientProfiles, prescriptions, users } from '../db/schema';
+import { appointments, doctors, doctorSchedules, patientProfiles, prescriptions, sessionOtps, users } from '../db/schema';
 import { requireAuth, requireRole } from '../middleware/auth';
 import { isValidDate, getNextFreeSlot } from '../lib/slots';
 import { requireDoctor, noProfile } from '../lib/doctor';
 import { computeCommission } from '../lib/commission';
 import { recordCashEntry, recordPaymentTransaction } from '../lib/payments';
 import { createUpiQrCode } from '../lib/razorpay';
+import { sendSmartpingSms } from '../lib/notifications';
 
 export const doctorRouter = Router();
 
@@ -214,6 +216,7 @@ async function doctorAppointment(
   feePaise: number;
   sessionStartedAt: Date | null;
   platformFeePercent: number;
+  patientPhone: string;
 } | null> {
   const [row] = await db
     .select({
@@ -225,6 +228,7 @@ async function doctorAppointment(
       feePaise: appointments.feePaise,
       sessionStartedAt: appointments.sessionStartedAt,
       platformFeePercent: doctors.platformFeePercent,
+      patientPhone: appointments.patientPhone,
     })
     .from(appointments)
     .innerJoin(doctors, eq(doctors.id, appointments.doctorId))
@@ -234,6 +238,76 @@ async function doctorAppointment(
 }
 
 // --- session state machine ----------------------------------------------
+
+const OTP_TTL_MIN = 5;
+const otpHash = (v: string) => createHash('sha256').update(v).digest('hex');
+const sixDigit = () => String(randomInt(100000, 1000000));
+
+const otpBodySchema = z.object({ otp: z.string().regex(/^\d{6}$/) });
+
+// Generate both start + end OTPs, send them to the patient in a single SMS
+// matching the approved DLT template, then return a masked confirmation.
+doctorRouter.post('/appointments/:id/session/send-otp', async (req, res, next) => {
+  try {
+    const doctor = await requireDoctor(req.user!.id);
+    if (!doctor) {
+      res.status(noProfile.status).json({ error: { message: noProfile.message } });
+      return;
+    }
+    const row = await doctorAppointment(doctor.id, req.params.id);
+    if (!row) {
+      res.status(404).json({ error: { message: 'Appointment not found' } });
+      return;
+    }
+    if (row.status !== 'upcoming') {
+      res.status(400).json({ error: { message: 'Only upcoming appointments can send an OTP' } });
+      return;
+    }
+    if (row.paymentMode !== 'postpay') {
+      res.status(400).json({ error: { message: 'OTP verification applies only to post-pay appointments' } });
+      return;
+    }
+
+    const startOtp = sixDigit();
+    const endOtp = sixDigit();
+    const now = new Date();
+    const ttlMs = OTP_TTL_MIN * 60 * 1000;
+    const text =
+      `Your PhysioPrime start-OTP is ${startOtp} and end-OTP is ${endOtp}. ` +
+      `Use these OTPs to start and end your session with Dr. ${doctor.name}. Reg. https://physio-prime.in/`;
+
+    const sent = await sendSmartpingSms({ to: row.patientPhone, text });
+    if (!sent) {
+      res.status(503).json({ error: { message: 'SMS provider not configured' } });
+      return;
+    }
+
+    await db
+      .insert(sessionOtps)
+      .values({
+        appointmentId: row.id,
+        startHash: otpHash(startOtp),
+        endHash: otpHash(endOtp),
+        startExpiresAt: new Date(now.getTime() + ttlMs),
+        endExpiresAt: new Date(now.getTime() + ttlMs * 2),
+      })
+      .onConflictDoUpdate({
+        target: sessionOtps.appointmentId,
+        set: {
+          startHash: otpHash(startOtp),
+          endHash: otpHash(endOtp),
+          startExpiresAt: new Date(now.getTime() + ttlMs),
+          endExpiresAt: new Date(now.getTime() + ttlMs * 2),
+          startVerified: false,
+          endVerified: false,
+        },
+      });
+
+    res.json({ ok: true });
+  } catch (err) {
+    next(err);
+  }
+});
 
 // Begin the session. Separate from payment state: a session can start whether or
 // not payment happened (prepay paid, or postpay collected before/after).
@@ -256,6 +330,22 @@ doctorRouter.post('/appointments/:id/session/start', async (req, res, next) => {
     if (row.sessionStartedAt) {
       res.status(400).json({ error: { message: 'Session already started' } });
       return;
+    }
+    if (row.paymentMode === 'postpay') {
+      const parsed = otpBodySchema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: { message: 'A 6-digit OTP is required to start a post-pay session' } });
+        return;
+      }
+      const [otpRow] = await db
+        .select()
+        .from(sessionOtps)
+        .where(and(eq(sessionOtps.appointmentId, row.id), eq(sessionOtps.startVerified, false)));
+      if (!otpRow || otpHash(parsed.data.otp) !== otpRow.startHash || otpRow.startExpiresAt < new Date()) {
+        res.status(401).json({ error: { message: 'Invalid or expired OTP' } });
+        return;
+      }
+      await db.update(sessionOtps).set({ startVerified: true }).where(eq(sessionOtps.id, otpRow.id));
     }
     const [updated] = await db
       .update(appointments)
@@ -284,6 +374,22 @@ doctorRouter.post('/appointments/:id/session/complete', async (req, res, next) =
     if (row.status !== 'upcoming' || !row.sessionStartedAt) {
       res.status(400).json({ error: { message: 'Start the session before completing it' } });
       return;
+    }
+    if (row.paymentMode === 'postpay') {
+      const parsed = otpBodySchema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: { message: 'A 6-digit OTP is required to complete a post-pay session' } });
+        return;
+      }
+      const [otpRow] = await db
+        .select()
+        .from(sessionOtps)
+        .where(and(eq(sessionOtps.appointmentId, row.id), eq(sessionOtps.endVerified, false)));
+      if (!otpRow || otpHash(parsed.data.otp) !== otpRow.endHash || otpRow.endExpiresAt < new Date()) {
+        res.status(401).json({ error: { message: 'Invalid or expired OTP' } });
+        return;
+      }
+      await db.update(sessionOtps).set({ endVerified: true }).where(eq(sessionOtps.id, otpRow.id));
     }
     const durationSec = Math.max(0, Math.round((Date.now() - row.sessionStartedAt.getTime()) / 1000));
     const [updated] = await db
