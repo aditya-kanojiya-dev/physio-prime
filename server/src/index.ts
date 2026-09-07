@@ -34,6 +34,13 @@ export function createApp() {
   app.set('trust proxy', trustProxyHops());
   app.use(securityHeaders());
   app.use(cors(createCorsOptions()));
+  // ponytail: no-store the dynamic API so Vercel's edge never serves a cached
+  // cross-origin reply (e.g. a 304 stored without Access-Control-Allow-Origin).
+  // CDN-cacheable static lists later if this becomes a perf bottleneck.
+  app.use('/api/v1', (_req, res, next) => {
+    res.setHeader('Cache-Control', 'no-store');
+    next();
+  });
   // raw-body for the razorpay webhook must run before express.json() so the
   // signature can be verified against the exact bytes received
   app.post('/api/v1/razorpay/webhook', express.raw({ type: 'application/json', limit: JSON_BODY_LIMIT }));
