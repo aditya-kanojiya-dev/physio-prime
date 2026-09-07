@@ -10,7 +10,13 @@ function envInt(name: string, fallback: number): number {
 
 export function isRateLimitExempt(req: Pick<Request, 'originalUrl' | 'path'>): boolean {
   const url = (req.originalUrl || req.path || '').split('?')[0];
-  return url === '/api/v1/health' || url === '/api/v1/razorpay/webhook';
+  // /auth/me is a token-gated identity check hit on every page load — exempting
+  // it from the login brute-force limiter stops harmless reloads from 429ing.
+  return (
+    url === '/api/v1/health' ||
+    url === '/api/v1/razorpay/webhook' ||
+    url === '/api/v1/auth/me'
+  );
 }
 
 const jsonTooManyRequests: RequestHandler = (_req, res) => {
@@ -37,6 +43,6 @@ export function createApiLimiter(): RequestHandler {
   return rateLimit({
     ...shared,
     windowMs: envInt('RATE_LIMIT_API_WINDOW_MS', 60 * 1000),
-    limit: envInt('RATE_LIMIT_API_MAX', 120),
+    limit: envInt('RATE_LIMIT_API_MAX', 600),
   });
 }
