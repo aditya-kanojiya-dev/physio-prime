@@ -70,6 +70,7 @@ export function LocationsPage() {
   })
 
   const areas = master.data?.areas ?? []
+  const loadError = error ?? ((current.error ?? master.error) as ApiError | undefined)?.message ?? null
   const toggle = (area: string) => {
     setError(null)
     const loc = byArea.get(area)
@@ -89,9 +90,9 @@ export function LocationsPage() {
           </p>
         </div>
 
-        {error && (
+        {loadError && (
           <div className="flex items-center gap-2 rounded-xl bg-rose-50 border border-rose-200 px-3 py-2 text-xs font-bold text-rose-600">
-            <AlertCircle className="h-4 w-4 shrink-0" /> {error}
+            <AlertCircle className="h-4 w-4 shrink-0" /> {loadError}
           </div>
         )}
 

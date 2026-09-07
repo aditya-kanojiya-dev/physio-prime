@@ -68,7 +68,7 @@ export function DoctorOverviewPage() {
         {/* Greeting */}
         <div>
           <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-            {greeting}, Dr. {user?.name?.split(' ')[0] || ''}
+            {greeting}, {user?.name?.split(' ')[0] || ''}
           </h1>
           <p className="text-sm font-semibold text-slate-500 mt-1">
             {today} — Here's your practice overview for today.
