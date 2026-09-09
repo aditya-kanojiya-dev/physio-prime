@@ -138,6 +138,16 @@ describe('PATCH /api/v1/auth/me profile fields', () => {
     expect(res.status).toBe(200);
     expect(res.body.user.dob).toBeNull();
   });
+
+  it('stores the default empty object when address is sent as null', async () => {
+    const email = 'profile.null-address@example.com';
+    const res = await api
+      .patch('/api/v1/auth/me')
+      .set('Authorization', `Bearer ${email}`)
+      .send({ address: null });
+    expect(res.status).toBe(200);
+    expect(res.body.user.address).toEqual({});
+  });
 });
 
 describe('removed endpoints', () => {

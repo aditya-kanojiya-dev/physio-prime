@@ -65,6 +65,9 @@ authRouter.patch('/me', requireAuth, async (req, res, next) => {
     for (const key of ['gender', 'dob', 'weight', 'height', 'address'] as const) {
       if (body[key] !== undefined) profilePatch[key] = body[key];
     }
+    // ponytail: address is jsonb NOT NULL default {} — a null from the profile form
+    // ("no address set") would violate the constraint; store the default instead.
+    if (profilePatch.address === null) profilePatch.address = {};
     if (Object.keys(body).length === 0) {
       res.status(400).json({ error: { message: 'Nothing to update' } });
       return;
