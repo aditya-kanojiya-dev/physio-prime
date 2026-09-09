@@ -6,6 +6,7 @@ import {
   appointments,
   categories,
   contentSections,
+  departments,
   doctorApplications,
   doctorLocations,
   doctorPayouts,
@@ -14,6 +15,7 @@ import {
   patientProfiles,
   prescriptions,
   reviews,
+  serviceAreas,
   symptoms,
   users,
 } from '../db/schema';
@@ -23,6 +25,11 @@ import { getEarnedNet } from './payouts';
 export const adminRouter = Router();
 
 adminRouter.use(requireAuth, requireRole('admin'));
+
+function parseId(raw: string): number | null {
+  const id = Number(raw);
+  return Number.isInteger(id) ? id : null;
+}
 
 const isDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'date must be YYYY-MM-DD');
 
@@ -70,6 +77,8 @@ const doctorColumns = {
   homeVisitsEnabled: doctors.homeVisitsEnabled,
   maxRadiusKm: doctors.maxRadiusKm,
   platformFeePercent: doctors.platformFeePercent,
+  categoryId: doctors.categoryId,
+  deletionRequestedAt: doctors.deletionRequestedAt,
 };
 
 const appointmentColumns = {
@@ -199,9 +208,11 @@ adminRouter.get('/insights', async (req, res, next) => {
 adminRouter.get('/doctors', async (_req, res, next) => {
   try {
     const rows = await db
-      .select({ ...doctorColumns, email: users.email })
+      .select({ ...doctorColumns, email: users.email, status: users.status, categoryTitle: categories.title, departmentPlatformFeePercent: departments.platformFeePercent })
       .from(doctors)
       .innerJoin(users, eq(users.id, doctors.userId))
+      .leftJoin(departments, eq(departments.name, doctors.department))
+      .leftJoin(categories, eq(categories.id, doctors.categoryId))
       .orderBy(asc(doctors.name));
     res.json({ doctors: rows });
   } catch (err) {
@@ -232,12 +243,12 @@ const doctorCreateSchema = z.object({
   registration: z.record(z.string(), z.unknown()).optional(),
   phone: z.string().max(20).nullable().optional(),
   designation: z.string().max(100).nullable().optional(),
-  employeeId: z.string().max(50).nullable().optional(),
   department: z.string().max(100).nullable().optional(),
   address: z.record(z.string(), z.unknown()).optional(),
   homeVisitsEnabled: z.boolean().optional(),
   maxRadiusKm: z.string().optional(),
-  platformFeePercent: z.number().int().min(0).max(100).optional(),
+  platformFeePercent: z.number().int().min(0).max(100).nullable().optional(),
+  categoryId: z.number().int().positive().nullable().optional(),
 });
 
 adminRouter.post('/doctors', async (req, res, next) => {
@@ -260,13 +271,18 @@ adminRouter.post('/doctors', async (req, res, next) => {
       return;
     }
 
-    const slug = slugify(body.name, user.id);
+    const [{ id: nextId }] = (await db.execute(sql`select nextval('doctors_id_seq')::int as id`)).rows;
+    const doctorId = Number(nextId);
+    const employeeId = `EMP-${String(doctorId).padStart(3, '0')}`;
+    const slug = slugify(body.name, doctorId);
     const [doctor] = await db
       .insert(doctors)
       .values({
+        id: doctorId,
         userId: user.id,
         name: body.name,
         slug,
+        employeeId,
         title: doctorFields.title ?? null,
         specialty: doctorFields.specialty ?? null,
         photo: doctorFields.photo ?? null,
@@ -287,13 +303,13 @@ adminRouter.post('/doctors', async (req, res, next) => {
         registration: doctorFields.registration ?? {},
         phone: doctorFields.phone ?? null,
         designation: doctorFields.designation ?? null,
-        employeeId: doctorFields.employeeId ?? null,
         department: doctorFields.department ?? null,
         address: doctorFields.address ?? {},
         homeVisitsEnabled: doctorFields.homeVisitsEnabled ?? false,
         maxRadiusKm: doctorFields.maxRadiusKm ?? '10',
-        platformFeePercent: doctorFields.platformFeePercent ?? 30,
-      })
+        platformFeePercent: doctorFields.platformFeePercent ?? null,
+        categoryId: doctorFields.categoryId ?? null,
+      } as any)
       .returning(doctorColumns);
 
     res.status(201).json({ doctor });
@@ -306,7 +322,6 @@ const doctorPatchSchema = z.object({
   name: z.string().min(1).max(100).optional(),
   title: z.string().max(200).optional(),
   specialty: z.string().max(200).optional(),
-  slug: z.string().regex(/^[a-z0-9-]+$/).optional(),
   photo: z.string().url().nullable().optional(),
   experienceYears: z.number().int().nonnegative().optional(),
   patientsTreated: z.number().int().nonnegative().optional(),
@@ -325,11 +340,12 @@ const doctorPatchSchema = z.object({
   registration: z.record(z.string(), z.unknown()).optional(),
   phone: z.string().max(20).nullable().optional(),
   designation: z.string().max(100).nullable().optional(),
-  employeeId: z.string().max(50).nullable().optional(),
   department: z.string().max(100).nullable().optional(),
   address: z.record(z.string(), z.unknown()).optional(),
   homeVisitsEnabled: z.boolean().optional(),
   maxRadiusKm: z.string().optional(),
+  platformFeePercent: z.number().int().min(0).max(100).nullable().optional(),
+  categoryId: z.number().int().positive().nullable().optional(),
 });
 
 adminRouter.patch('/doctors/:id', async (req, res, next) => {
@@ -339,17 +355,231 @@ adminRouter.patch('/doctors/:id', async (req, res, next) => {
       res.status(400).json({ error: { message: 'Nothing to update' } });
       return;
     }
-    const id = Number(req.params.id);
-    if (!Number.isInteger(id)) {
-      res.status(400).json({ error: { message: 'id must be an integer' } });
-      return;
-    }
+    const id = parseId(req.params.id);
+    if (id === null) return res.status(400).json({ error: { message: 'id must be an integer' } });
     const [updated] = await db.update(doctors).set(body).where(eq(doctors.id, id)).returning(doctorColumns);
     if (!updated) {
       res.status(404).json({ error: { message: 'Doctor not found' } });
       return;
     }
     res.json({ doctor: updated });
+  } catch (err) {
+    next(err);
+  }
+});
+
+const doctorStatusSchema = z.object({
+  status: z.enum(['active', 'inactive']),
+});
+
+adminRouter.patch('/doctors/:id/status', async (req, res, next) => {
+  try {
+    const { status } = doctorStatusSchema.parse(req.body);
+    const id = parseId(req.params.id);
+    if (id === null) return res.status(400).json({ error: { message: 'id must be an integer' } });
+    const [doctor] = await db.select({ userId: doctors.userId }).from(doctors).where(eq(doctors.id, id));
+    if (!doctor) {
+      res.status(404).json({ error: { message: 'Doctor not found' } });
+      return;
+    }
+    await db.update(users).set({ status }).where(eq(users.id, doctor.userId));
+    res.json({ status });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ponytail: hard delete only when the doctor has no history (appointments/payouts/
+// reviews/prescriptions are FK-restrictive). Otherwise 409 pointing at the toggle —
+// deactivate keeps the record while hiding the profile.
+async function doctorHasHistory(tx: Parameters<Parameters<typeof db.transaction>[0]>[0], doctorId: number): Promise<string | null> {
+  const counts = await Promise.all([
+    tx.select({ c: sql<number>`count(*)` }).from(appointments).where(sql`${appointments.doctorId} = ${doctorId} OR ${appointments.paymentCollectedByDoctorId} = ${doctorId}`),
+    tx.select({ c: sql<number>`count(*)` }).from(doctorPayouts).where(eq(doctorPayouts.doctorId, doctorId)),
+    tx.select({ c: sql<number>`count(*)` }).from(reviews).where(eq(reviews.doctorId, doctorId)),
+    tx.select({ c: sql<number>`count(*)` }).from(prescriptions).where(eq(prescriptions.doctorId, doctorId)),
+  ]);
+  const [appointmentsCount, payoutsCount, reviewsCount, prescriptionsCount] = counts.map((row) => Number(row[0].c));
+  if (appointmentsCount > 0) return 'appointment history';
+  if (payoutsCount > 0) return 'payout history';
+  if (reviewsCount > 0) return 'reviews';
+  if (prescriptionsCount > 0) return 'prescriptions';
+  return null;
+}
+
+adminRouter.delete('/doctors/:id', async (req, res, next) => {
+  try {
+    const id = parseId(req.params.id);
+    if (id === null) return res.status(400).json({ error: { message: 'id must be an integer' } });
+    const [doctor] = await db.select({ id: doctors.id, userId: doctors.userId }).from(doctors).where(eq(doctors.id, id));
+    if (!doctor) {
+      res.status(404).json({ error: { message: 'Doctor not found' } });
+      return;
+    }
+    let blocker: string | null = null;
+    try {
+      await db.transaction(async (tx) => {
+        blocker = await doctorHasHistory(tx, id);
+        if (blocker) return;
+        // ponytail: deleting the user trips FK-restrict on patient-side rows
+        // (appointments.patient_id, notifications, etc.) that don't belong to
+        // the doctor-side history guard. Catch 23503 and 409 rather than
+        // maintaining a second list of tables.
+        await tx.delete(doctors).where(eq(doctors.id, id));
+        await tx.delete(users).where(eq(users.id, doctor.userId));
+      });
+    } catch (err) {
+      // DrizzleQueryError wraps the pg error; 23503 sits on err.cause.
+      const code = (err as { code?: string; cause?: { code?: string } } | null)?.cause?.code;
+      if (code === '23503') {
+        res.status(409).json({
+          error: { message: 'Doctor has linked account history (patient bookings, notifications, etc.). Deactivate the profile instead — it stops appearing on the site while keeping records.' },
+        });
+        return;
+      }
+      throw err;
+    }
+    if (blocker) {
+      res.status(409).json({
+        error: { message: `Doctor has ${blocker}. Deactivate the profile instead — it stops appearing on the site while keeping records.` },
+      });
+      return;
+    }
+    res.json({ deleted: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// --- service areas (master location list) --------------------------------
+
+const serviceAreaSchema = z.object({
+  name: z.string().min(1).max(100),
+  city: z.string().min(1).max(100).optional(),
+  active: z.boolean().optional(),
+  sortOrder: z.number().int().nonnegative().optional(),
+});
+
+adminRouter.get('/service-areas', async (_req, res, next) => {
+  try {
+    const rows = await db.select().from(serviceAreas).orderBy(asc(serviceAreas.sortOrder), asc(serviceAreas.name));
+    res.json({ areas: rows });
+  } catch (err) {
+    next(err);
+  }
+});
+
+adminRouter.post('/service-areas', async (req, res, next) => {
+  try {
+    const body = serviceAreaSchema.parse(req.body);
+    const [area] = await db
+      .insert(serviceAreas)
+      .values({ name: body.name, city: body.city ?? 'Nagpur', active: body.active ?? true, sortOrder: body.sortOrder ?? 0 })
+      .returning();
+    res.status(201).json({ area });
+  } catch (err) {
+    next(err);
+  }
+});
+
+adminRouter.patch('/service-areas/:id', async (req, res, next) => {
+  try {
+    const id = parseId(req.params.id);
+    if (id === null) return res.status(400).json({ error: { message: 'id must be an integer' } });
+    const body = serviceAreaSchema.partial().parse(req.body);
+    const [updated] = await db.update(serviceAreas).set(body).where(eq(serviceAreas.id, id)).returning();
+    if (!updated) {
+      res.status(404).json({ error: { message: 'Service area not found' } });
+      return;
+    }
+    res.json({ area: updated });
+  } catch (err) {
+    next(err);
+  }
+});
+
+adminRouter.delete('/service-areas/:id', async (req, res, next) => {
+  try {
+    const id = parseId(req.params.id);
+    if (id === null) return res.status(400).json({ error: { message: 'id must be an integer' } });
+    const deleted = await db.delete(serviceAreas).where(eq(serviceAreas.id, id)).returning({ id: serviceAreas.id });
+    if (!deleted.length) {
+      res.status(404).json({ error: { message: 'Service area not found' } });
+      return;
+    }
+    res.status(204).send();
+  } catch (err) {
+    next(err);
+  }
+});
+
+// --- admin: manage any doctor's practice locations -----------------------
+
+const adminLocationSchema = z.object({
+  name: z.string().min(1).max(200),
+  address: z.string().optional(),
+  area: z.string().optional(),
+  city: z.string().optional(),
+  state: z.string().optional(),
+  pincode: z.string().optional(),
+  lat: z.string().optional(),
+  lng: z.string().optional(),
+  radiusKm: z.string().optional(),
+  isPrimary: z.boolean().optional(),
+  active: z.boolean().optional(),
+});
+
+adminRouter.get('/doctors/:id/locations', async (req, res, next) => {
+  try {
+    const id = parseId(req.params.id);
+    if (id === null) return res.status(400).json({ error: { message: 'id must be an integer' } });
+    const locations = await db.select().from(doctorLocations).where(eq(doctorLocations.doctorId, id)).orderBy(asc(doctorLocations.id));
+    res.json({ locations });
+  } catch (err) {
+    next(err);
+  }
+});
+
+adminRouter.post('/doctors/:id/locations', async (req, res, next) => {
+  try {
+    const id = parseId(req.params.id);
+    if (id === null) return res.status(400).json({ error: { message: 'id must be an integer' } });
+    const body = adminLocationSchema.parse(req.body);
+    const [location] = await db.insert(doctorLocations).values({ doctorId: id, ...body }).returning();
+    res.status(201).json({ location });
+  } catch (err) {
+    next(err);
+  }
+});
+
+const adminLocationPatchSchema = adminLocationSchema.partial();
+
+adminRouter.patch('/locations/:id', async (req, res, next) => {
+  try {
+    const id = parseId(req.params.id);
+    if (id === null) return res.status(400).json({ error: { message: 'id must be an integer' } });
+    const body = adminLocationPatchSchema.parse(req.body);
+    const [updated] = await db.update(doctorLocations).set(body).where(eq(doctorLocations.id, id)).returning();
+    if (!updated) {
+      res.status(404).json({ error: { message: 'Location not found' } });
+      return;
+    }
+    res.json({ location: updated });
+  } catch (err) {
+    next(err);
+  }
+});
+
+adminRouter.delete('/locations/:id', async (req, res, next) => {
+  try {
+    const id = parseId(req.params.id);
+    if (id === null) return res.status(400).json({ error: { message: 'id must be an integer' } });
+    const deleted = await db.delete(doctorLocations).where(eq(doctorLocations.id, id)).returning({ id: doctorLocations.id });
+    if (!deleted.length) {
+      res.status(404).json({ error: { message: 'Location not found' } });
+      return;
+    }
+    res.status(204).send();
   } catch (err) {
     next(err);
   }
@@ -399,11 +629,8 @@ const decideSchema = z.object({
 adminRouter.post('/doctor-applications/:id/decide', async (req, res, next) => {
   try {
     const body = decideSchema.parse(req.body);
-    const id = Number(req.params.id);
-    if (!Number.isInteger(id)) {
-      res.status(400).json({ error: { message: 'id must be an integer' } });
-      return;
-    }
+    const id = parseId(req.params.id);
+    if (id === null) return res.status(400).json({ error: { message: 'id must be an integer' } });
     const [application] = await db
       .select()
       .from(doctorApplications)
@@ -440,12 +667,16 @@ adminRouter.post('/doctor-applications/:id/decide', async (req, res, next) => {
         }
         const [doctor] = await tx.select({ id: doctors.id }).from(doctors).where(eq(doctors.userId, userId));
         if (!doctor) {
+          const [{ id: nextId }] = (await tx.execute(sql`select nextval('doctors_id_seq')::int as id`)).rows;
+          const doctorId = Number(nextId);
           await tx.insert(doctors).values({
+            id: doctorId,
             userId,
             name: application.candidateName,
-            slug: slugify(application.candidateName, userId),
+            slug: slugify(application.candidateName, doctorId),
             verified: true,
-          });
+            employeeId: `EMP-${String(doctorId).padStart(3, '0')}`,
+          } as any);
         }
       }
     });
@@ -486,11 +717,8 @@ adminRouter.get('/patients', async (req, res, next) => {
 
 adminRouter.get('/doctors/:id/clients', async (req, res, next) => {
   try {
-    const id = Number(req.params.id);
-    if (!Number.isInteger(id)) {
-      res.status(400).json({ error: { message: 'id must be an integer' } });
-      return;
-    }
+    const id = parseId(req.params.id);
+    if (id === null) return res.status(400).json({ error: { message: 'id must be an integer' } });
     const [doctor] = await db.select({ id: doctors.id, name: doctors.name }).from(doctors).where(eq(doctors.id, id));
     if (!doctor) {
       res.status(404).json({ error: { message: 'Doctor not found' } });
@@ -524,11 +752,8 @@ adminRouter.get('/doctors/:id/clients', async (req, res, next) => {
 
 adminRouter.get('/doctors/:id', async (req, res, next) => {
   try {
-    const id = Number(req.params.id);
-    if (!Number.isInteger(id)) {
-      res.status(400).json({ error: { message: 'id must be an integer' } });
-      return;
-    }
+    const id = parseId(req.params.id);
+    if (id === null) return res.status(400).json({ error: { message: 'id must be an integer' } });
 
     const [doctor] = await db
       .select({ ...doctorColumns, email: users.email })
@@ -624,11 +849,8 @@ const patientDetailColumns = {
 
 adminRouter.get('/patients/:id', async (req, res, next) => {
   try {
-    const id = Number(req.params.id);
-    if (!Number.isInteger(id)) {
-      res.status(400).json({ error: { message: 'id must be an integer' } });
-      return;
-    }
+    const id = parseId(req.params.id);
+    if (id === null) return res.status(400).json({ error: { message: 'id must be an integer' } });
     const [patient] = await db
       .select(patientDetailColumns)
       .from(users)
@@ -758,11 +980,8 @@ adminRouter.get('/appointments', async (req, res, next) => {
       filters.push(eq(appointments.date, parsed.data));
     }
     if (query.doctorId) {
-      const doctorId = Number(query.doctorId);
-      if (!Number.isInteger(doctorId)) {
-        res.status(400).json({ error: { message: 'doctorId must be an integer' } });
-        return;
-      }
+      const doctorId = parseId(String(query.doctorId));
+      if (doctorId === null) return res.status(400).json({ error: { message: 'doctorId must be an integer' } });
       filters.push(eq(appointments.doctorId, doctorId));
     }
     const { from, to, error } = parseRange(query);
@@ -847,11 +1066,8 @@ adminRouter.patch('/users/:id', async (req, res, next) => {
       res.status(400).json({ error: { message: 'Nothing to update' } });
       return;
     }
-    const id = Number(req.params.id);
-    if (!Number.isInteger(id)) {
-      res.status(400).json({ error: { message: 'id must be an integer' } });
-      return;
-    }
+    const id = parseId(req.params.id);
+    if (id === null) return res.status(400).json({ error: { message: 'id must be an integer' } });
     const [updated] = await db.update(users).set(body).where(eq(users.id, id)).returning(patientColumns);
     if (!updated) {
       res.status(404).json({ error: { message: 'User not found' } });
@@ -905,11 +1121,8 @@ adminRouter.patch('/categories/:id', async (req, res, next) => {
       res.status(400).json({ error: { message: 'Nothing to update' } });
       return;
     }
-    const id = Number(req.params.id);
-    if (!Number.isInteger(id)) {
-      res.status(400).json({ error: { message: 'id must be an integer' } });
-      return;
-    }
+    const id = parseId(req.params.id);
+    if (id === null) return res.status(400).json({ error: { message: 'id must be an integer' } });
     const [updated] = await db.update(categories).set(body).where(eq(categories.id, id)).returning();
     if (!updated) {
       res.status(404).json({ error: { message: 'Category not found' } });
@@ -923,17 +1136,49 @@ adminRouter.patch('/categories/:id', async (req, res, next) => {
 
 adminRouter.delete('/categories/:id', async (req, res, next) => {
   try {
-    const id = Number(req.params.id);
-    if (!Number.isInteger(id)) {
-      res.status(400).json({ error: { message: 'id must be an integer' } });
-      return;
-    }
+    const id = parseId(req.params.id);
+    if (id === null) return res.status(400).json({ error: { message: 'id must be an integer' } });
     const deleted = await db.delete(categories).where(eq(categories.id, id)).returning({ id: categories.id });
     if (deleted.length === 0) {
       res.status(404).json({ error: { message: 'Category not found' } });
       return;
     }
     res.status(204).end();
+  } catch (err) {
+    next(err);
+  }
+});
+
+// --- departments --------------------------------------------------------
+
+const departmentFeeSchema = z.object({
+  platformFeePercent: z.number().int().min(0).max(100).optional(),
+});
+
+adminRouter.get('/departments', async (_req, res, next) => {
+  try {
+    const rows = await db.select().from(departments).orderBy(asc(departments.sortOrder), asc(departments.id));
+    res.json({ departments: rows });
+  } catch (err) {
+    next(err);
+  }
+});
+
+adminRouter.patch('/departments/:id', async (req, res, next) => {
+  try {
+    const body = departmentFeeSchema.partial().parse(req.body);
+    if (Object.keys(body).length === 0) {
+      res.status(400).json({ error: { message: 'Nothing to update' } });
+      return;
+    }
+    const id = parseId(req.params.id);
+    if (id === null) return res.status(400).json({ error: { message: 'id must be an integer' } });
+    const [updated] = await db.update(departments).set(body).where(eq(departments.id, id)).returning();
+    if (!updated) {
+      res.status(404).json({ error: { message: 'Department not found' } });
+      return;
+    }
+    res.json({ department: updated });
   } catch (err) {
     next(err);
   }
@@ -984,11 +1229,8 @@ adminRouter.patch('/symptoms/:id', async (req, res, next) => {
       res.status(400).json({ error: { message: 'Nothing to update' } });
       return;
     }
-    const id = Number(req.params.id);
-    if (!Number.isInteger(id)) {
-      res.status(400).json({ error: { message: 'id must be an integer' } });
-      return;
-    }
+    const id = parseId(req.params.id);
+    if (id === null) return res.status(400).json({ error: { message: 'id must be an integer' } });
     const [updated] = await db.update(symptoms).set(body).where(eq(symptoms.id, id)).returning();
     if (!updated) {
       res.status(404).json({ error: { message: 'Symptom not found' } });
@@ -1002,11 +1244,8 @@ adminRouter.patch('/symptoms/:id', async (req, res, next) => {
 
 adminRouter.delete('/symptoms/:id', async (req, res, next) => {
   try {
-    const id = Number(req.params.id);
-    if (!Number.isInteger(id)) {
-      res.status(400).json({ error: { message: 'id must be an integer' } });
-      return;
-    }
+    const id = parseId(req.params.id);
+    if (id === null) return res.status(400).json({ error: { message: 'id must be an integer' } });
     const deleted = await db.delete(symptoms).where(eq(symptoms.id, id)).returning({ id: symptoms.id });
     if (deleted.length === 0) {
       res.status(404).json({ error: { message: 'Symptom not found' } });
@@ -1166,11 +1405,8 @@ adminRouter.get('/reviews', async (req, res, next) => {
 
 adminRouter.patch('/reviews/:id', async (req, res, next) => {
   try {
-    const id = Number(req.params.id);
-    if (!Number.isInteger(id)) {
-      res.status(400).json({ error: { message: 'id must be an integer' } });
-      return;
-    }
+    const id = parseId(req.params.id);
+    if (id === null) return res.status(400).json({ error: { message: 'id must be an integer' } });
     const body = z.object({
       featured: z.boolean().optional(),
       status: z.enum(['approved', 'rejected', 'pending']).optional(),
@@ -1192,11 +1428,8 @@ adminRouter.patch('/reviews/:id', async (req, res, next) => {
 
 adminRouter.delete('/reviews/:id', async (req, res, next) => {
   try {
-    const id = Number(req.params.id);
-    if (!Number.isInteger(id)) {
-      res.status(400).json({ error: { message: 'id must be an integer' } });
-      return;
-    }
+    const id = parseId(req.params.id);
+    if (id === null) return res.status(400).json({ error: { message: 'id must be an integer' } });
     const deleted = await db.delete(reviews).where(eq(reviews.id, id)).returning({ id: reviews.id });
     if (deleted.length === 0) {
       res.status(404).json({ error: { message: 'Review not found' } });
@@ -1260,11 +1493,8 @@ adminRouter.get('/payouts', async (req, res, next) => {
 
 adminRouter.patch('/payouts/:id', async (req, res, next) => {
   try {
-    const id = Number(req.params.id);
-    if (!Number.isInteger(id)) {
-      res.status(400).json({ error: { message: 'id must be an integer' } });
-      return;
-    }
+    const id = parseId(req.params.id);
+    if (id === null) return res.status(400).json({ error: { message: 'id must be an integer' } });
     const body = z.object({
       status: z.enum(['processing', 'completed', 'failed']),
       transactionId: z.string().min(1).max(200).optional(),

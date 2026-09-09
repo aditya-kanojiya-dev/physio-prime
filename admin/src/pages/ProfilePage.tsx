@@ -1,11 +1,12 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Loader2, User, Briefcase, Lock, Save, Eye, EyeOff } from 'lucide-react'
+import { Loader2, MessageCircle, User, Briefcase, Lock, Save, Eye, EyeOff } from 'lucide-react'
 import { api, ApiError } from '../lib/api'
 import { DoctorProfile } from '../lib/types'
 import { AdminLayout } from '../components/admin/AdminLayout'
 import { ChangePasswordModal } from '../components/admin/ChangePasswordModal'
 import { ImageUpload } from '../components/admin/ImageUpload'
+import { DEPARTMENTS, DESIGNATIONS, EXPERIENCE_YEARS } from '../lib/options'
 
 const inputCls = 'w-full p-2.5 bg-white border border-slate-200 rounded-xl text-slate-900 font-bold focus:outline-none focus:border-teal-500 transition-colors'
 const labelCls = 'font-bold text-slate-600'
@@ -22,6 +23,7 @@ export function ProfilePage() {
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [showPasswordModal, setShowPasswordModal] = useState(false)
+  const [deletionRequested, setDeletionRequested] = useState(false)
 
   // --- form state ---
   const [name, setName] = useState('')
@@ -30,15 +32,12 @@ export function ProfilePage() {
   const [gender, setGender] = useState('')
   const [phone, setPhone] = useState('')
   const [designation, setDesignation] = useState('')
-  const [employeeId, setEmployeeId] = useState('')
   const [department, setDepartment] = useState('')
   const [address, setAddress] = useState('')
   const [experienceYears, setExperienceYears] = useState('')
   const [languages, setLanguages] = useState('')
   const [expertise, setExpertise] = useState('')
   const [treatments, setTreatments] = useState('')
-  const [homeFee, setHomeFee] = useState('')
-  const [onlineFee, setOnlineFee] = useState('')
   const [hydrated, setHydrated] = useState(false)
 
   const { data: doctor, isLoading } = useQuery({
@@ -56,15 +55,13 @@ export function ProfilePage() {
     setGender(doctor.gender || '')
     setPhone(doctor.phone || '')
     setDesignation(doctor.designation || '')
-    setEmployeeId(doctor.employeeId || '')
     setDepartment(doctor.department || '')
     setAddress(doctor.address?.full as string || '')
     setExperienceYears(String(doctor.experienceYears ?? ''))
     setLanguages((doctor.languages || []).join(', '))
     setExpertise((doctor.expertise || []).join(', '))
     setTreatments((doctor.treatments || []).join(', '))
-    setHomeFee(String(doctor.fees?.home ?? ''))
-    setOnlineFee(String(doctor.fees?.online ?? ''))
+    setDeletionRequested(!!doctor.deletionRequestedAt)
     setHydrated(true)
   }
 
@@ -77,14 +74,9 @@ export function ProfilePage() {
         gender: gender || undefined,
         phone: phone || undefined,
         designation: designation || undefined,
-        employeeId: employeeId || undefined,
         department: department || undefined,
         address: address ? { full: address } : undefined,
         experienceYears: experienceYears ? Number(experienceYears) : undefined,
-        fees: {
-          home: Number(homeFee) || 0,
-          online: Number(onlineFee) || 0,
-        },
         languages: splitList(languages),
         expertise: splitList(expertise),
         treatments: splitList(treatments),
@@ -97,6 +89,21 @@ export function ProfilePage() {
     },
     onError: (err) => {
       setError(err instanceof ApiError ? err.message : 'Save failed')
+      setMessage(null)
+    },
+  })
+
+  const requestDeletion = useMutation({
+    mutationFn: () => api.post<{ deletionRequestedAt: string | null }>('/doctor/profile/deletion-request', {}),
+    onSuccess: (res) => {
+      setDeletionRequested(true)
+      setMessage('Deletion request sent to admin')
+      setError(null)
+      qc.setQueryData(['doctor/profile'], (old: DoctorProfile | undefined) => old ? { ...old, deletionRequestedAt: res.deletionRequestedAt } : old)
+      setTimeout(() => setMessage(null), 3000)
+    },
+    onError: (err) => {
+      setError(err instanceof ApiError ? err.message : 'Request failed')
       setMessage(null)
     },
   })
@@ -204,31 +211,31 @@ export function ProfilePage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className={labelCls}>Designation</label>
-                <input value={designation} onChange={(e) => setDesignation(e.target.value)} placeholder="Senior Physiotherapist" className={inputCls} />
+                <select value={designation} onChange={(e) => setDesignation(e.target.value)} className={inputCls}>
+                  <option value="">Select…</option>
+                  {DESIGNATIONS.map((t) => <option key={t} value={t}>{t}</option>)}
+                </select>
               </div>
               <div>
                 <label className={labelCls}>Department</label>
-                <input value={department} onChange={(e) => setDepartment(e.target.value)} placeholder="Orthopedic" className={inputCls} />
+                <select value={department} onChange={(e) => setDepartment(e.target.value)} className={inputCls}>
+                  <option value="">Select…</option>
+                  {DEPARTMENTS.map((t) => <option key={t} value={t}>{t}</option>)}
+                </select>
               </div>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className={labelCls}>Employee ID</label>
-                <input value={employeeId} onChange={(e) => setEmployeeId(e.target.value)} className={inputCls} />
-              </div>
-              <div>
                 <label className={labelCls}>Experience (years)</label>
-                <input type="number" min={0} value={experienceYears} onChange={(e) => setExperienceYears(e.target.value)} className={inputCls} />
+                <select value={experienceYears} onChange={(e) => setExperienceYears(e.target.value)} className={inputCls}>
+                  <option value="">Select…</option>
+                  {EXPERIENCE_YEARS.map((y) => <option key={y} value={y}>{y} years</option>)}
+                </select>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {(['home', 'online'] as const).map((m) => (
-                <div key={m} className="space-y-1">
-                  <label className={labelCls}>Fees – {m} (₹)</label>
-                  <input type="number" min={0} value={m === 'home' ? homeFee : onlineFee} onChange={(e) => m === 'home' ? setHomeFee(e.target.value) : setOnlineFee(e.target.value)} className={inputCls} />
-                </div>
-              ))}
+            <div className="rounded-2xl bg-slate-50 border border-slate-200 p-3 text-xs text-slate-500">
+              Consultation fees are set by the admin. Contact support to change them.
             </div>
 
             <div>
@@ -270,6 +277,31 @@ export function ProfilePage() {
               <button onClick={() => setShowPasswordModal(true)} className="px-4 py-2 rounded-xl bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 text-xs font-bold transition-all">
                 Change Password
               </button>
+            </div>
+
+            <div className="rounded-xl border border-rose-200 bg-rose-50 p-4">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-sm font-bold text-slate-900">Delete Account</p>
+                  <p className="text-xs text-slate-500">
+                    {deletionRequested
+                      ? 'Your deletion request is pending admin approval.'
+                      : 'Request removal of your profile. An admin approves the final deletion.'}
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    if (window.confirm('Request permanent deletion of your profile? An admin must approve this.')) {
+                      requestDeletion.mutate()
+                    }
+                  }}
+                  disabled={deletionRequested || requestDeletion.isPending}
+                  className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition-all disabled:opacity-50 flex items-center gap-2 shrink-0"
+                >
+                  {requestDeletion.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <MessageCircle className="w-4 h-4" />}
+                  {deletionRequested ? 'Requested' : 'Request Deletion'}
+                </button>
+              </div>
             </div>
           </div>
         )}

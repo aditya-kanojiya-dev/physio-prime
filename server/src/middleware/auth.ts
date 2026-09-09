@@ -24,6 +24,7 @@ declare module 'express-serve-static-core' {
 async function resolveUser(email: string, name?: string | null): Promise<TokenUser | null> {
   const [existing] = await db.select().from(users).where(eq(users.email, email));
   if (existing) {
+    if (existing.status === 'inactive') return null;
     return { id: existing.id, role: existing.role as TokenUser['role'], email };
   }
   const [created] = await db

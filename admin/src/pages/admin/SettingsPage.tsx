@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Settings, RefreshCw, Save, Globe, Phone, Mail, MapPin } from 'lucide-react'
-import { api } from '../../lib/api'
+import { BadgePercent, Settings, RefreshCw, Save, Globe, Phone, Mail, MapPin, Loader2 } from 'lucide-react'
+import { api, ApiError } from '../../lib/api'
+import { AdminDepartment } from '../../lib/types'
 import { AdminLayout } from '../../components/admin/AdminLayout'
 
 interface SettingsData {
@@ -26,6 +27,8 @@ export function SettingsPage() {
   const queryClient = useQueryClient()
   const [form, setForm] = useState<SettingsData>(defaultSettings)
   const [message, setMessage] = useState('')
+  const [deptFees, setDeptFees] = useState<Record<number, string>>({})
+  const [deptFeeError, setDeptFeeError] = useState('')
 
   const { data: sections, isLoading } = useQuery({
     queryKey: ['admin/cms/settings'],
@@ -71,6 +74,31 @@ export function SettingsPage() {
       setMessage('Social links saved')
       setTimeout(() => setMessage(''), 3000)
     },
+  })
+
+  const { data: departments } = useQuery({
+    queryKey: ['admin/departments'],
+    queryFn: async () => (await api.get<{ departments: AdminDepartment[] }>('/admin/departments')).departments,
+  })
+
+  useEffect(() => {
+    if (!departments) return
+    setDeptFees((f) => {
+      const next = { ...f }
+      for (const d of departments) if (next[d.id] === undefined) next[d.id] = String(d.platformFeePercent)
+      return next
+    })
+  }, [departments])
+
+  const saveDeptFees = useMutation({
+    mutationFn: async (changes: { id: number; platformFeePercent: number }[]) =>
+      Promise.all(changes.map((d) => api.patch(`/admin/departments/${d.id}`, { platformFeePercent: d.platformFeePercent }))),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin/departments'] })
+      setMessage('Department commissions saved')
+      setTimeout(() => setMessage(''), 3000)
+    },
+    onError: (err) => setDeptFeeError(err instanceof ApiError ? err.message : 'Save failed'),
   })
 
   const update = (key: string, value: string) => setForm((f) => ({ ...f, [key]: value }))
@@ -133,6 +161,61 @@ export function SettingsPage() {
               <button onClick={() => saveGeneral.mutate()} disabled={saveGeneral.isPending} className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-teal-500 text-white text-sm font-bold shadow-md shadow-blue-500/20 hover:shadow-lg transition-all disabled:opacity-50">
                 {saveGeneral.isPending ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                 Save General
+              </button>
+            </div>
+
+            {/* Department Commission */}
+            <div className="p-6 rounded-3xl bg-white border border-slate-200 space-y-5">
+              <div className="flex items-center gap-3 pb-4 border-b border-slate-200">
+                <div className="p-3 rounded-2xl bg-indigo-100 text-indigo-700"><BadgePercent className="w-5 h-5" /></div>
+                <div>
+                  <h2 className="text-base font-extrabold text-slate-900">Department Commission</h2>
+                  <p className="text-xs text-slate-500">
+                    Default platform fee (%) applied to doctors in each department. The admin can still set a higher/lower rate for
+                    an individual doctor on the Commissions page.
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-2.5">
+                {(departments || []).map((d) => (
+                  <div key={d.id} className="flex items-center justify-between gap-4 rounded-xl bg-slate-100/70 border border-slate-200 px-4 py-2.5">
+                    <div>
+                      <p className="text-sm font-extrabold text-slate-900">{d.name}</p>
+                      <p className="text-[10px] text-slate-400">{d.slug}</p>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        type="number"
+                        min={0}
+                        max={100}
+                        value={deptFees[d.id] ?? ''}
+                        onChange={(e) => setDeptFees((f) => ({ ...f, [d.id]: e.target.value }))}
+                        className="w-20 px-2.5 py-1.5 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-900 focus:outline-none focus:border-teal-500"
+                      />
+                      <span className="text-xs font-bold text-slate-500 w-4">%</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {deptFeeError && <p className="text-xs font-bold text-rose-600">{deptFeeError}</p>}
+
+              <button
+                onClick={() => {
+                  const changes = (departments || [])
+                    .map((d) => ({ id: d.id, platformFeePercent: Number(deptFees[d.id]) }))
+                    .filter((d) => Number.isInteger(d.platformFeePercent) && d.platformFeePercent !== (departments || []).find((x) => x.id === d.id)?.platformFeePercent)
+                  if (changes.length > 0) {
+                    setDeptFeeError('')
+                    saveDeptFees.mutate(changes)
+                  }
+                }}
+                disabled={saveDeptFees.isPending || !departments}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-teal-500 text-white text-sm font-bold shadow-md shadow-blue-500/20 hover:shadow-lg transition-all disabled:opacity-50"
+              >
+                {saveDeptFees.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                Save Department Commissions
               </button>
             </div>
 

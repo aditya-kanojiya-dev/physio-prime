@@ -10,17 +10,22 @@ import {
   Loader2,
   MapPin,
   Plus,
+  Power,
+  PowerOff,
   Search,
   Star,
   Stethoscope,
   Users,
   X,
   UserRound,
+  Trash2,
 } from 'lucide-react'
 import { api, ApiError } from '../../lib/api'
-import { AdminApplication, AdminClient, AdminDoctor } from '../../lib/types'
+import { AdminApplication, AdminClient, AdminDoctor, ServiceArea } from '../../lib/types'
 import { AdminLayout } from '../../components/admin/AdminLayout'
 import { ImageUpload } from '../../components/admin/ImageUpload'
+import { ChipMultiSelect } from '../../components/ChipMultiSelect'
+import { CITIES, DEPARTMENTS, DESIGNATIONS, EXPERIENCE_YEARS, HOME_RADIUS_KM, SPECIALTIES, STATES } from '../../lib/options'
 
 const emptyForm = {
   name: '',
@@ -41,7 +46,6 @@ const emptyForm = {
   bio: '',
   phone: '',
   designation: '',
-  employeeId: '',
   department: '',
   languages: '',
   expertise: '',
@@ -53,7 +57,7 @@ const emptyForm = {
   registrationValidTill: '',
   homeVisitsEnabled: false,
   maxRadiusKm: '10',
-  platformFeePercent: 30,
+  platformFeePercent: '',
   patientsTreated: 0,
   nextAvailable: '',
 }
@@ -87,6 +91,11 @@ export function DoctorsPage() {
     enabled: clientsDoctor !== null,
   })
 
+  const { data: serviceAreas } = useQuery({
+    queryKey: ['admin/service-areas'],
+    queryFn: async () => (await api.get<{ areas: ServiceArea[] }>('/admin/service-areas')).areas,
+  })
+
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ['admin/doctors'] })
     qc.invalidateQueries({ queryKey: ['admin/applications'] })
@@ -104,6 +113,19 @@ export function DoctorsPage() {
       api.patch(`/admin/doctors/${id}`, patch),
     onSuccess: invalidate,
     onError: (err) => setError(err instanceof ApiError ? err.message : 'Update failed'),
+  })
+
+  const toggleStatus = useMutation({
+    mutationFn: ({ id, status }: { id: number; status: 'active' | 'inactive' }) =>
+      api.patch(`/admin/doctors/${id}/status`, { status }),
+    onSuccess: invalidate,
+    onError: (err) => setError(err instanceof ApiError ? err.message : 'Status update failed'),
+  })
+
+  const deleteDoctor = useMutation({
+    mutationFn: (id: number) => api.delete(`/admin/doctors/${id}`),
+    onSuccess: invalidate,
+    onError: (err) => setError(err instanceof ApiError ? err.message : 'Delete failed'),
   })
 
   const saveDoctor = useMutation({
@@ -135,7 +157,6 @@ export function DoctorsPage() {
       bio: form.bio,
       phone: form.phone || null,
       designation: form.designation || null,
-      employeeId: form.employeeId || null,
       department: form.department || null,
       languages: form.languages ? form.languages.split(',').map(s => s.trim()).filter(Boolean) : [],
       expertise: form.expertise ? form.expertise.split(',').map(s => s.trim()).filter(Boolean) : [],
@@ -153,7 +174,7 @@ export function DoctorsPage() {
       homeVisitsEnabled: form.homeVisitsEnabled,
       maxRadiusKm: form.maxRadiusKm,
       nextAvailable: form.nextAvailable || null,
-      platformFeePercent: Number(form.platformFeePercent),
+      platformFeePercent: form.platformFeePercent === '' ? null : Number(form.platformFeePercent),
     })
   }
 
@@ -272,115 +293,156 @@ export function DoctorsPage() {
           />
         </div>
 
-        {/* Table */}
-        <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-xl">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-slate-100 text-slate-500 font-extrabold uppercase text-[10px] tracking-wider border-b border-slate-200">
-                <tr>
-                  <th className="p-4">Doctor</th>
-                  <th className="p-4">Specialty</th>
-                  <th className="p-4">Consultation Fees</th>
-                  <th className="p-4">Rating</th>
-                  <th className="p-4">Badges</th>
-                  <th className="p-4 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-200 text-slate-700">
-                {isLoading ? (
-                  <tr>
-                    <td colSpan={6} className="p-8 text-center text-slate-500">
-                      <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2 text-teal-500" />
-                    </td>
-                  </tr>
-                ) : filtered.length > 0 ? (
-                  filtered.map((d) => (
-                    <tr key={d.id} className="hover:bg-slate-100/50 transition-colors">
-                      <td className="p-4 flex items-center gap-3">
-                        {d.photo ? (
-                          <img src={d.photo} alt={d.name} className="w-10 h-10 rounded-2xl object-cover border border-slate-200 shrink-0" />
-                        ) : (
-                          <div className="w-10 h-10 rounded-2xl bg-slate-100 flex items-center justify-center shrink-0">
-                            <UserRound className="w-5 h-5 text-slate-400" />
-                          </div>
-                        )}
-                        <div>
-                          <p className="font-extrabold text-slate-900 text-sm">{d.name}</p>
-                          <p className="text-[11px] text-slate-500 flex items-center gap-1">
-                            <MapPin className="w-3 h-3 text-slate-400" /> {String(d.location?.area || '') || 'Nagpur'}
-                          </p>
-                        </div>
-                      </td>
-                      <td className="p-4">
-                        <p className="font-bold text-slate-700">{d.specialty}</p>
-                        <p className="text-[10px] text-slate-500">{d.experienceYears} Years Exp.</p>
-                      </td>
-                      <td className="p-4 font-bold text-teal-700">
-                        Home: ₹{(d.fees?.home || 0).toLocaleString('en-IN')} | Online: ₹{(d.fees?.online || 0).toLocaleString('en-IN')}
-                      </td>
-                      <td className="p-4 font-extrabold">
-                        <span className="flex items-center gap-1 text-amber-700">
-                          <Star className="w-3.5 h-3.5 fill-amber-400" /> {d.rating || 0}
-                        </span>
-                      </td>
-                      <td className="p-4">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <button
-                            onClick={() => toggle.mutate({ id: d.id, patch: { verified: !d.verified } })}
-                            className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold border flex items-center gap-1 transition-all ${
-                              d.verified
-                                ? 'bg-teal-50 text-teal-700 border-teal-200'
-                                : 'bg-slate-100 text-slate-400 border-slate-200 hover:text-teal-700'
-                            }`}
-                            title="Toggle verified"
-                          >
-                            <CheckCircle className="w-3 h-3" /> {d.verified ? 'Verified' : 'Unverified'}
-                          </button>
-                          <button
-                            onClick={() => toggle.mutate({ id: d.id, patch: { featured: !d.featured } })}
-                            className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold border transition-all ${
-                              d.featured
-                                ? 'bg-amber-50 text-amber-700 border-amber-200'
-                                : 'bg-slate-100 text-slate-400 border-slate-200 hover:text-amber-700'
-                            }`}
-                            title="Toggle prime status"
-                          >
-                            {d.featured ? 'Prime' : 'Not Prime'}
-                          </button>
-                        </div>
-                      </td>
-                      <td className="p-4 text-right">
-                        <div className="flex gap-2 justify-end">
-                          <Link
-                            to={`/admin/doctors/${d.id}`}
-                            className="p-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 transition-all"
-                            title="View Ledger"
-                          >
-                            <FileText className="w-4 h-4" />
-                          </Link>
-                          <button
-                            onClick={() => setClientsDoctor(d)}
-                            className="p-2 rounded-xl bg-teal-50 hover:bg-teal-100 text-teal-700 border border-teal-200 transition-all"
-                            title="View Clients"
-                          >
-                            <Users className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={6} className="p-8 text-center text-slate-500">
-                      <Stethoscope className="w-8 h-8 mx-auto mb-2 text-slate-500" />
-                      <p className="font-medium">No doctors found</p>
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+        {/* Doctor cards */}
+        {isLoading ? (
+          <div className="p-12 flex justify-center text-slate-500">
+            <Loader2 className="w-6 h-6 animate-spin text-teal-500" />
           </div>
-        </div>
+        ) : filtered.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filtered.map((d) => (
+              <div
+                key={d.id}
+                className="bg-white border border-slate-200 rounded-3xl p-5 shadow-sm hover:shadow-lg transition-shadow relative overflow-hidden"
+              >
+                <div
+                  className={`absolute inset-x-0 top-0 h-1 ${
+                    d.status === 'inactive' ? 'bg-rose-400' : 'bg-gradient-to-r from-teal-500 to-blue-500'
+                  }`}
+                />
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    {d.photo ? (
+                      <img src={d.photo} alt={d.name} className="w-14 h-14 rounded-2xl object-cover border border-slate-200 shrink-0" />
+                    ) : (
+                      <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center shrink-0">
+                        <UserRound className="w-6 h-6 text-slate-400" />
+                      </div>
+                    )}
+                    <div className="min-w-0">
+                      <p className="font-extrabold text-slate-900 text-sm truncate">{d.name}</p>
+                      <p className="text-[11px] text-slate-500 truncate">{d.specialty || 'No specialty'}</p>
+                      <p className="text-[10px] text-slate-400 flex items-center gap-1 mt-0.5">
+                        <MapPin className="w-3 h-3" /> {String(d.location?.area || '') || 'Nagpur'}
+                      </p>
+                    </div>
+                  </div>
+                  <span
+                    className={`flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-extrabold border shrink-0 ${
+                      d.status === 'inactive'
+                        ? 'bg-rose-50 text-rose-700 border-rose-200'
+                        : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                    }`}
+                  >
+                    <span className={`w-1.5 h-1.5 rounded-full ${d.status === 'inactive' ? 'bg-rose-500' : 'bg-emerald-500'}`} />
+                    {d.status === 'inactive' ? 'OFF' : 'ON'}
+                  </span>
+                  {d.deletionRequestedAt && (
+                    <span className="flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-extrabold border border-amber-300 bg-amber-50 text-amber-800 shrink-0">
+                      Delete requested
+                    </span>
+                  )}
+                </div>
+
+                <div className="mt-4 space-y-1.5 text-xs">
+                  <div className="flex justify-between">
+                    <span className="text-slate-400 font-bold">Category</span>
+                    <span className="font-bold text-slate-700">{d.categoryTitle || '—'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400 font-bold">Commission</span>
+                    <span className="font-bold text-slate-700">{d.platformFeePercent ?? 'Auto (department)'}%</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400 font-bold">Rating</span>
+                    <span className="font-extrabold text-amber-700 flex items-center gap-1">
+                      <Star className="w-3.5 h-3.5 fill-amber-400" /> {d.rating || 0}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400 font-bold">Experience</span>
+                    <span className="font-bold text-slate-700">{d.experienceYears ?? 0} yrs</span>
+                  </div>
+                </div>
+
+                <div className="mt-4 flex items-center gap-2 flex-wrap">
+                  <button
+                    onClick={() => toggle.mutate({ id: d.id, patch: { verified: !d.verified } })}
+                    className={`px-2.5 py-1 rounded-full text-[10px] font-extrabold border flex items-center gap-1 transition-all ${
+                      d.verified ? 'bg-teal-50 text-teal-700 border-teal-200' : 'bg-slate-100 text-slate-400 border-slate-200 hover:text-teal-700'
+                    }`}
+                    title="Toggle verified"
+                  >
+                    <CheckCircle className="w-3 h-3" /> {d.verified ? 'Verified' : 'Unverified'}
+                  </button>
+                  <button
+                    onClick={() => toggle.mutate({ id: d.id, patch: { featured: !d.featured } })}
+                    className={`px-2.5 py-1 rounded-full text-[10px] font-extrabold border transition-all ${
+                      d.featured ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-slate-100 text-slate-400 border-slate-200 hover:text-amber-700'
+                    }`}
+                    title="Toggle prime status"
+                  >
+                    {d.featured ? 'Prime' : 'Not Prime'}
+                  </button>
+                </div>
+
+                <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
+                  <button
+                    onClick={() =>
+                      toggleStatus.mutate({
+                        id: d.id,
+                        status: d.status === 'active' ? 'inactive' : 'active',
+                      })
+                    }
+                    disabled={toggleStatus.isPending}
+                    className={`flex items-center gap-2 rounded-xl px-3 py-2 text-[10px] font-extrabold border transition-all disabled:opacity-50 ${
+                      d.status === 'active'
+                        ? 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100'
+                        : 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
+                    }`}
+                    title={d.status === 'active' ? 'Switch profile OFF' : 'Switch profile ON'}
+                  >
+                    {d.status === 'active' ? <PowerOff className="w-3.5 h-3.5" /> : <Power className="w-3.5 h-3.5" />}
+                    {d.status === 'active' ? 'Turn OFF' : 'Turn ON'}
+                  </button>
+                  <div className="flex gap-1.5">
+                    <Link
+                      to={`/admin/doctors/${d.id}`}
+                      className="p-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 transition-all"
+                      title="View Ledger"
+                    >
+                      <FileText className="w-4 h-4" />
+                    </Link>
+                    <button
+                      onClick={() => setClientsDoctor(d)}
+                      className="p-2 rounded-xl bg-teal-50 hover:bg-teal-100 text-teal-700 border border-teal-200 transition-all"
+                      title="View Clients"
+                    >
+                      <Users className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (window.confirm(`Delete ${d.name} permanently? This also removes their login.`)) {
+                          deleteDoctor.mutate(d.id)
+                        }
+                      }}
+                      disabled={deleteDoctor.isPending}
+                      className="p-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 transition-all disabled:opacity-50"
+                      title="Delete doctor"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="p-12 text-center text-slate-500">
+            <Stethoscope className="w-8 h-8 mx-auto mb-2 text-slate-500" />
+            <p className="font-medium">No doctors found</p>
+          </div>
+        )}
       </div>
 
       {/* Clients Modal */}
@@ -459,10 +521,13 @@ export function DoctorsPage() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Field label="Specialty *">
-                  <input required value={form.specialty} onChange={(e) => setForm({ ...form, specialty: e.target.value })} className={inputCls} placeholder="Sports Injury & Spine Rehabilitation" />
+                  <ChipMultiSelect value={form.specialty} onChange={(v) => setForm({ ...form, specialty: v })} options={SPECIALTIES} />
                 </Field>
                 <Field label="Title">
-                  <input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className={inputCls} placeholder="Senior Physiotherapist" />
+                  <select value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className={inputCls}>
+                    <option value="">—</option>
+                    {DESIGNATIONS.map((t) => <option key={t} value={t}>{t}</option>)}
+                  </select>
                 </Field>
               </div>
 
@@ -480,19 +545,24 @@ export function DoctorsPage() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Field label="Designation">
-                  <input value={form.designation} onChange={(e) => setForm({ ...form, designation: e.target.value })} className={inputCls} placeholder="Consultant Physiotherapist" />
+                  <select value={form.designation} onChange={(e) => setForm({ ...form, designation: e.target.value })} className={inputCls}>
+                    <option value="">—</option>
+                    {DESIGNATIONS.map((t) => <option key={t} value={t}>{t}</option>)}
+                  </select>
                 </Field>
                 <Field label="Department">
-                  <input value={form.department} onChange={(e) => setForm({ ...form, department: e.target.value })} className={inputCls} placeholder="Rehabilitation" />
+                  <select value={form.department} onChange={(e) => setForm({ ...form, department: e.target.value })} className={inputCls}>
+                    <option value="">—</option>
+                    {DEPARTMENTS.map((t) => <option key={t} value={t}>{t}</option>)}
+                  </select>
                 </Field>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <Field label="Employee ID">
-                  <input value={form.employeeId} onChange={(e) => setForm({ ...form, employeeId: e.target.value })} className={inputCls} placeholder="EMP-001" />
-                </Field>
                 <Field label="Experience (Years) *">
-                  <input type="number" required value={form.experienceYears} onChange={(e) => setForm({ ...form, experienceYears: Number(e.target.value) })} className={inputCls} />
+                  <select value={form.experienceYears} onChange={(e) => setForm({ ...form, experienceYears: Number(e.target.value) })} className={inputCls}>
+                    {EXPERIENCE_YEARS.map((y) => <option key={y} value={y}>{y} years</option>)}
+                  </select>
                 </Field>
               </div>
 
@@ -505,7 +575,7 @@ export function DoctorsPage() {
                   <input type="number" required value={form.feesOnline} onChange={(e) => setForm({ ...form, feesOnline: Number(e.target.value) })} className={inputCls} />
                 </Field>
                 <Field label="Platform Fee (%)">
-                  <input type="number" value={form.platformFeePercent} onChange={(e) => setForm({ ...form, platformFeePercent: Number(e.target.value) })} className={inputCls} min={0} max={100} />
+                  <input type="number" value={form.platformFeePercent} onChange={(e) => setForm({ ...form, platformFeePercent: e.target.value })} className={inputCls} min={0} max={100} placeholder="Auto (department)" />
                 </Field>
               </div>
 
@@ -523,15 +593,24 @@ export function DoctorsPage() {
               {/* Location */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Field label="Area">
-                  <input value={form.area} onChange={(e) => setForm({ ...form, area: e.target.value })} className={inputCls} placeholder="Dharampeth" />
+                  <select value={form.area} onChange={(e) => setForm({ ...form, area: e.target.value })} className={inputCls}>
+                    <option value="">—</option>
+                    {(serviceAreas || []).filter((a) => a.active).map((a) => <option key={a.id} value={a.name}>{a.name}, {a.city || 'Nagpur'}</option>)}
+                  </select>
                 </Field>
                 <Field label="City">
-                  <input value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} className={inputCls} placeholder="Nagpur" />
+                  <select value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} className={inputCls}>
+                    <option value="">—</option>
+                    {CITIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                  </select>
                 </Field>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Field label="State">
-                  <input value={form.state} onChange={(e) => setForm({ ...form, state: e.target.value })} className={inputCls} placeholder="Maharashtra" />
+                  <select value={form.state} onChange={(e) => setForm({ ...form, state: e.target.value })} className={inputCls}>
+                    <option value="">—</option>
+                    {STATES.map((s) => <option key={s} value={s}>{s}</option>)}
+                  </select>
                 </Field>
                 <Field label="Pincode">
                   <input value={form.pincode} onChange={(e) => setForm({ ...form, pincode: e.target.value })} className={inputCls} placeholder="440010" />
@@ -576,7 +655,10 @@ export function DoctorsPage() {
               {/* Settings */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Field label="Max Home Visit Radius (km)">
-                  <input value={form.maxRadiusKm} onChange={(e) => setForm({ ...form, maxRadiusKm: e.target.value })} className={inputCls} />
+                  <select value={form.maxRadiusKm} onChange={(e) => setForm({ ...form, maxRadiusKm: e.target.value })} className={inputCls}>
+                    <option value="">—</option>
+                    {HOME_RADIUS_KM.map((r) => <option key={r} value={r}>{r} km</option>)}
+                  </select>
                 </Field>
                 <div className="flex flex-wrap items-center gap-6 pt-5">
                   <label className="flex items-center gap-2 cursor-pointer">

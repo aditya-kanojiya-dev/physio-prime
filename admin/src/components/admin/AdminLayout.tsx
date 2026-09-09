@@ -24,6 +24,7 @@ import {
   Image,
   Settings,
   Receipt,
+  Percent,
 } from 'lucide-react'
 import { useAuth } from '../../lib/auth'
 import { NotificationsPanel } from '../NotificationsPanel'
@@ -31,6 +32,8 @@ import { NotificationsPanel } from '../NotificationsPanel'
 const adminNav = [
   { to: '/admin/dashboard', label: 'Dashboard', icon: Activity },
   { to: '/admin/doctors', label: 'Doctors', icon: Stethoscope },
+  { to: '/admin/locations', label: 'Locations', icon: MapPin },
+  { to: '/admin/commissions', label: 'Commissions', icon: Percent },
   { to: '/admin/appointments', label: 'Appointments', icon: CalendarCheck },
   { to: '/admin/patients', label: 'Patients', icon: Users },
   { to: '/admin/categories', label: 'Categories', icon: Layers },

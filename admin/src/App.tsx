@@ -16,6 +16,8 @@ import { CommunityPage } from './pages/CommunityPage'
 import { CommunityDetailPage } from './pages/CommunityDetailPage'
 import { DashboardPage } from './pages/admin/DashboardPage'
 import { DoctorsPage } from './pages/admin/DoctorsPage'
+import { LocationsPage as AdminLocationsPage } from './pages/admin/LocationsPage'
+import { CommissionsPage } from './pages/admin/CommissionsPage'
 import { DoctorLedgerPage } from './pages/admin/DoctorLedgerPage'
 import { AppointmentsPage as AdminAppointmentsPage } from './pages/admin/AppointmentsPage'
 import { PatientsPage } from './pages/admin/PatientsPage'
@@ -91,6 +93,8 @@ const router = createBrowserRouter([
       { path: 'dashboard', element: <DashboardPage /> },
       { path: 'doctors', element: <DoctorsPage /> },
       { path: 'doctors/:id', element: <DoctorLedgerPage /> },
+      { path: 'locations', element: <AdminLocationsPage /> },
+      { path: 'commissions', element: <CommissionsPage /> },
       { path: 'appointments', element: <AdminAppointmentsPage /> },
       { path: 'patients', element: <PatientsPage /> },
       { path: 'categories', element: <CategoriesPage /> },

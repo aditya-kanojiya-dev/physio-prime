@@ -2,10 +2,10 @@ import { Router } from 'express';
 import { and, eq, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '../db/pool';
-import { appointments, doctorPayouts, doctors } from '../db/schema';
+import { appointments, departments, doctorPayouts, doctors } from '../db/schema';
 import { requireAuth, requireRole } from '../middleware/auth';
 import { requireDoctor, noProfile } from '../lib/doctor';
-import { netAmountSql } from '../lib/commission';
+import { sumEarnedSql, resolvePlatformFeePercentSql } from '../lib/commission';
 
 export const doctorPayoutsRouter = Router();
 
@@ -15,10 +15,11 @@ doctorPayoutsRouter.use(requireAuth, requireRole('doctor'));
 export async function getEarnedNet(doctorId: number) {
   const [earned] = await db
     .select({
-      total: sql<number>`coalesce(sum(case when ${appointments.paymentStatus} = 'paid' and ${appointments.status} = 'completed' then ${netAmountSql(appointments.feePaise, doctors.platformFeePercent)} else 0 end), 0)`,
+      total: sql<number>`${sumEarnedSql(sql`${appointments.paymentStatus} = 'paid' and ${appointments.status} = 'completed'`, appointments.feePaise, resolvePlatformFeePercentSql(doctors.platformFeePercent, departments.platformFeePercent))}`,
     })
     .from(appointments)
     .innerJoin(doctors, eq(doctors.id, appointments.doctorId))
+    .leftJoin(departments, eq(departments.name, doctors.department))
     .where(eq(appointments.doctorId, doctorId));
   return Number(earned?.total ?? 0);
 }

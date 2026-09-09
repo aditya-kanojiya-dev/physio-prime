@@ -1,8 +1,8 @@
 import { Router, type NextFunction } from 'express';
 import { eq } from 'drizzle-orm';
 import { db } from '../db/pool';
-import { appointments, doctors, paymentWebhooks } from '../db/schema';
-import { computeCommission } from '../lib/commission';
+import { appointments, departments, doctors, paymentWebhooks } from '../db/schema';
+import { computeCommission, resolvePlatformFeePercent } from '../lib/commission';
 import { recordPaymentTransaction, type Tx } from '../lib/payments';
 import { verifyWebhookSignature } from '../lib/razorpay';
 
@@ -35,13 +35,15 @@ async function recordCaptured(
       feePaise: appointments.feePaise,
       paymentStatus: appointments.paymentStatus,
       platformFeePercent: doctors.platformFeePercent,
+      departmentPlatformFeePercent: departments.platformFeePercent,
     })
     .from(appointments)
     .innerJoin(doctors, eq(doctors.id, appointments.doctorId))
+    .leftJoin(departments, eq(departments.name, doctors.department))
     .where(where)
-    .for('update');
+    .for('update', { of: [appointments] });
   if (!row || row.paymentStatus === 'paid') return;
-  const c = computeCommission(row.feePaise, row.platformFeePercent);
+  const c = computeCommission(row.feePaise, resolvePlatformFeePercent(row.platformFeePercent, row.departmentPlatformFeePercent));
   await tx
     .update(appointments)
     .set({

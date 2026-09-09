@@ -2,16 +2,17 @@ import bcrypt from 'bcryptjs';
 import { sql } from 'drizzle-orm';
 import { db, pool } from '../db/pool';
 import { runMigrations } from '../db/migrate';
-import { appointments, blogCategories, blogPosts, blogPostTags, blogTags, categories, communityCategories, communityPosts, communityReplies, communityVotes, conversations, doctorApplications, doctorCashLedger, doctorLocations, doctorNotifications, doctorPayouts, doctors, doctorSchedules, messages, patientProfiles, paymentTransactions, prescriptions, refunds, reviews, settlements, symptoms, users } from '../db/schema';
+import { appointments, blogCategories, blogPosts, blogPostTags, blogTags, categories, communityCategories, communityPosts, communityReplies, communityVotes, conversations, departments, doctorApplications, doctorCashLedger, doctorLocations, doctorNotifications, doctorPayouts, doctors, doctorSchedules, messages, patientProfiles, paymentTransactions, prescriptions, refunds, reviews, serviceAreas, settlements, symptoms, users } from '../db/schema';
 import { CATEGORIES_DATA } from './seed-data/categories';
 import { SYMPTOMS_DATA } from './seed-data/symptoms';
 import { DOCTORS_DATA } from './seed-data/doctors';
+import { SERVICE_AREAS } from './seed-data/service-areas';
 
 // ponytail: truncates users too so dev seed stays idempotent; drop `users` from
 // this list once real registrations land in later phases.
 export async function seed(): Promise<void> {
   await db.execute(
-    sql`TRUNCATE users, doctors, doctor_applications, categories, symptoms, patient_profiles, appointments, reviews, prescriptions, community_categories, doctor_locations, doctor_payouts, community_posts, community_replies, community_votes, conversations, messages, doctor_notifications, payment_transactions, doctor_cash_ledger, refunds, payment_webhooks, settlements, blog_categories, blog_tags, blog_posts, blog_post_tags RESTART IDENTITY CASCADE`,
+    sql`TRUNCATE users, doctors, doctor_applications, categories, departments, symptoms, patient_profiles, appointments, reviews, prescriptions, community_categories, doctor_locations, doctor_payouts, community_posts, community_replies, community_votes, conversations, messages, doctor_notifications, payment_transactions, doctor_cash_ledger, refunds, payment_webhooks, settlements, service_areas, blog_categories, blog_tags, blog_posts, blog_post_tags RESTART IDENTITY CASCADE`,
   );
 
   const passwordHash = bcrypt.hashSync('physio123', 10);
@@ -48,6 +49,7 @@ export async function seed(): Promise<void> {
         title: d.title,
         specialty: d.specialty,
         slug: d.slug,
+        employeeId: `EMP-${String(i + 1).padStart(3, '0')}`,
         photo: d.photo,
         rating: String(d.rating),
         reviewCount: d.reviewCount,
@@ -94,7 +96,21 @@ export async function seed(): Promise<void> {
   const seededAppointments = await seedShowcase(insertedDoctors);
 
   await db.insert(categories).values(CATEGORIES_DATA);
+  await db.insert(departments).values([
+    { name: 'Orthopedic', slug: 'orthopedic', sortOrder: 1 },
+    { name: 'Sports', slug: 'sports', sortOrder: 2 },
+    { name: 'Neurological', slug: 'neurological', sortOrder: 3 },
+    { name: 'Pediatric', slug: 'pediatric', sortOrder: 4 },
+    { name: 'Cardiopulmonary', slug: 'cardiopulmonary', sortOrder: 5 },
+    { name: 'Geriatric', slug: 'geriatric', sortOrder: 6 },
+    { name: 'Gynecological', slug: 'gynecological', sortOrder: 7 },
+    { name: 'General Rehabilitation', slug: 'general-rehabilitation', sortOrder: 8 },
+  ]);
   await db.insert(symptoms).values(SYMPTOMS_DATA);
+
+  await db
+    .insert(serviceAreas)
+    .values(SERVICE_AREAS.map((name, i) => ({ name, city: 'Nagpur', active: true, sortOrder: i })));
 
   await db.insert(communityCategories).values([
     { name: 'General Medicine', slug: 'general-medicine', description: 'General medical discussions', sortOrder: 0 },

@@ -3,11 +3,11 @@ import { createHash, randomInt } from 'node:crypto';
 import { and, asc, count, desc, eq, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '../db/pool';
-import { appointments, doctors, doctorSchedules, patientProfiles, prescriptions, sessionOtps, users } from '../db/schema';
+import { appointments, departments, doctors, doctorSchedules, patientProfiles, prescriptions, sessionOtps, users } from '../db/schema';
 import { requireAuth, requireRole } from '../middleware/auth';
 import { isValidDate, getNextFreeSlot } from '../lib/slots';
 import { requireDoctor, noProfile } from '../lib/doctor';
-import { computeCommission } from '../lib/commission';
+import { computeCommission, resolvePlatformFeePercent } from '../lib/commission';
 import { recordCashEntry, recordPaymentTransaction } from '../lib/payments';
 import { createUpiQrCode } from '../lib/razorpay';
 import { sendSmartpingSms } from '../lib/notifications';
@@ -45,6 +45,7 @@ const doctorColumns = {
   employeeId: doctors.employeeId,
   department: doctors.department,
   address: doctors.address,
+  deletionRequestedAt: doctors.deletionRequestedAt,
 };
 
 const appointmentColumns = {
@@ -72,7 +73,6 @@ const appointmentColumns = {
 };
 
 const profilePatchSchema = z.object({
-  fees: z.record(z.string(), z.number().nonnegative()).optional(),
   bio: z.string().max(5000).optional(),
   expertise: z.array(z.string().max(100)).optional(),
   treatments: z.array(z.string().max(100)).optional(),
@@ -81,7 +81,6 @@ const profilePatchSchema = z.object({
   experienceYears: z.number().int().nonnegative().optional(),
   phone: z.string().max(20).nullable().optional(),
   designation: z.string().max(100).nullable().optional(),
-  employeeId: z.string().max(50).nullable().optional(),
   department: z.string().max(100).nullable().optional(),
   address: z.record(z.string(), z.unknown()).nullable().optional(),
 });
@@ -120,6 +119,10 @@ doctorRouter.get('/profile', async (req, res, next) => {
 doctorRouter.patch('/profile', async (req, res, next) => {
   try {
     const body = profilePatchSchema.parse(req.body);
+    if (Object.keys(body).length === 0) {
+      res.status(400).json({ error: { message: 'No editable fields provided' } });
+      return;
+    }
     const [doctor] = await db.select({ id: doctors.id }).from(doctors).where(eq(doctors.userId, req.user!.id));
     if (!doctor) {
       res.status(noProfile.status).json({ error: { message: noProfile.message } });
@@ -127,6 +130,24 @@ doctorRouter.patch('/profile', async (req, res, next) => {
     }
     const [updated] = await db.update(doctors).set(body).where(eq(doctors.id, doctor.id)).returning(doctorColumns);
     res.json({ doctor: updated });
+  } catch (err) {
+    next(err);
+  }
+});
+
+doctorRouter.post('/profile/deletion-request', async (req, res, next) => {
+  try {
+    const [doctor] = await db.select({ id: doctors.id }).from(doctors).where(eq(doctors.userId, req.user!.id));
+    if (!doctor) {
+      res.status(noProfile.status).json({ error: { message: noProfile.message } });
+      return;
+    }
+    const [updated] = await db
+      .update(doctors)
+      .set({ deletionRequestedAt: new Date() })
+      .where(eq(doctors.id, doctor.id))
+      .returning({ deletionRequestedAt: doctors.deletionRequestedAt });
+    res.json({ deletionRequestedAt: updated?.deletionRequestedAt ?? null });
   } catch (err) {
     next(err);
   }
@@ -215,7 +236,7 @@ async function doctorAppointment(
   paymentStatus: string;
   feePaise: number;
   sessionStartedAt: Date | null;
-  platformFeePercent: number;
+  platformFeePercent: number | null;
   patientPhone: string;
 } | null> {
   const [row] = await db
@@ -463,9 +484,11 @@ doctorRouter.post('/appointments/:id/collect/cash', async (req, res, next) => {
           paymentStatus: appointments.paymentStatus,
           feePaise: appointments.feePaise,
           platformFeePercent: doctors.platformFeePercent,
+          departmentPlatformFeePercent: departments.platformFeePercent,
         })
         .from(appointments)
         .innerJoin(doctors, eq(doctors.id, appointments.doctorId))
+        .leftJoin(departments, eq(departments.name, doctors.department))
         .where(eq(appointments.bookingId, req.params.id))
         .for('update');
       if (!row || row.doctorId !== doctor.id) {
@@ -480,7 +503,7 @@ doctorRouter.post('/appointments/:id/collect/cash', async (req, res, next) => {
       if (row.status === 'cancelled' || row.status === 'no_show') {
         throw Object.assign(new Error('Cannot collect payment on a cancelled or no-show appointment'), { status: 400 });
       }
-      const c = computeCommission(row.feePaise, row.platformFeePercent);
+      const c = computeCommission(row.feePaise, resolvePlatformFeePercent(row.platformFeePercent, row.departmentPlatformFeePercent));
       const [upd] = await tx
         .update(appointments)
         .set({

@@ -84,10 +84,13 @@ export const doctors = pgTable('doctors', {
   maxRadiusKm: numeric('max_radius_km').notNull().default('10'),
   phone: text('phone'),
   designation: text('designation'),
-  employeeId: text('employee_id'),
+  employeeId: text('employee_id').notNull(),
   department: text('department'),
   address: jsonb('address').notNull().default({}),
-  platformFeePercent: integer('platform_fee_percent').notNull().default(30),
+  // NULL platformFeePercent = inherit from the doctor's department default.
+  platformFeePercent: integer('platform_fee_percent'),
+  categoryId: integer('category_id').references(() => categories.id, { onDelete: 'set null' }),
+  deletionRequestedAt: timestamp('deletion_requested_at', { withTimezone: true }),
 });
 
 export const doctorSchedules = pgTable(
@@ -189,6 +192,15 @@ export const categories = pgTable('categories', {
   active: boolean('active').notNull().default(true),
 });
 
+export const departments = pgTable('departments', {
+  id: serial('id').primaryKey(),
+  name: text('name').notNull().unique(),
+  slug: text('slug').notNull().unique(),
+  active: boolean('active').notNull().default(true),
+  sortOrder: integer('sort_order').notNull().default(0),
+  platformFeePercent: integer('platform_fee_percent').notNull().default(30),
+});
+
 export const symptoms = pgTable('symptoms', {
   id: serial('id').primaryKey(),
   title: text('title').notNull(),
@@ -247,6 +259,18 @@ export const doctorLocations = pgTable('doctor_locations', {
   radiusKm: numeric('radius_km').notNull().default('10'),
   isPrimary: boolean('is_primary').notNull().default(false),
   active: boolean('active').notNull().default(true),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// DB-backed master list of serviceable neighborhoods, managed by admin. Replaces
+// the old hardcoded SERVICE_AREAS as the single source of truth for location
+// dropdowns (patient booking + doctor visit toggles).
+export const serviceAreas = pgTable('service_areas', {
+  id: serial('id').primaryKey(),
+  name: text('name').notNull().unique(),
+  city: text('city').notNull().default('Nagpur'),
+  active: boolean('active').notNull().default(true),
+  sortOrder: integer('sort_order').notNull().default(0),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 

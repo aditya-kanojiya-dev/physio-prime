@@ -1,0 +1,1 @@
+ALTER TABLE "doctors" ADD COLUMN IF NOT EXISTS "deletion_requested_at" timestamp with time zone;

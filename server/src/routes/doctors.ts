@@ -1,10 +1,10 @@
 import { Router } from 'express';
-import { and, eq, sql, type SQL } from 'drizzle-orm';
+import { and, asc, eq, sql, type SQL } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '../db/pool';
-import { doctors, categories, symptoms, doctorLocations } from '../db/schema';
+import { doctors, categories, symptoms, doctorLocations, serviceAreas, users } from '../db/schema';
 import { getAvailableWindows, isPast, isValidDate } from '../lib/slots';
-import { SERVICE_AREAS, SERVICE_CITIES, PAN_INDIA } from '../lib/locations';
+import { PAN_INDIA } from '../lib/locations';
 
 export const doctorsRouter = Router();
 
@@ -50,6 +50,33 @@ function tokenMatchSql(title: string, withBio: boolean): SQL {
   if (clauses.length === 0) return sql`false`;
   return sql`(${sql.join(clauses, sql` OR `)})`;
 }
+
+const doctorColumns = {
+  id: doctors.id,
+  name: doctors.name,
+  title: doctors.title,
+  specialty: doctors.specialty,
+  slug: doctors.slug,
+  photo: doctors.photo,
+  rating: doctors.rating,
+  reviewCount: doctors.reviewCount,
+  experienceYears: doctors.experienceYears,
+  patientsTreated: doctors.patientsTreated,
+  languages: doctors.languages,
+  location: doctors.location,
+  fees: doctors.fees,
+  nextAvailable: doctors.nextAvailable,
+  verified: doctors.verified,
+  featured: doctors.featured,
+  gender: doctors.gender,
+  bio: doctors.bio,
+  education: doctors.education,
+  experience: doctors.experience,
+  registration: doctors.registration,
+  expertise: doctors.expertise,
+  treatments: doctors.treatments,
+  homeVisitsEnabled: doctors.homeVisitsEnabled,
+};
 
 const summaryColumns = {
   name: doctors.name,
@@ -152,9 +179,9 @@ doctorsRouter.get('/', async (req, res) => {
   }
 
   const rows = await (query.area
-    ? db.select(summaryColumns).from(doctors).innerJoin(doctorLocations, eq(doctors.id, doctorLocations.doctorId))
-    : db.select(summaryColumns).from(doctors)
-  ).where(and(...conditions)).orderBy(order);
+    ? db.select(summaryColumns).from(doctors).innerJoin(doctorLocations, eq(doctors.id, doctorLocations.doctorId)).innerJoin(users, eq(doctors.userId, users.id))
+    : db.select(summaryColumns).from(doctors).innerJoin(users, eq(doctors.userId, users.id))
+  ).where(and(...conditions, eq(users.status, 'active'))).orderBy(order);
 
   // ponytail: numeric columns arrive as strings from pg; rating is a number in the API
   // contract. `id` mirrors the app's slug-as-id contract (slug == the app's original doc id).
@@ -221,13 +248,35 @@ doctorsRouter.get('/areas', async (_req, res) => {
   res.json({ areas: rows.map((r) => r.area).filter(Boolean) });
 });
 
-// Master list of serviceable locations (fixed, single source of truth).
-doctorsRouter.get('/locations/master', (_req, res) => {
-  res.json({ areas: SERVICE_AREAS, cities: SERVICE_CITIES, panIndia: PAN_INDIA });
+// Master list of serviceable locations (DB-backed, managed by admin).
+doctorsRouter.get('/locations/master', async (_req, res, next) => {
+  try {
+    const rows = await db
+      .select({ name: serviceAreas.name, city: serviceAreas.city })
+      .from(serviceAreas)
+      .where(eq(serviceAreas.active, true))
+      .orderBy(asc(serviceAreas.sortOrder));
+    const panIndia = PAN_INDIA;
+    const byCity = new Map<string, string[]>();
+    for (const r of rows) {
+      const list = byCity.get(r.city) ?? [];
+      list.push(r.name);
+      byCity.set(r.city, list);
+    }
+    const cities = [...byCity.entries()].map(([name, areas]) => ({ name, areas }));
+    cities.push({ name: PAN_INDIA, areas: [] });
+    res.json({ areas: rows.map((r) => r.name), cities, panIndia });
+  } catch (err) {
+    next(err);
+  }
 });
 
 doctorsRouter.get('/:slug', async (req, res) => {
-  const [row] = await db.select().from(doctors).where(eq(doctors.slug, req.params.slug));
+  const [row] = await db
+    .select({ ...doctorColumns })
+    .from(doctors)
+    .innerJoin(users, eq(doctors.userId, users.id))
+    .where(and(eq(doctors.slug, req.params.slug), eq(users.status, 'active')));
   if (!row) {
     res.status(404).json({ error: { message: 'Doctor not found' } });
     return;
@@ -286,7 +335,11 @@ doctorsRouter.get('/:slug/slots', async (req, res, next) => {
       res.status(400).json({ error: { message: 'Date is in the past' } });
       return;
     }
-    const [doctor] = await db.select().from(doctors).where(eq(doctors.slug, req.params.slug));
+    const [doctor] = await db
+      .select({ id: doctors.id })
+      .from(doctors)
+      .innerJoin(users, eq(doctors.userId, users.id))
+      .where(and(eq(doctors.slug, req.params.slug), eq(users.status, 'active')));
     if (!doctor) {
       res.status(404).json({ error: { message: 'Doctor not found' } });
       return;

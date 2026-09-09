@@ -17,8 +17,10 @@ import {
   X,
 } from 'lucide-react'
 import { api, ApiError } from '../../lib/api'
-import { DoctorLedger, formatFee, formatDate } from '../../lib/types'
+import { DoctorLedger, ServiceArea, formatFee, formatDate } from '../../lib/types'
 import { AdminLayout } from '../../components/admin/AdminLayout'
+import { CITIES, DEPARTMENTS, DESIGNATIONS, EXPERIENCE_YEARS, SPECIALTIES } from '../../lib/options'
+import { ChipMultiSelect } from '../../components/ChipMultiSelect'
 
 const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 const inputCls = 'w-full p-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:border-teal-500 transition-colors'
@@ -98,6 +100,12 @@ export function DoctorLedgerPage() {
     enabled: !!id,
   })
 
+  const { data: serviceAreas } = useQuery({
+    queryKey: ['admin/service-areas'],
+    queryFn: async () => (await api.get<{ areas: ServiceArea[] }>('/admin/service-areas')).areas,
+    enabled: !!id,
+  })
+
   const [editingSection, setEditingSection] = useState<string | null>(null)
   const [error2, setError2] = useState<string | null>(null)
 
@@ -148,9 +156,9 @@ export function DoctorLedgerPage() {
     setProfileForm({
       name: doctor.name, title: doctor.title || '', specialty: doctor.specialty || '',
       gender: doctor.gender || '', phone: doctor.phone || '', designation: doctor.designation || '',
-      employeeId: doctor.employeeId || '', department: doctor.department || '',
+      department: doctor.department || '',
       experienceYears: doctor.experienceYears || 0, patientsTreated: doctor.patientsTreated || 0,
-      bio: doctor.bio || '', slug: doctor.slug,
+      bio: doctor.bio || '',
       languages: doctor.languages?.join(', ') || '',
       verified: doctor.verified, featured: doctor.featured,
     })
@@ -177,11 +185,11 @@ export function DoctorLedgerPage() {
     saveMutation.mutate({
       name: profileForm.name, title: profileForm.title, specialty: profileForm.specialty,
       gender: profileForm.gender, phone: profileForm.phone || null,
-      designation: profileForm.designation || null, employeeId: profileForm.employeeId || null,
+      designation: profileForm.designation || null,
       department: profileForm.department || null,
       experienceYears: Number(profileForm.experienceYears),
       patientsTreated: Number(profileForm.patientsTreated),
-      bio: profileForm.bio || null, slug: profileForm.slug,
+      bio: profileForm.bio || null,
       languages: String(profileForm.languages).split(',').map((s: string) => s.trim()).filter(Boolean),
       verified: profileForm.verified, featured: profileForm.featured,
     })
@@ -245,19 +253,16 @@ export function DoctorLedgerPage() {
               <div className="space-y-3">
                 <div className="grid grid-cols-2 gap-3">
                   <Field label="Name *"><input required value={String(profileForm.name)} onChange={(e) => setProfileForm({ ...profileForm, name: e.target.value })} className={inputCls} /></Field>
-                  <Field label="Title"><input value={String(profileForm.title)} onChange={(e) => setProfileForm({ ...profileForm, title: e.target.value })} className={inputCls} /></Field>
+                  <Field label="Title"><select value={String(profileForm.title)} onChange={(e) => setProfileForm({ ...profileForm, title: e.target.value })} className={selectCls}><option value="">—</option>{DESIGNATIONS.map((t) => <option key={t} value={t}>{t}</option>)}</select></Field>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <Field label="Specialty *"><input required value={String(profileForm.specialty)} onChange={(e) => setProfileForm({ ...profileForm, specialty: e.target.value })} className={inputCls} /></Field>
-                  <Field label="Slug"><input value={String(profileForm.slug)} onChange={(e) => setProfileForm({ ...profileForm, slug: e.target.value })} className={inputCls} /></Field>
-                </div>
+                <Field label="Specialty *"><ChipMultiSelect value={String(profileForm.specialty || '')} onChange={(v) => setProfileForm({ ...profileForm, specialty: v })} options={SPECIALTIES} /></Field>
                 <div className="grid grid-cols-3 gap-3">
                   <Field label="Gender">
                     <select value={String(profileForm.gender)} onChange={(e) => setProfileForm({ ...profileForm, gender: e.target.value })} className={selectCls}>
                       <option value="">—</option><option value="male">Male</option><option value="female">Female</option><option value="other">Other</option>
                     </select>
                   </Field>
-                  <Field label="Experience (yrs)"><input type="number" value={Number(profileForm.experienceYears)} onChange={(e) => setProfileForm({ ...profileForm, experienceYears: Number(e.target.value) })} className={inputCls} /></Field>
+                  <Field label="Experience (yrs)"><select value={Number(profileForm.experienceYears)} onChange={(e) => setProfileForm({ ...profileForm, experienceYears: Number(e.target.value) })} className={selectCls}>{EXPERIENCE_YEARS.map((y) => <option key={y} value={y}>{y} years</option>)}</select></Field>
                   <Field label="Patients Treated"><input type="number" value={Number(profileForm.patientsTreated)} onChange={(e) => setProfileForm({ ...profileForm, patientsTreated: Number(e.target.value) })} className={inputCls} /></Field>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
@@ -265,9 +270,8 @@ export function DoctorLedgerPage() {
                   <Field label="Languages (comma-sep)"><input value={String(profileForm.languages)} onChange={(e) => setProfileForm({ ...profileForm, languages: e.target.value })} className={inputCls} /></Field>
                 </div>
                 <div className="grid grid-cols-3 gap-3">
-                  <Field label="Designation"><input value={String(profileForm.designation)} onChange={(e) => setProfileForm({ ...profileForm, designation: e.target.value })} className={inputCls} /></Field>
-                  <Field label="Employee ID"><input value={String(profileForm.employeeId)} onChange={(e) => setProfileForm({ ...profileForm, employeeId: e.target.value })} className={inputCls} /></Field>
-                  <Field label="Department"><input value={String(profileForm.department)} onChange={(e) => setProfileForm({ ...profileForm, department: e.target.value })} className={inputCls} /></Field>
+                  <Field label="Designation"><select value={String(profileForm.designation)} onChange={(e) => setProfileForm({ ...profileForm, designation: e.target.value })} className={selectCls}><option value="">—</option>{DESIGNATIONS.map((t) => <option key={t} value={t}>{t}</option>)}</select></Field>
+                  <Field label="Department"><select value={String(profileForm.department)} onChange={(e) => setProfileForm({ ...profileForm, department: e.target.value })} className={selectCls}><option value="">—</option>{DEPARTMENTS.map((t) => <option key={t} value={t}>{t}</option>)}</select></Field>
                 </div>
                 <Field label="Bio"><textarea value={String(profileForm.bio)} onChange={(e) => setProfileForm({ ...profileForm, bio: e.target.value })} rows={3} className={`${inputCls} resize-none`} /></Field>
                 <div className="flex gap-6 pt-1">
@@ -321,8 +325,8 @@ export function DoctorLedgerPage() {
             {editingSection === 'location' ? (
               <div className="space-y-3">
                 <div className="grid grid-cols-2 gap-3">
-                  <Field label="Area"><input value={locForm.area} onChange={(e) => setLocForm({ ...locForm, area: e.target.value })} className={inputCls} /></Field>
-                  <Field label="City"><input value={locForm.city} onChange={(e) => setLocForm({ ...locForm, city: e.target.value })} className={inputCls} /></Field>
+                  <Field label="Area"><select value={locForm.area} onChange={(e) => setLocForm({ ...locForm, area: e.target.value })} className={selectCls}><option value="">—</option>{(serviceAreas || []).filter((a) => a.active).map((a) => <option key={a.id} value={a.name}>{a.name}, {a.city || 'Nagpur'}</option>)}</select></Field>
+                  <Field label="City"><select value={locForm.city} onChange={(e) => setLocForm({ ...locForm, city: e.target.value })} className={selectCls}><option value="">—</option>{CITIES.map((c) => <option key={c} value={c}>{c}</option>)}</select></Field>
                 </div>
               </div>
             ) : (

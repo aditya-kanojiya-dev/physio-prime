@@ -98,17 +98,17 @@ describe('PATCH /api/v1/doctor/profile', () => {
     const res = await api
       .patch('/api/v1/doctor/profile')
       .set('Authorization', `Bearer ${await doctorToken()}`)
-      .send({ fees: { home: 1100, online: 599, clinic: 800 }, bio: 'Updated bio' });
+      .send({ bio: 'Updated bio', languages: ['en', 'hi'] });
     expect(res.status).toBe(200);
-    expect(res.body.doctor.fees.home).toBe(1100);
     expect(res.body.doctor.bio).toBe('Updated bio');
+    expect(res.body.doctor.languages).toEqual(['en', 'hi']);
   });
 
   it('rejects invalid shapes', async () => {
     const res = await api
       .patch('/api/v1/doctor/profile')
       .set('Authorization', `Bearer ${await doctorToken()}`)
-      .send({ fees: { home: -5 } });
+      .send({ bio: 123 });
     expect(res.status).toBe(400);
   });
 });

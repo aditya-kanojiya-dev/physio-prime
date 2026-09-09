@@ -27,6 +27,7 @@ export interface DoctorProfile {
   employeeId?: string | null;
   department?: string | null;
   address?: Record<string, unknown> | null;
+  deletionRequestedAt?: string | null;
 }
 
 export type AppointmentStatus = 'upcoming' | 'completed' | 'cancelled' | 'no_show';
@@ -98,7 +99,12 @@ export interface AdminDoctor {
   address: Record<string, unknown>;
   homeVisitsEnabled: boolean;
   maxRadiusKm: string;
-  platformFeePercent: number;
+  platformFeePercent: number | null;
+  categoryId: number | null;
+  categoryTitle?: string | null;
+  departmentPlatformFeePercent?: number | null;
+  deletionRequestedAt: string | null;
+  status: 'active' | 'inactive';
 }
 
 export interface AdminApplication {
@@ -158,6 +164,15 @@ export interface AdminCategory {
   conditions: string[];
   sortOrder: number;
   active: boolean;
+}
+
+export interface AdminDepartment {
+  id: number;
+  name: string;
+  slug: string;
+  active: boolean;
+  sortOrder: number;
+  platformFeePercent: number;
 }
 
 export interface AdminSymptom {
@@ -341,6 +356,14 @@ export interface Payout {
 }
 
 // --- Locations ---
+export interface ServiceArea {
+  id: number;
+  name: string;
+  city: string | null;
+  active: boolean;
+  sortOrder: number;
+}
+
 export interface DoctorLocation {
   id: number;
   name: string;

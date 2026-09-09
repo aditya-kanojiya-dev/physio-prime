@@ -35,7 +35,7 @@ beforeAll(async () => {
   await db.update(users).set({ role: 'doctor' }).where(eq(users.id, doctor.id));
   const [doc] = await db
     .insert(doctors)
-    .values({ userId: doctor.id, name: 'Payout Test Doc', slug: 'doc-payout-test', platformFeePercent: FEE_PERCENT })
+    .values({ userId: doctor.id, name: 'Payout Test Doc', slug: 'doc-payout-test', platformFeePercent: FEE_PERCENT, employeeId: 'EMP-900' })
     .returning({ id: doctors.id });
   doctorId = doc.id;
   doctorToken = doctor.token;
