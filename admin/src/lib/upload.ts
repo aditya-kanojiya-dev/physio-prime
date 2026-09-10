@@ -1,6 +1,6 @@
 import { supabase } from './supabase'
 
-const BUCKET = 'blog-images'
+const BUCKET = 'media'
 
 export async function uploadImage(file: File, folder = 'misc'): Promise<string> {
   const ext = file.name.split('.').pop() || 'jpg'

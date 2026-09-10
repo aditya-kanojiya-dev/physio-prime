@@ -11,7 +11,7 @@ interface StorageFile {
   metadata: { size?: number; mimetype?: string }
 }
 
-const BUCKET = 'blog-images'
+const BUCKET = 'media'
 
 export function MediaLibraryPage() {
   const [copied, setCopied] = useState('')
