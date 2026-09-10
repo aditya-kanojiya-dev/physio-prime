@@ -2,6 +2,23 @@ import { and, eq, inArray } from 'drizzle-orm';
 import { db } from '../db/pool';
 import { appointments, doctorSchedules } from '../db/schema';
 
+// Prepay appointments that are never paid get auto-cancelled after this long,
+// releasing their slot. Postpay bookings (no razorpay order) are never stale.
+export const PAYMENT_GRACE_MS = 15 * 60 * 1000;
+export const EXPIRED_REASON = `Payment not completed within ${PAYMENT_GRACE_MS / 60000} minutes`;
+
+export interface UnpaidRow {
+  status: string;
+  paymentStatus: string;
+  razorpayOrderId: string | null;
+  createdAt: Date;
+}
+
+export function isStaleUnpaid(row: UnpaidRow): boolean {
+  if (row.status !== 'upcoming' || row.razorpayOrderId == null || row.paymentStatus === 'paid') return false;
+  return Date.now() - new Date(row.createdAt).getTime() > PAYMENT_GRACE_MS;
+}
+
 const WINDOWS = [
   { start: '07:00', end: '09:00', label: 'Early Morning' },
   { start: '09:00', end: '12:00', label: 'Morning' },
@@ -62,8 +79,14 @@ export async function getAvailableWindows(doctorId: number, dateStr: string): Pr
 
   if (schedules.length === 0) return [];
 
-  const booked = await db
-    .select({ timeSlot: appointments.timeSlot })
+  const booked = (await db
+    .select({
+      timeSlot: appointments.timeSlot,
+      status: appointments.status,
+      paymentStatus: appointments.paymentStatus,
+      razorpayOrderId: appointments.razorpayOrderId,
+      createdAt: appointments.createdAt,
+    })
     .from(appointments)
     .where(
       and(
@@ -71,7 +94,7 @@ export async function getAvailableWindows(doctorId: number, dateStr: string): Pr
         eq(appointments.date, dateStr),
         inArray(appointments.status, ['upcoming', 'completed']),
       ),
-    );
+    )).filter((r) => !isStaleUnpaid(r));
 
   const now = dateStr === todayStr() ? nowHHmm() : null;
   return schedules
@@ -97,8 +120,14 @@ export async function getAvailableWindows(doctorId: number, dateStr: string): Pr
 }
 
 export async function getNextFreeSlot(doctorId: number, dateStr: string, windowStart: string, windowEnd: string): Promise<string | null> {
-  const booked = await db
-    .select({ timeSlot: appointments.timeSlot })
+  const booked = (await db
+    .select({
+      timeSlot: appointments.timeSlot,
+      status: appointments.status,
+      paymentStatus: appointments.paymentStatus,
+      razorpayOrderId: appointments.razorpayOrderId,
+      createdAt: appointments.createdAt,
+    })
     .from(appointments)
     .where(
       and(
@@ -106,7 +135,7 @@ export async function getNextFreeSlot(doctorId: number, dateStr: string, windowS
         eq(appointments.date, dateStr),
         inArray(appointments.status, ['upcoming', 'completed']),
       ),
-    );
+    )).filter((r) => !isStaleUnpaid(r));
 
   const bookedStarts = new Set(booked.map((r) => r.timeSlot.split('-')[0]));
   const startMin = toMinutes(windowStart);

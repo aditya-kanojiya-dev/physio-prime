@@ -109,9 +109,12 @@ export interface Appointment {
   fee: number;
   address?: string;
   createdAt: string;
+  createdAtIso: string;
   videoCallLink?: string;
   cancellationReason?: string;
   paymentMethod?: string;
+  paymentStatus?: string;
+  razorpayOrderId?: string | null;
 }
 
 // --- Blog ---

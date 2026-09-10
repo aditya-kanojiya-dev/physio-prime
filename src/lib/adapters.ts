@@ -291,8 +291,16 @@ export function toAppointment(a: ApiAppointment): Appointment {
     fee: Math.round(a.feePaise / 100),
     address: addressToText(a.address),
     createdAt: (a.createdAt || '').slice(0, 10),
+    createdAtIso: a.createdAt || '',
     videoCallLink: a.videoCallLink || undefined,
     cancellationReason: a.cancellationReason || undefined,
     paymentMethod: a.paymentStatus === 'paid' ? 'Paid online' : a.paymentStatus === 'pending' ? 'Payment pending' : a.paymentStatus,
+    paymentStatus: a.paymentStatus,
+    razorpayOrderId: a.razorpayOrderId,
   };
+}
+
+// Unpaid online (Razorpay) bookings still holding a slot — shown under "Pending".
+export function hasPendingOnlinePayment(a: Appointment): boolean {
+  return a.status === 'upcoming' && !!a.razorpayOrderId && a.paymentStatus !== 'paid';
 }

@@ -7,6 +7,7 @@ import { Activity, User, Menu, X, ArrowRight, Sparkles, MapPin, LogIn, LogOut, H
 import { motion, AnimatePresence } from 'framer-motion';
 import { AuthModal } from '../auth/AuthModal';
 import { EASE_OUT } from '../../lib/motion';
+import { hasPendingOnlinePayment } from '../../lib/adapters';
 import { useSymptoms, useCategories } from '../../hooks/queries';
 import { buildConditionGroups } from '../../data/conditions';
 import logo from '../../assets/logo.png';
@@ -98,7 +99,7 @@ export const Navbar: React.FC = () => {
     return categories.filter((c) => c.title.toLowerCase().includes(q));
   }, [categories, categoryQuery]);
 
-  const upcomingCount = appointments.filter(a => a.status === 'upcoming').length;
+  const upcomingCount = appointments.filter(a => a.status === 'upcoming' && !hasPendingOnlinePayment(a)).length;
 
   useEffect(() => {
     const handleScroll = () => {

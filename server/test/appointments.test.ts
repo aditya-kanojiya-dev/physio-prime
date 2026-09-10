@@ -5,8 +5,8 @@ import { db } from '../src/db/pool';
 import { runMigrations } from '../src/db/migrate';
 import { seed } from '../src/lib/seed';
 import { createApp } from '../src/index';
-import { doctors } from '../src/db/schema';
-import { getAvailableWindows } from '../src/lib/slots';
+import { doctors, appointments } from '../src/db/schema';
+import { getAvailableWindows, PAYMENT_GRACE_MS } from '../src/lib/slots';
 import { futureWeekday, nowHHmm, pickSlot, registerPatient, todayStr } from './helpers';
 
 vi.mock('../src/lib/razorpay', () => ({
@@ -330,6 +330,8 @@ describe('POST /api/v1/appointments/:id/verify', () => {
 });
 
 describe('POST /api/v1/appointments/:id/reschedule', () => {
+  // ponytail: this test fires real WhatsApp/email gateways on every booking,
+  // so it hovers at the 15s default timeout; keep headroom for slow gateways.
   it('reschedules to a free slot, 409 on a taken slot, 400 on a cancelled appointment', async () => {
     const { token } = await registerPatient('apt.reschedule@example.com');
     const takenSlot = await pickSlot(MONDAY, DOCTOR);
@@ -372,7 +374,7 @@ describe('POST /api/v1/appointments/:id/reschedule', () => {
       .set('Authorization', `Bearer ${token}`)
       .send({ date: MONDAY, slot: takenSlot });
     expect(cancelled.status).toBe(400);
-  });
+  }, 60_000);
 
   it('returns 200 unchanged when rescheduling to the identical date+slot', async () => {
     const { token } = await registerPatient('apt.noop@example.com');
@@ -391,6 +393,63 @@ describe('POST /api/v1/appointments/:id/reschedule', () => {
     expect(res.status).toBe(200);
     expect(res.body.appointment.date).toBe(MONDAY);
     expect(res.body.appointment.timeSlot).toBe(slot);
+  });
+});
+
+describe('auto-cancel of unpaid prepay appointments', () => {
+  const backdate = (id: string) =>
+    db
+      .update(appointments)
+      .set({ createdAt: new Date(Date.now() - PAYMENT_GRACE_MS - 60_000) })
+      .where(eq(appointments.bookingId, id));
+
+  it('cancels an expired unpaid booking, frees its slot, and rejects verify', async () => {
+    const { token } = await registerPatient('apt.expire@example.com');
+    const { token: otherToken } = await registerPatient('apt.expire2@example.com');
+    const slot = await pickSlot(MONDAY, DOCTOR);
+    const booked = await api
+      .post('/api/v1/appointments')
+      .set('Authorization', `Bearer ${token}`)
+      .send(bookPayload({ slot }))
+      .expect(201);
+    const id = booked.body.appointment.id;
+
+    await backdate(id);
+
+    const verify = await api
+      .post(`/api/v1/appointments/${id}/verify`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ razorpayPaymentId: 'pay_late', razorpaySignature: 'sig' });
+    expect(verify.status).toBe(400);
+    expect(verify.body.error.message).toContain('Payment session expired');
+
+    const detail = await api.get(`/api/v1/appointments/${id}`).set('Authorization', `Bearer ${token}`);
+    expect(detail.status).toBe(200);
+    expect(detail.body.appointment.status).toBe('cancelled');
+
+    const list = await api.get('/api/v1/appointments').set('Authorization', `Bearer ${token}`);
+    expect(list.body.appointments.find((a: { id: string }) => a.id === id).status).toBe('cancelled');
+
+    const rebuy = await api
+      .post('/api/v1/appointments')
+      .set('Authorization', `Bearer ${otherToken}`)
+      .send(bookPayload({ slot }));
+    expect(rebuy.status).toBe(201);
+  });
+
+  it('does not cancel a fresh unpaid booking within the grace window', async () => {
+    const { token } = await registerPatient('apt.inwindow@example.com');
+    const slot = await pickSlot(MONDAY, DOCTOR);
+    const booked = await api
+      .post('/api/v1/appointments')
+      .set('Authorization', `Bearer ${token}`)
+      .send(bookPayload({ slot }))
+      .expect(201);
+    const id = booked.body.appointment.id;
+
+    const detail = await api.get(`/api/v1/appointments/${id}`).set('Authorization', `Bearer ${token}`);
+    expect(detail.status).toBe(200);
+    expect(detail.body.appointment.status).toBe('upcoming');
   });
 });
 

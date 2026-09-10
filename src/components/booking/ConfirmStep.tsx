@@ -5,7 +5,8 @@ import { motion } from 'framer-motion';
 import { useAuth } from '../../context/AuthContext';
 import { useBooking } from '../../context/BookingContext';
 import { Doctor, ConsultationMode, Symptom } from '../../types';
-import { api, ApiError } from '../../lib/api';
+import { ApiError } from '../../lib/api';
+import { openRazorpayCheckout } from '../../lib/razorpayCheckout';
 import { fadeUp } from '../../lib/motion';
 import {
   ArrowLeft,
@@ -20,12 +21,6 @@ import {
   MapPin,
 } from 'lucide-react';
 
-declare global {
-  interface Window {
-    Razorpay?: new (options: Record<string, unknown>) => { open: () => void };
-  }
-}
-
 interface ConfirmStepProps {
   doctor: Doctor;
   mode: ConsultationMode;
@@ -33,20 +28,6 @@ interface ConfirmStepProps {
   selectedDate: string;
   selectedTime: string;
   onBack: () => void;
-}
-
-let razorpayLoaded: Promise<void> | null = null;
-function loadRazorpay(): Promise<void> {
-  if (!razorpayLoaded) {
-    razorpayLoaded = new Promise((resolve, reject) => {
-      const script = document.createElement('script');
-      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
-      script.onload = () => resolve();
-      script.onerror = () => reject(new Error('Failed to load Razorpay checkout'));
-      document.body.appendChild(script);
-    });
-  }
-  return razorpayLoaded;
 }
 
 const RELATIONS = ['Father', 'Mother', 'Spouse', 'Child', 'Grandparent', 'Sibling', 'Friend', 'Other'];
@@ -82,6 +63,7 @@ export const ConfirmStep: React.FC<ConfirmStepProps> = ({
   selectedTime,
   onBack,
 }) => {
+  type CreatedAppointment = Awaited<ReturnType<typeof createAppointment>>;
   const navigate = useNavigate();
   const { user, openAuthModal } = useAuth();
   const { createAppointment } = useBooking();
@@ -102,7 +84,12 @@ export const ConfirmStep: React.FC<ConfirmStepProps> = ({
 
   const [processing, setProcessing] = useState(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
-  const [createdAppointment, setCreatedAppointment] = useState<Awaited<ReturnType<typeof createAppointment>>['appointment'] | null>(null);
+  const [createdAppointment, setCreatedAppointment] = useState<CreatedAppointment['appointment'] | null>(null);
+  // Unpaid prepay booking held until the payment screen is dismissed; the
+  // server auto-cancels it after a grace window, this just lets the user retry
+  // the same order (and shows the countdown) instead of recreating a booking.
+  const [lastPending, setLastPending] = useState<CreatedAppointment | null>(null);
+  const [heldFor, setHeldFor] = useState<number | null>(null);
 
   const [attempted, setAttempted] = useState(false);
 
@@ -149,6 +136,17 @@ export const ConfirmStep: React.FC<ConfirmStepProps> = ({
     }
   }, [createdAppointment]);
 
+  useEffect(() => {
+    if (heldFor == null) return;
+    if (heldFor <= 0) {
+      setHeldFor(null);
+      setLastPending(null);
+      return;
+    }
+    const t = setTimeout(() => setHeldFor((s) => (s == null ? null : s - 1)), 1000);
+    return () => clearTimeout(t);
+  }, [heldFor]);
+
   const ageNum = parseInt(patientAge);
   const canSubmit = useMemo(() => {
     if (!user) return false;
@@ -157,10 +155,39 @@ export const ConfirmStep: React.FC<ConfirmStepProps> = ({
     return true;
   }, [user, errors, agreed]);
 
+  const openCheckout = async (appointment: CreatedAppointment['appointment'], razorpayOrder: CreatedAppointment['razorpayOrder']) => {
+    if (!import.meta.env.VITE_RAZORPAY_KEY_ID || !razorpayOrder) {
+      setPaymentError('Payment gateway is not configured - your appointment is reserved but unpaid.');
+      return;
+    }
+
+    await openRazorpayCheckout({
+      appointmentId: appointment.id,
+      orderId: razorpayOrder.id,
+      amountPaise: razorpayOrder.amountPaise,
+      description: appointment.doctorName + ' - ' + appointment.doctorSpecialty,
+      prefill: { name: patientName, email: patientEmail, contact: patientPhone },
+      onPaid: () => {
+        setCreatedAppointment(appointment);
+        setHeldFor(null);
+        setLastPending(null);
+      },
+      onDismiss: () => {
+        // Keep the slot held server-side; it auto-cancels if unpaid after
+        // the grace window. Show the countdown + allow retrying this order.
+        setCreatedAppointment(null);
+        setHeldFor(15 * 60);
+        setPaymentError('Payment was not completed. Your slot is held — retry paying before the timer runs out, otherwise the appointment is cancelled automatically.');
+      },
+    });
+  };
+
   const handlePay = async () => {
     setAttempted(true);
     setProcessing(true);
     setPaymentError(null);
+    setHeldFor(null);
+    setLastPending(null);
     try {
       const { appointment, razorpayOrder } = await createAppointment({
         doctorSlug: doctor.id,
@@ -185,38 +212,8 @@ export const ConfirmStep: React.FC<ConfirmStepProps> = ({
         return;
       }
 
-      const key = import.meta.env.VITE_RAZORPAY_KEY_ID;
-      if (!key || !razorpayOrder) {
-        setPaymentError('Payment gateway is not configured - your appointment is reserved but unpaid.');
-        return;
-      }
-
-      await loadRazorpay();
-      const rzp = new window.Razorpay!({
-        key,
-        order_id: razorpayOrder.id,
-        amount: razorpayOrder.amountPaise,
-        currency: 'INR',
-        name: 'PhysioPrime',
-        description: appointment.doctorName + ' - ' + appointment.doctorSpecialty,
-        prefill: { name: patientName, email: patientEmail, contact: patientPhone },
-        handler: async (response: { razorpay_payment_id: string; razorpay_signature: string }) => {
-          try {
-            await api.post('/appointments/' + appointment.id + '/verify', {
-              razorpayPaymentId: response.razorpay_payment_id,
-              razorpaySignature: response.razorpay_signature,
-            });
-          } catch {
-            // ponytail: verification failed but payment went through; backend will reconcile
-          }
-        },
-        modal: {
-          ondismiss: () => {
-            setPaymentError('Payment was not completed. Your appointment is reserved but unpaid.');
-          },
-        },
-      });
-      rzp.open();
+      setLastPending({ appointment, razorpayOrder });
+      await openCheckout(appointment, razorpayOrder);
     } catch (err) {
       if (err instanceof ApiError) {
         setPaymentError(
@@ -620,8 +617,26 @@ export const ConfirmStep: React.FC<ConfirmStepProps> = ({
 
           {/* Error */}
           {paymentError && (
-            <div className="p-4 rounded-2xl bg-red-50 border border-red-200 text-xs font-semibold text-red-700">
-              {paymentError}
+            <div className="p-4 rounded-2xl bg-yellow-50 border border-yellow-200 space-y-2">
+              <p className="text-xs font-semibold text-yellow-800">{paymentError}</p>
+              {heldFor != null && heldFor > 0 && (
+                <p className="text-xs font-extrabold text-amber-700">
+                  Auto-cancelling in {Math.floor(heldFor / 60)}:{String(heldFor % 60).padStart(2, '0')} if not paid
+                </p>
+              )}
+              {lastPending && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPaymentError(null);
+                    setHeldFor(null);
+                    openCheckout(lastPending.appointment, lastPending.razorpayOrder);
+                  }}
+                  className="px-4 py-2 rounded-lg bg-amber-600 text-white font-extrabold text-xs hover:bg-amber-700 transition-colors"
+                >
+                  Retry Payment
+                </button>
+              )}
             </div>
           )}
 

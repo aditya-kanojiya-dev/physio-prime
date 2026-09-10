@@ -1,10 +1,10 @@
 import { Router } from 'express';
-import { and, desc, eq, inArray } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNotNull, lt, ne } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '../db/pool';
 import { appointments, doctors, doctorSchedules, users } from '../db/schema';
 import { requireAuth, requireRole } from '../middleware/auth';
-import { availableFromSchedules, dayOfWeek, isPast, isValidDate } from '../lib/slots';
+import { availableFromSchedules, dayOfWeek, EXPIRED_REASON, isPast, isStaleUnpaid, isValidDate, PAYMENT_GRACE_MS } from '../lib/slots';
 import { createOrder, verifySignature } from '../lib/razorpay';
 import { sendNotification, templates, type NotificationCtx } from '../lib/notifications';
 
@@ -258,7 +258,13 @@ async function availableStarts(tx: Tx, doctorId: number, date: string): Promise<
       ),
     );
   const booked = await tx
-    .select({ timeSlot: appointments.timeSlot })
+    .select({
+      timeSlot: appointments.timeSlot,
+      status: appointments.status,
+      paymentStatus: appointments.paymentStatus,
+      razorpayOrderId: appointments.razorpayOrderId,
+      createdAt: appointments.createdAt,
+    })
     .from(appointments)
     .where(
       and(
@@ -267,8 +273,9 @@ async function availableStarts(tx: Tx, doctorId: number, date: string): Promise<
         inArray(appointments.status, ['upcoming', 'completed']),
       ),
     );
+  const blocked = booked.filter((r) => !isStaleUnpaid(r));
   return new Set(
-    availableFromSchedules(schedules, booked.map((r) => r.timeSlot.split('-')[0]), date).map((s) => s.start),
+    availableFromSchedules(schedules, blocked.map((r) => r.timeSlot.split('-')[0]), date).map((s) => s.start),
   );
 }
 
@@ -339,6 +346,20 @@ async function bookTransaction(
 
 appointmentsRouter.get('/', async (req, res, next) => {
   try {
+    // Lazy auto-cancel: unpaid prepay bookings expire after the grace window,
+    // freeing their slot the next time anyone looks. Postpay keeps the slot.
+    await db
+      .update(appointments)
+      .set({ status: 'cancelled', cancellationReason: EXPIRED_REASON })
+      .where(
+        and(
+          eq(appointments.patientId, req.user!.id),
+          eq(appointments.status, 'upcoming'),
+          isNotNull(appointments.razorpayOrderId),
+          ne(appointments.paymentStatus, 'paid'),
+          lt(appointments.createdAt, new Date(Date.now() - PAYMENT_GRACE_MS)),
+        ),
+      );
     const rows = await db
       .select({ ...appointmentColumns, doctor: doctorSummary })
       .from(appointments)
@@ -411,6 +432,13 @@ appointmentsRouter.get('/:id', async (req, res, next) => {
       res.status(403).json({ error: { message: 'Forbidden' } });
       return;
     }
+    if (isStaleUnpaid(row)) {
+      await db
+        .update(appointments)
+        .set({ status: 'cancelled', cancellationReason: EXPIRED_REASON })
+        .where(eq(appointments.id, row.id));
+      row.status = 'cancelled';
+    }
     res.json({ appointment: serializeAppointment(row) });
   } catch (err) {
     next(err);
@@ -435,6 +463,14 @@ appointmentsRouter.post('/:id/verify', async (req, res, next) => {
     }
     if (row.status !== 'upcoming') {
       res.status(400).json({ error: { message: 'Only upcoming appointments can be verified' } });
+      return;
+    }
+    if (isStaleUnpaid(row)) {
+      await db
+        .update(appointments)
+        .set({ status: 'cancelled', cancellationReason: EXPIRED_REASON })
+        .where(eq(appointments.id, row.id));
+      res.status(400).json({ error: { message: 'Payment session expired. Please book again.' } });
       return;
     }
     if (!row.razorpayOrderId) {
@@ -473,6 +509,7 @@ appointmentsRouter.post('/:id/reschedule', async (req, res, next) => {
       if (!row) throw new BookingError(404, 'Appointment not found');
       if (row.patientId !== req.user!.id) throw new BookingError(403, 'Forbidden');
       if (row.status !== 'upcoming') throw new BookingError(400, 'Only upcoming appointments can be rescheduled');
+      if (isStaleUnpaid(row)) throw new BookingError(400, 'Payment session expired. Please book again.');
       if (row.date === body.date && row.timeSlot === body.slot) return { row, changed: false };
       // serialize concurrent bookings/reschedules for the same doctor, mirroring the booking path
       await tx.select().from(doctors).where(eq(doctors.id, row.doctorId)).for('update');

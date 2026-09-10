@@ -1,18 +1,55 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { useBooking } from '../context/BookingContext';
 import { useSlots } from '../hooks/queries';
-import { slotLabel } from '../lib/adapters';
+import { slotLabel, hasPendingOnlinePayment } from '../lib/adapters';
+import { openRazorpayCheckout } from '../lib/razorpayCheckout';
 import { Appointment } from '../types';
-import { Calendar, Video, Home, MapPin, RotateCcw, XCircle, Sparkles, Loader2, User, Mail, Phone, Ruler, Weight, Users } from 'lucide-react';
+import { Calendar, Video, Home, MapPin, RotateCcw, XCircle, Sparkles, Loader2, User, Mail, Phone, Ruler, Weight, Users, CreditCard, Timer } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { DoctorTrackingModal } from '../components/tracking/DoctorTrackingModal';
+
+// Mirrors server PAYMENT_GRACE_MS: unpaid online bookings auto-cancel after this.
+const PAYMENT_HOLD_MS = 15 * 60 * 1000;
+
+function PendingCountdown({ apt, onExpire }: { apt: Appointment; onExpire: () => void }) {
+  const expiresAt = Number.isFinite(new Date(apt.createdAtIso).getTime())
+    ? new Date(apt.createdAtIso).getTime() + PAYMENT_HOLD_MS
+    : Date.now();
+  const [left, setLeft] = useState(() => Math.max(0, expiresAt - Date.now()));
+  const fired = useRef(false);
+
+  useEffect(() => {
+    setLeft(Math.max(0, expiresAt - Date.now()));
+    const t = setInterval(() => setLeft(Math.max(0, expiresAt - Date.now())), 1000);
+    return () => clearInterval(t);
+  }, [expiresAt]);
+
+  useEffect(() => {
+    if (left === 0 && !fired.current) {
+      fired.current = true;
+      onExpire();
+    }
+  }, [left, onExpire]);
+
+  const m = Math.floor(left / 60000);
+  const s = Math.floor((left % 60000) / 1000);
+  return (
+    <span className="inline-flex items-center gap-1 rounded-lg bg-amber-200/70 px-2 py-0.5 text-xs font-black text-amber-800 tabular-nums">
+      <Timer className="w-3 h-3" />
+      {m}:{String(s).padStart(2, '0')}
+    </span>
+  );
+}
 
 export const AppointmentsPage: React.FC = () => {
   const { appointments, rescheduleAppointment, cancelAppointment } = useBooking();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'upcoming' | 'completed' | 'cancelled'>('upcoming');
+  const queryClient = useQueryClient();
+  const [activeTab, setActiveTab] = useState<'upcoming' | 'pending' | 'completed' | 'cancelled'>('upcoming');
   const [trackingApt, setTrackingApt] = useState<Appointment | null>(null);
+  const [payingId, setPayingId] = useState<string | null>(null);
 
   // Reschedule state
   const [rescheduleApt, setRescheduleApt] = useState<Appointment | null>(null);
@@ -30,7 +67,13 @@ export const AppointmentsPage: React.FC = () => {
   // View patient modal state
   const [viewPatientApt, setViewPatientApt] = useState<Appointment | null>(null);
 
-  const filteredAppointments = appointments.filter(a => a.status === activeTab);
+  const filteredAppointments = appointments.filter(a =>
+    activeTab === 'upcoming'
+      ? a.status === 'upcoming' && !hasPendingOnlinePayment(a)
+      : activeTab === 'pending'
+        ? hasPendingOnlinePayment(a)
+        : a.status === activeTab
+  );
 
   const handleConfirmReschedule = async () => {
     if (rescheduleApt && newDate && newTime) {
@@ -51,6 +94,32 @@ export const AppointmentsPage: React.FC = () => {
       } catch {
         alert('Could not cancel the appointment. Please try again.');
       }
+    }
+  };
+
+  const refetchAppointments = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ['appointments'] });
+  }, [queryClient]);
+
+  const handlePay = async (apt: Appointment) => {
+    if (!apt.razorpayOrderId || !import.meta.env.VITE_RAZORPAY_KEY_ID) {
+      alert('Payment gateway is not configured.');
+      return;
+    }
+    setPayingId(apt.id);
+    try {
+      await openRazorpayCheckout({
+        appointmentId: apt.id,
+        orderId: apt.razorpayOrderId,
+        amountPaise: apt.fee * 100,
+        description: apt.doctorName + ' - ' + apt.doctorSpecialty,
+        prefill: { name: apt.patientName, email: apt.patientEmail || '', contact: apt.patientPhone },
+        onPaid: refetchAppointments,
+      });
+    } catch {
+      alert('Could not open the payment window. Please try again.');
+    } finally {
+      setPayingId(null);
     }
   };
 
@@ -80,7 +149,7 @@ export const AppointmentsPage: React.FC = () => {
 
         {/* Tab Filters Bar */}
         <div className="flex items-center justify-between p-2 rounded-2xl glass-panel border border-slate-200 shadow-md">
-          <div className="grid grid-cols-3 gap-2 w-full sm:w-auto">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 w-full sm:w-auto">
             <button
               onClick={() => setActiveTab('upcoming')}
               className={`px-6 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center justify-center gap-2 ${
@@ -91,7 +160,21 @@ export const AppointmentsPage: React.FC = () => {
             >
               <span>Upcoming</span>
               <span className="text-[10px] font-black px-1.5 py-0.2 rounded-full bg-white/20">
-                {appointments.filter(a => a.status === 'upcoming').length}
+                {appointments.filter(a => a.status === 'upcoming' && !hasPendingOnlinePayment(a)).length}
+              </span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('pending')}
+              className={`px-6 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center justify-center gap-2 ${
+                activeTab === 'pending'
+                  ? 'bg-amber-500 text-white shadow-md shadow-amber-500/20'
+                  : 'text-slate-600 hover:bg-slate-100'
+              }`}
+            >
+              <span>Pending</span>
+              <span className="text-[10px] font-black px-1.5 py-0.2 rounded-full bg-white/20">
+                {appointments.filter(hasPendingOnlinePayment).length}
               </span>
             </button>
 
@@ -254,7 +337,36 @@ export const AppointmentsPage: React.FC = () => {
                 </div>
 
                 {/* Actions Bar */}
-                {apt.status === 'upcoming' && (
+                {hasPendingOnlinePayment(apt) ? (
+                  <div className="pt-2 space-y-3 rounded-2xl bg-amber-50 border border-amber-200 px-4 py-3">
+                    <p className="text-xs font-semibold text-amber-700">
+                      Payment pending — slot auto-cancels in{' '}
+                      <PendingCountdown apt={apt} onExpire={refetchAppointments} />{' '}
+                      if not completed.
+                    </p>
+                    <div className="flex flex-wrap items-center gap-2 justify-end">
+                      <button
+                        onClick={() => setCancelApt(apt)}
+                        className="px-4 py-2 rounded-xl font-bold text-xs text-rose-600 bg-rose-50 hover:bg-rose-100 transition-colors flex items-center gap-1.5"
+                      >
+                        <XCircle className="w-3.5 h-3.5" />
+                        <span>Cancel Booking</span>
+                      </button>
+                      <button
+                        onClick={() => handlePay(apt)}
+                        disabled={payingId === apt.id}
+                        className="px-4 py-2 rounded-xl font-bold text-xs text-white bg-amber-600 hover:bg-amber-700 disabled:opacity-60 transition-colors flex items-center gap-1.5"
+                      >
+                        {payingId === apt.id ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <CreditCard className="w-3.5 h-3.5" />
+                        )}
+                        <span>Complete Payment</span>
+                      </button>
+                    </div>
+                  </div>
+                ) : apt.status === 'upcoming' && (
                   <div className="pt-2 flex flex-wrap items-center justify-end gap-3">
                     <button
                       onClick={() => setViewPatientApt(apt)}

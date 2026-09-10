@@ -3,6 +3,7 @@ import { User, FileText, Bell, Shield, Edit3, Save, X, CheckCircle2, AlertCircle
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useBooking } from '../context/BookingContext';
+import { hasPendingOnlinePayment } from '../lib/adapters';
 import { supabase } from '../lib/supabase';
 
 export const DashboardPage: React.FC = () => {
@@ -51,7 +52,7 @@ export const DashboardPage: React.FC = () => {
             <div className="p-3 rounded-2xl bg-teal-50 border border-teal-200 text-center">
               <p className="text-xs text-slate-500 font-semibold">Upcoming Sessions</p>
               <p className="text-lg font-extrabold text-teal-600">
-                {appointments.filter(a => a.status === 'upcoming').length}
+                {appointments.filter(a => a.status === 'upcoming' && !hasPendingOnlinePayment(a)).length}
               </p>
             </div>
           </div>
