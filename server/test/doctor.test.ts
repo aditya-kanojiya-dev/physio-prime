@@ -1,12 +1,12 @@
 import { describe, it, beforeAll, afterAll, beforeEach, expect, vi } from 'vitest';
 import request from 'supertest';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { db } from '../src/db/pool';
 import { runMigrations } from '../src/db/migrate';
 import { seed } from '../src/lib/seed';
 import { createApp } from '../src/index';
-import { appointments, doctors, users } from '../src/db/schema';
-import { registerPatient } from './helpers';
+import { appointments, doctors, doctorSchedules, users } from '../src/db/schema';
+import { registerPatient, futureWeekday } from './helpers';
 
 vi.mock('../src/lib/razorpay', () => ({
   createOrder: vi.fn(),
@@ -110,6 +110,24 @@ describe('PATCH /api/v1/doctor/profile', () => {
       .set('Authorization', `Bearer ${await doctorToken()}`)
       .send({ bio: 123 });
     expect(res.status).toBe(400);
+  });
+
+  it('persists name and gender and keeps users.name in sync', async () => {
+    const token = await doctorToken();
+    const res = await api
+      .patch('/api/v1/doctor/profile')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ name: 'Dr. Tarannum Edited', gender: 'female' });
+    expect(res.status).toBe(200);
+    expect(res.body.doctor.name).toBe('Dr. Tarannum Edited');
+    expect(res.body.doctor.gender).toBe('female');
+
+    const [doc] = await db.select().from(doctors).where(eq(doctors.slug, DOCTOR_SLUG));
+    const [user] = await db.select({ name: users.name }).from(users).where(eq(users.id, doc.userId));
+    expect(user?.name).toBe('Dr. Tarannum Edited');
+
+    const me = await api.get('/api/v1/auth/me').set('Authorization', `Bearer ${token}`);
+    expect(me.body.user.name).toBe('Dr. Tarannum Edited');
   });
 });
 
@@ -402,5 +420,92 @@ describe('doctor schedules', () => {
       .set('Authorization', `Bearer ${await doctorToken()}`)
       .send({ windows: [{ dayOfWeek: 1, windowStart: '08:00', windowEnd: '10:00', maxPatients: 0, active: true }] });
     expect(bad.status).toBe(400);
+  });
+});
+
+describe('GET /api/v1/doctor/slots', () => {
+  it('returns available windows for a future date', async () => {
+    const [doc] = await db.select().from(doctors).where(eq(doctors.slug, DOCTOR_SLUG));
+    const scheds = await db
+      .select()
+      .from(doctorSchedules)
+      .where(and(eq(doctorSchedules.doctorId, doc.id), eq(doctorSchedules.active, true)));
+    expect(scheds.length).toBeGreaterThan(0);
+
+    const date = futureWeekday(scheds[0].dayOfWeek);
+    const res = await api.get(`/api/v1/doctor/slots?date=${date}`).set('Authorization', `Bearer ${await doctorToken()}`);
+    expect(res.status).toBe(200);
+    expect(res.body.date).toBe(date);
+    expect(Array.isArray(res.body.windows)).toBe(true);
+    expect(res.body.windows.length).toBeGreaterThan(0);
+    expect(res.body.windows[0].start).toMatch(/^\d{2}:\d{2}$/);
+    expect(res.body.windows[0].end).toMatch(/^\d{2}:\d{2}$/);
+  });
+
+  it('rejects past and malformed dates', async () => {
+    const past = await api
+      .get('/api/v1/doctor/slots?date=2020-01-01')
+      .set('Authorization', `Bearer ${await doctorToken()}`);
+    expect(past.status).toBe(400);
+
+    const bad = await api
+      .get('/api/v1/doctor/slots?date=2026/08/20')
+      .set('Authorization', `Bearer ${await doctorToken()}`);
+    expect(bad.status).toBe(400);
+  });
+});
+
+describe('PATCH /api/v1/doctor/appointments/:id/reschedule', () => {
+  async function reschedule(bookingId: string, body: Record<string, string>) {
+    return api
+      .patch(`/api/v1/doctor/appointments/${bookingId}/reschedule`)
+      .set('Authorization', `Bearer ${await doctorToken()}`)
+      .send(body);
+  }
+
+  it('moves an upcoming appointment to a free slot in the window', async () => {
+    const [doc] = await db.select().from(doctors).where(eq(doctors.slug, DOCTOR_SLUG));
+    const apt = await insertAppointment(doc.id);
+    const scheds = await db
+      .select()
+      .from(doctorSchedules)
+      .where(and(eq(doctorSchedules.doctorId, doc.id), eq(doctorSchedules.active, true)));
+    const date = futureWeekday(scheds[0].dayOfWeek);
+
+    const res = await reschedule(apt.bookingId, {
+      date,
+      windowStart: scheds[0].windowStart.slice(0, 5),
+      windowEnd: scheds[0].windowEnd.slice(0, 5),
+    });
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.newTimeSlot).toMatch(/^\d{2}:\d{2}-\d{2}:\d{2}$/);
+
+    const [row] = await db.select({ date: appointments.date, timeSlot: appointments.timeSlot }).from(appointments).where(eq(appointments.id, apt.id));
+    expect(row?.date).toBe(date);
+  });
+
+  it('rejects a past date', async () => {
+    const [doc] = await db.select().from(doctors).where(eq(doctors.slug, DOCTOR_SLUG));
+    const apt = await insertAppointment(doc.id);
+
+    const res = await reschedule(apt.bookingId, { date: '2020-01-01', windowStart: '08:00', windowEnd: '09:00' });
+    expect(res.status).toBe(400);
+  });
+
+  it('rejects malformed window times', async () => {
+    const [doc] = await db.select().from(doctors).where(eq(doctors.slug, DOCTOR_SLUG));
+    const apt = await insertAppointment(doc.id);
+
+    const res = await reschedule(apt.bookingId, { date: futureWeekday(1), windowStart: '8:00', windowEnd: '09:00' });
+    expect(res.status).toBe(400);
+  });
+
+  it('rejects rescheduling another doctor appointment', async () => {
+    const [other] = await db.select().from(doctors).where(eq(doctors.slug, 'doc-pritam-rathod'));
+    const apt = await insertAppointment(other.id);
+
+    const res = await reschedule(apt.bookingId, { date: futureWeekday(1), windowStart: '08:00', windowEnd: '09:00' });
+    expect(res.status).toBe(404);
   });
 });

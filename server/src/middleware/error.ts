@@ -1,5 +1,6 @@
 import type { NextFunction, Request, Response } from 'express';
 import { ZodError } from 'zod';
+import { notifyAdmin } from '../lib/notifications';
 
 const GENERIC_MESSAGE = 'Something went wrong. Please try again.';
 
@@ -37,10 +38,27 @@ export function resolveClientError(
   };
 }
 
-export function errorHandler(err: unknown, _req: Request, res: Response, _next: NextFunction) {
-  console.error('[ERROR]', err);
+export function errorHandler(err: unknown, req: Request, res: Response, _next: NextFunction) {
+  console.error(`[ERROR] ${req.method} ${req.originalUrl}`, err);
   if (res.headersSent) return;
 
   const { status, body } = resolveClientError(err);
   res.status(status).json(body);
+
+  // Persist unexpected failures (5xx) to admin alerts — fire-and-forget, never
+  // blocks the error response. Notify only when the server is actually broken,
+  // not for 4xx client mistakes.
+  if (status >= 500) {
+    void notifyAdmin({
+      type: 'server_error',
+      title: `500 ${req.method} ${req.originalUrl}`,
+      body: err instanceof Error ? err.message : 'Internal Server Error',
+      metadata: {
+        method: req.method,
+        path: req.originalUrl,
+        userId: (req as Request & { user?: { id?: number } }).user?.id ?? null,
+        stack: err instanceof Error ? err.stack ?? null : null,
+      },
+    });
+  }
 }

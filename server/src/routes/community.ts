@@ -11,6 +11,7 @@ import {
 } from '../db/schema';
 import { requireAuth, requireRole } from '../middleware/auth';
 import { requireDoctor } from '../lib/doctor';
+import { notifyDoctor } from '../lib/notifications';
 
 export const communityRouter = Router();
 
@@ -159,6 +160,20 @@ authRouter.post('/posts/:id/replies', async (req, res, next) => {
       .where(eq(communityPosts.id, postId));
 
     res.status(201).json({ reply: { ...reply, createdAt: reply.createdAt.toISOString() } });
+
+    const [post] = await db
+      .select({ doctorId: communityPosts.doctorId, title: communityPosts.title })
+      .from(communityPosts)
+      .where(eq(communityPosts.id, postId));
+    if (post && post.doctorId !== doctor.id) {
+      void notifyDoctor(post.doctorId, {
+        type: 'community',
+        title: 'New reply on your post',
+        body: `${doctor.name}: ${body.slice(0, 140)}`,
+        link: `/community/posts/${postId}`,
+        metadata: { postId, title: post.title },
+      });
+    }
   } catch (err) {
     next(err);
   }
@@ -209,10 +224,43 @@ authRouter.post('/posts/:id/vote', async (req, res, next) => {
       .where(eq(communityPosts.id, postId));
 
     res.json({ voteCount: updated?.voteCount ?? 0 });
+
+    // Only alert the author on a brand-new vote (not up/down/toggle spam).
+    if (!existing) {
+      const [post] = await db
+        .select({ doctorId: communityPosts.doctorId, title: communityPosts.title })
+        .from(communityPosts)
+        .where(eq(communityPosts.id, postId));
+      if (post && post.doctorId !== doctor.id) {
+        void notifyDoctor(post.doctorId, {
+          type: 'community',
+          title: 'New vote on your post',
+          body: `${doctor.name} voted ${value === 1 ? 'up' : 'down'} on "${post.title}"`,
+          link: `/community/posts/${postId}`,
+          metadata: { postId, vote: value },
+        });
+      }
+    }
   } catch (err) {
     next(err);
   }
 });
+
+async function notifyCommentVote(author: number, voterName: string, value: number, replyId: number) {
+  const [reply] = await db
+    .select({ doctorId: communityReplies.doctorId, postId: communityReplies.postId, body: communityReplies.body })
+    .from(communityReplies)
+    .where(eq(communityReplies.id, replyId));
+  if (reply && reply.doctorId !== author) {
+    void notifyDoctor(reply.doctorId, {
+      type: 'community',
+      title: 'New vote on your reply',
+      body: `${voterName} voted ${value === 1 ? 'up' : 'down'} on your reply`,
+      link: `/community/posts/${reply.postId}`,
+      metadata: { replyId, vote: value },
+    });
+  }
+}
 
 // --- POST /community/replies/:id/vote (auth) ---
 
@@ -257,6 +305,8 @@ authRouter.post('/replies/:id/vote', async (req, res, next) => {
       .where(eq(communityReplies.id, replyId));
 
     res.json({ voteCount: updated?.voteCount ?? 0 });
+
+    if (!existing) void notifyCommentVote(doctor.id, doctor.name, value, replyId);
   } catch (err) {
     next(err);
   }

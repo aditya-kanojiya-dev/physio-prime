@@ -4,6 +4,7 @@ import { db } from '../db/pool';
 import { doctors, conversations, messages } from '../db/schema';
 import { requireAuth, requireRole } from '../middleware/auth';
 import { requireDoctor, noProfile } from '../lib/doctor';
+import { notifyDoctor } from '../lib/notifications';
 
 export const doctorMessagesRouter = Router();
 doctorMessagesRouter.use(requireAuth, requireRole('doctor'));
@@ -169,6 +170,13 @@ doctorMessagesRouter.post('/messages/conversations', async (req, res, next) => {
       conversation: { id: existing.id, doctor1Id: d1, doctor2Id: d2 },
       message: { id: msg.id, body: msg.body, createdAt: msg.createdAt.toISOString() },
     });
+
+    void notifyDoctor(toDoctorId, {
+      type: 'message',
+      title: 'New message',
+      body: `From ${doctor.name}: ${message.slice(0, 140)}`,
+      link: `/messages?conversation=${existing.id}`,
+    });
   } catch (err) {
     next(err);
   }
@@ -209,6 +217,14 @@ doctorMessagesRouter.post('/messages/conversations/:id/replies', async (req, res
 
     res.status(201).json({
       message: { id: msg.id, body: msg.body, read: msg.read, createdAt: msg.createdAt.toISOString() },
+    });
+
+    const otherId = conv.doctor1Id === doctor.id ? conv.doctor2Id : conv.doctor1Id;
+    void notifyDoctor(otherId, {
+      type: 'message',
+      title: 'New message',
+      body: `From ${doctor.name}: ${message.slice(0, 140)}`,
+      link: `/messages?conversation=${conversationId}`,
     });
   } catch (err) {
     next(err);

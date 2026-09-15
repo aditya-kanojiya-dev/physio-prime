@@ -363,6 +363,17 @@ export const doctorNotifications = pgTable('doctor_notifications', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
+export const adminNotifications = pgTable('admin_notifications', {
+  id: serial('id').primaryKey(),
+  type: text('type').notNull(),
+  title: text('title').notNull(),
+  body: text('body'),
+  link: text('link'),
+  read: boolean('read').notNull().default(false),
+  metadata: jsonb('metadata').notNull().default({}),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 // --- Blog ---
 export const blogCategories = pgTable('blog_categories', {
   id: serial('id').primaryKey(),

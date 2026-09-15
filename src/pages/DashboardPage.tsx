@@ -141,11 +141,30 @@ function ProfileTab() {
       setError('Name cannot be empty.');
       return;
     }
+    const phoneDigits = (phone || '').replace(/\D/g, '');
+    if (phone.trim() && phoneDigits.length !== 10) {
+      setError('Phone number must be a valid 10-digit number.');
+      return;
+    }
+    if (weight.trim()) {
+      const w = Number(weight);
+      if (!(w > 0 && w <= 500)) {
+        setError('Weight must be between 1 and 500 kg.');
+        return;
+      }
+    }
+    if (height.trim()) {
+      const h = Number(height);
+      if (!(h > 0 && h <= 250)) {
+        setError('Height must be between 1 and 250 cm.');
+        return;
+      }
+    }
     setLoading(true);
     try {
       await updateProfile({
         name: name.trim(),
-        phone: phone.trim() || null,
+        phone: phone.trim() ? phoneDigits : null,
         gender: gender || null,
         dob: dob || null,
         weight: weight || null,
@@ -241,8 +260,12 @@ function ProfileTab() {
                 type="number"
                 min="1"
                 max="500"
+                step="0.1"
                 value={weight}
                 onChange={(e) => setWeight(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === '-' || e.key === 'e' || e.key === 'E') e.preventDefault();
+                }}
                 placeholder="e.g. 65"
                 className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 shadow-sm"
               />
@@ -254,8 +277,12 @@ function ProfileTab() {
                 type="number"
                 min="1"
                 max="250"
+                step="0.1"
                 value={height}
                 onChange={(e) => setHeight(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === '-' || e.key === 'e' || e.key === 'E') e.preventDefault();
+                }}
                 placeholder="e.g. 168"
                 className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 shadow-sm"
               />

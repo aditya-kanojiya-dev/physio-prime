@@ -1,11 +1,13 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { usePageMeta } from '../lib/usePageMeta'
 import { Link } from 'react-router-dom'
 import { BookOpen, Search, RefreshCw, Clock, ChevronLeft, ChevronRight, ArrowRight } from 'lucide-react'
 import { api } from '../lib/api'
 import { BlogPost, BlogPostsResponse, BlogCategory, BlogTag } from '../types'
 
 export function BlogListingPage() {
+  usePageMeta('Blog | PhysioPrime', 'Health tips, recovery guides, and physiotherapy insights from certified specialists.')
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState('')
   const [tag, setTag] = useState('')

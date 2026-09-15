@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ShieldCheck, MapPin, Award, Users, Activity, ArrowRight } from 'lucide-react';
+import { usePageMeta } from '../lib/usePageMeta';
 import { useBooking } from '../context/BookingContext';
 import { motion, useInView } from 'framer-motion';
 import { fadeUp, staggerContainer } from '../lib/motion';
@@ -29,6 +30,7 @@ function CountUp({ target, suffix }: { target: number; suffix: string }) {
 }
 
 export const AboutPage: React.FC = () => {
+  usePageMeta('About Us | PhysioPrime', 'Learn about PhysioPrime\'s mission to make quality physiotherapy accessible.');
   const { setCurrentPage } = useBooking();
 
   const stats = [

@@ -6,6 +6,7 @@ import tailwindcss from '@tailwindcss/vite'
 // admin is a separate Vite app (root = admin/), sharing the root .env file.
 export default defineConfig({
   root: fileURLToPath(new URL('.', import.meta.url)),
+  base: process.env.NODE_ENV === 'production' ? '/admin/' : '/',
   envDir: '..',
   plugins: [react(), tailwindcss()],
   server: {

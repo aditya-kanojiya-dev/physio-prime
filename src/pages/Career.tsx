@@ -53,6 +53,7 @@ export const Career: React.FC = () => {
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [fileName, setFileName] = useState('');
+  const [error, setError] = useState('');
 
   const positions = [
     'Physiotherapist',
@@ -125,7 +126,14 @@ export const Career: React.FC = () => {
   // ponytail: wired to POST /api/v1/careers — resume upload deferred (needs storage infra)
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError('');
     setIsLoading(true);
+
+    if (formData.phone && !/^\d{10}$/.test(formData.phone.replace(/\D/g, ''))) {
+      setIsLoading(false);
+      setError('Phone number must be a valid 10-digit number.');
+      return;
+    }
 
     try {
       const res = await fetch('/api/v1/careers', {
@@ -134,7 +142,7 @@ export const Career: React.FC = () => {
         body: JSON.stringify({
           fullName: formData.fullName,
           email: formData.email,
-          phone: formData.phone,
+          phone: formData.phone.replace(/\D/g, ''),
           position: formData.position,
           specialization: formData.specialization,
           qualification: formData.qualification,
@@ -246,10 +254,12 @@ export const Career: React.FC = () => {
                   </label>
                   <input
                     type="tel"
+                    inputMode="numeric"
                     name="phone"
+                    maxLength={10}
                     value={formData.phone}
                     onChange={handleInputChange}
-                    placeholder="Enter phone number"
+                    placeholder="Enter 10-digit phone number"
                     required
                     className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 focus:bg-white transition-all"
                   />
@@ -455,6 +465,11 @@ export const Career: React.FC = () => {
               </div>
 
               {/* Submit Button */}
+              {error && (
+                <div className="text-xs font-bold text-red-600 bg-red-50 border border-red-200 rounded-xl px-3 py-2.5">
+                  {error}
+                </div>
+              )}
               <button
                 type="submit"
                 disabled={isLoading || !formData.consent}

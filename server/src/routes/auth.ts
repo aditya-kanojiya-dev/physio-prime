@@ -49,7 +49,12 @@ authRouter.get('/me', requireAuth, async (req, res, next) => {
 
 const profilePatchSchema = z.object({
   name: z.string().trim().min(1).max(100).optional(),
-  phone: z.string().trim().max(20).nullable().optional(),
+  phone: z
+    .string()
+    .trim()
+    .refine((v) => v === null || /^\d{10}$/.test(v), 'phone must be exactly 10 digits')
+    .nullable()
+    .optional(),
   gender: z.enum(['male', 'female', 'other']).nullable().optional(),
   dob: z.string().refine(isValidDate, 'dob must be YYYY-MM-DD').nullable().optional(),
   weight: z.coerce.number().positive().max(500).nullable().optional(),

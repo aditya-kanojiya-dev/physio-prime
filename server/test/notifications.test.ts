@@ -1,6 +1,7 @@
 import { describe, it, beforeAll, afterAll, beforeEach, expect, vi } from 'vitest';
 import request from 'supertest';
 import { and, eq } from 'drizzle-orm';
+import { sql } from 'drizzle-orm';
 import { db } from '../src/db/pool';
 import { runMigrations } from '../src/db/migrate';
 import { seed } from '../src/lib/seed';
@@ -87,6 +88,7 @@ async function insertPaidAppointmentForTomorrow(patientId: number): Promise<numb
 beforeAll(async () => {
   await runMigrations();
   await seed();
+  await db.execute(sql`TRUNCATE notifications RESTART IDENTITY CASCADE`);
 });
 
 afterAll(async () => {
@@ -102,6 +104,7 @@ beforeEach(() => {
   vi.mocked(createRefund).mockResolvedValue();
   providers.twilioWhatsApp = vi.fn(async () => undefined);
   providers.twilioSms = vi.fn(async () => undefined);
+  providers.resendEmail = vi.fn(async () => undefined);
 });
 
 describe('sendNotification', () => {
@@ -157,9 +160,8 @@ describe('booking flow notifications', () => {
   it('creates a bookingConfirmed whatsapp row when a payment is verified', async () => {
     await bookAndVerify('ntf.confirm@example.com');
     const rows = await db.select().from(notifications);
-    const confirmed = rows.filter((r) => r.template === 'confirmed');
+    const confirmed = rows.filter((r) => r.template === 'confirmed' && r.channel === 'whatsapp');
     expect(confirmed.length).toBe(1);
-    expect(confirmed[0].channel).toBe('whatsapp');
     expect(confirmed[0].status).toBe('sent');
     expect(confirmed[0].body).toContain('confirmed');
   });
@@ -174,9 +176,8 @@ describe('booking flow notifications', () => {
       .send({ date: targetDay, slot: targetSlot })
       .expect(200);
     const rows = await db.select().from(notifications);
-    const rescheduled = rows.filter((r) => r.template === 'rescheduled');
+    const rescheduled = rows.filter((r) => r.template === 'rescheduled' && r.channel === 'whatsapp');
     expect(rescheduled.length).toBe(1);
-    expect(rescheduled[0].channel).toBe('whatsapp');
     expect(rescheduled[0].body).toContain('moved to');
 
     await api
@@ -185,7 +186,7 @@ describe('booking flow notifications', () => {
       .send({ date: targetDay, slot: targetSlot })
       .expect(200);
     const after = await db.select().from(notifications);
-    expect(after.filter((r) => r.template === 'rescheduled').length).toBe(1);
+    expect(after.filter((r) => r.template === 'rescheduled' && r.channel === 'whatsapp').length).toBe(1);
   });
 
   it('creates a bookingCancelled row (non-refundable note) after cancel', async () => {
@@ -196,9 +197,9 @@ describe('booking flow notifications', () => {
       .send({ reason: 'Changed my mind' })
       .expect(200);
     const rows = await db.select().from(notifications);
-    const cancelled = rows.filter((r) => r.template === 'cancelled');
+    const cancelled = rows.filter((r) => r.template === 'cancelled' && r.channel === 'whatsapp');
     expect(cancelled.length).toBe(1);
-    expect(cancelled[0].channel).toBe('whatsapp');
+    expect(cancelled[0].status).toBe('sent');
     expect(cancelled[0].body).toContain('non-refundable');
   });
 });

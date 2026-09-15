@@ -4,6 +4,7 @@ import express from 'express';
 import { sql, eq } from 'drizzle-orm';
 import { db } from '../src/db/pool';
 import { runMigrations } from '../src/db/migrate';
+import { seed } from '../src/lib/seed';
 import { users, patientProfiles } from '../src/db/schema';
 import { createApp } from '../src/index';
 import { requireAuth, requireRole } from '../src/middleware/auth';
@@ -19,6 +20,7 @@ const probeApi = request(probeApp);
 beforeAll(async () => {
   await runMigrations();
   await db.execute(sql`TRUNCATE users, patient_profiles, doctor_applications RESTART IDENTITY CASCADE`);
+  await seed();
 });
 
 afterAll(async () => {
@@ -62,13 +64,21 @@ describe('PATCH /api/v1/auth/me', () => {
     const res = await api
       .patch('/api/v1/auth/me')
       .set('Authorization', `Bearer ${email}`)
-      .send({ name: 'Edited Name', phone: '+91 90000 00000' });
+      .send({ name: 'Edited Name', phone: '9000000000' });
     expect(res.status).toBe(200);
-    expect(res.body.user).toMatchObject({ email, name: 'Edited Name', phone: '+91 90000 00000' });
+    expect(res.body.user).toMatchObject({ email, name: 'Edited Name', phone: '9000000000' });
 
     const [row] = await db.select().from(users).where(eq(users.email, email));
     expect(row?.name).toBe('Edited Name');
-    expect(row?.phone).toBe('+91 90000 00000');
+    expect(row?.phone).toBe('9000000000');
+  });
+
+  it('rejects a phone that is not exactly 10 digits', async () => {
+    const res = await api
+      .patch('/api/v1/auth/me')
+      .set('Authorization', 'Bearer badphone.me@example.com')
+      .send({ phone: '+91 90000 00000' });
+    expect(res.status).toBe(400);
   });
 
   it('clears phone when sent as null', async () => {
@@ -76,7 +86,7 @@ describe('PATCH /api/v1/auth/me', () => {
     await api
       .patch('/api/v1/auth/me')
       .set('Authorization', `Bearer ${email}`)
-      .send({ phone: '123' });
+      .send({ phone: null });
     const res = await api
       .patch('/api/v1/auth/me')
       .set('Authorization', `Bearer ${email}`)

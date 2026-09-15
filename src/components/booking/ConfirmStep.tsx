@@ -101,22 +101,30 @@ export const ConfirmStep: React.FC<ConfirmStepProps> = ({
     if (!patientEmail.trim()) e.email = 'Email is required';
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(patientEmail.trim())) e.email = 'Enter a valid email address';
     if (!patientPhone.trim()) e.phone = 'Phone number is required';
-    else if (!/^\d{10}$/.test(patientPhone.trim())) e.phone = 'Enter a valid 10-digit phone number';
+    else if (!/^\d{10}$/.test(patientPhone.replace(/\D/g, ''))) e.phone = 'Enter a valid 10-digit phone number';
     if (!patientGender) e.gender = 'Select a gender';
     if (!patientAge.trim()) e.age = 'Age is required';
     else {
       const ageInt = parseInt(patientAge);
       if (ageInt < 1 || ageInt > 100) e.age = 'Age must be between 1 and 100';
     }
+    if (patientWeight.trim()) {
+      const w = Number(patientWeight);
+      if (!(w > 0 && w <= 500)) e.weight = 'Weight must be between 1 and 500 kg';
+    }
+    if (patientHeight.trim()) {
+      const h = Number(patientHeight);
+      if (!(h > 0 && h <= 250)) e.height = 'Height must be between 1 and 250 cm';
+    }
     if (forOther && !relation) e.relation = 'Select who this appointment is for';
     return e;
-  }, [patientName, patientEmail, patientPhone, patientGender, patientAge, forOther, relation]);
+  }, [patientName, patientEmail, patientPhone, patientGender, patientAge, patientWeight, patientHeight, forOther, relation]);
 
   function prefillSelf() {
     if (!user) return;
     setPatientName(user.name || '');
     setPatientEmail(user.email || '');
-    setPatientPhone(user.phone || '');
+    setPatientPhone((user.phone || '').replace(/\D/g, ''));
     setPatientGender((user.gender as 'male' | 'female' | 'other') || 'male');
     setPatientAge(ageFromDob(user.dob));
     setPatientWeight(user.weight || '');
@@ -463,9 +471,11 @@ export const ConfirmStep: React.FC<ConfirmStepProps> = ({
                 <label className="text-xs font-bold text-slate-700">Phone Number *</label>
                 <input
                   type="tel"
+                  inputMode="numeric"
+                  maxLength={10}
                   value={patientPhone}
-                  onChange={e => setPatientPhone(e.target.value)}
-                  placeholder="Enter phone number"
+                  onChange={e => setPatientPhone(e.target.value.replace(/\D/g, ''))}
+                  placeholder="Enter 10-digit phone number"
                   className={`w-full px-4 py-3 bg-white border ${attempted && errors.phone ? 'border-red-400 border-2' : 'border-slate-200'} rounded-xl text-sm font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 shadow-sm`}
                 />
                 {attempted && errors.phone && (
@@ -513,22 +523,40 @@ export const ConfirmStep: React.FC<ConfirmStepProps> = ({
                 <label className="text-xs font-bold text-slate-700">Weight (kg) <span className="font-normal text-slate-400">(optional)</span></label>
                 <input
                   type="number"
+                  min="1"
+                  max="500"
+                  step="0.1"
                   value={patientWeight}
                   onChange={e => setPatientWeight(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === '-' || e.key === 'e' || e.key === 'E') e.preventDefault();
+                  }}
                   placeholder="Enter weight in kg"
-                  className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 shadow-sm"
+                  className={`w-full px-4 py-3 bg-white border ${attempted && errors.weight ? 'border-red-400 border-2' : 'border-slate-200'} rounded-xl text-sm font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 shadow-sm`}
                 />
+                {attempted && errors.weight && (
+                  <p className="text-[11px] font-semibold text-red-600">{errors.weight}</p>
+                )}
               </div>
 
               <div className="space-y-1">
                 <label className="text-xs font-bold text-slate-700">Height (cm) <span className="font-normal text-slate-400">(optional)</span></label>
                 <input
                   type="number"
+                  min="1"
+                  max="250"
+                  step="0.1"
                   value={patientHeight}
                   onChange={e => setPatientHeight(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === '-' || e.key === 'e' || e.key === 'E') e.preventDefault();
+                  }}
                   placeholder="Enter height in cm"
-                  className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 shadow-sm"
+                  className={`w-full px-4 py-3 bg-white border ${attempted && errors.height ? 'border-red-400 border-2' : 'border-slate-200'} rounded-xl text-sm font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 shadow-sm`}
                 />
+                {attempted && errors.height && (
+                  <p className="text-[11px] font-semibold text-red-600">{errors.height}</p>
+                )}
               </div>
             </div>
 

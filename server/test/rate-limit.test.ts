@@ -16,10 +16,10 @@ describe('trustProxyHops', () => {
 });
 
 describe('isRateLimitExempt', () => {
-  it('skips health checks and Razorpay webhooks only', () => {
+  it('skips health checks, Razorpay webhooks, and identity checks', () => {
     expect(isRateLimitExempt({ originalUrl: '/api/v1/health', path: '/api/v1/health' })).toBe(true);
     expect(isRateLimitExempt({ originalUrl: '/api/v1/razorpay/webhook', path: '/webhook' })).toBe(true);
-    expect(isRateLimitExempt({ originalUrl: '/api/v1/auth/me', path: '/me' })).toBe(false);
+    expect(isRateLimitExempt({ originalUrl: '/api/v1/auth/me', path: '/me' })).toBe(true);
   });
 });
 

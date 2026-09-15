@@ -176,6 +176,34 @@ describe('POST /api/v1/appointments validation', () => {
       .send(bookPayload({ doctorSlug: SECOND_DOCTOR, mode: 'clinic' }));
     expect(res.status).toBe(400);
   });
+
+  it('rejects a patientPhone that is not exactly 10 digits', async () => {
+    const { token } = await registerPatient('apt.badphone@example.com');
+    for (const patientPhone of ['+91 90000 00000', '98765432', '98765432101']) {
+      const res = await api
+        .post('/api/v1/appointments')
+        .set('Authorization', `Bearer ${token}`)
+        .send(bookPayload({ patientPhone }));
+      expect(res.status).toBe(400);
+    }
+  });
+
+  it('rejects weight and height that are zero or negative', async () => {
+    const { token } = await registerPatient('apt.badvitals@example.com');
+    const slot = await pickSlot(MONDAY, DOCTOR);
+    for (const overrides of [
+      { patientWeight: 0 },
+      { patientWeight: -5 },
+      { patientHeight: 0 },
+      { patientHeight: -10 },
+    ]) {
+      const res = await api
+        .post('/api/v1/appointments')
+        .set('Authorization', `Bearer ${token}`)
+        .send(bookPayload({ slot, ...overrides }));
+      expect(res.status).toBe(400);
+    }
+  });
 });
 
 describe('GET /api/v1/doctors/:slug/slots', () => {

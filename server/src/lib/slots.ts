@@ -119,8 +119,14 @@ export async function getAvailableWindows(doctorId: number, dateStr: string): Pr
     .filter((w) => (now ? w.end > now : true));
 }
 
-export async function getNextFreeSlot(doctorId: number, dateStr: string, windowStart: string, windowEnd: string): Promise<string | null> {
-  const booked = (await db
+export async function getNextFreeSlot(
+  doctorId: number,
+  dateStr: string,
+  windowStart: string,
+  windowEnd: string,
+  q: Pick<typeof db, 'select'> = db,
+): Promise<string | null> {
+  const booked = (await q
     .select({
       timeSlot: appointments.timeSlot,
       status: appointments.status,

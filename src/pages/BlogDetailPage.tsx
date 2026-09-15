@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useParams, Link } from 'react-router-dom'
 import { ArrowLeft, Clock, Tag, BookOpen, RefreshCw } from 'lucide-react'
 import { api } from '../lib/api'
+import DOMPurify from 'isomorphic-dompurify'
 import { BlogPost } from '../types'
 
 export function BlogDetailPage() {
@@ -107,7 +108,7 @@ export function BlogDetailPage() {
             prose-img:rounded-2xl prose-img:border prose-img:border-slate-200
             prose-strong:text-slate-900
             prose-blockquote:border-blue-500 prose-blockquote:text-slate-600"
-          dangerouslySetInnerHTML={{ __html: post.content }}
+          dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(post.content) }}
         />
 
         {/* Back to blog */}

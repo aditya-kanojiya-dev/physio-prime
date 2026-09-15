@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { usePageMeta } from '../lib/usePageMeta';
 import { useBooking } from '../context/BookingContext';
 import { useDoctorDetail } from '../hooks/queries';
 import { DoctorProfileHeader } from '../components/doctors/DoctorProfileHeader';
@@ -13,6 +14,7 @@ export const DoctorDetailPage: React.FC = () => {
   const navigate = useNavigate();
   const { setSelectedDoctorId } = useBooking();
   const { data: doctor, isLoading, error } = useDoctorDetail(id || '');
+  usePageMeta(doctor?.name ? `${doctor.name} | PhysioPrime` : 'Doctor Profile | PhysioPrime', doctor?.name ? `Book ${doctor.name} for physiotherapy consultations.` : 'View physiotherapist profile, specialties, and book an appointment.');
 
   // Update context when doctor is found
   useEffect(() => {

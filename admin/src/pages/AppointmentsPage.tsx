@@ -508,7 +508,7 @@ function RescheduleModal({
     queryKey: ['doctor/slots', appointmentId, date],
     queryFn: async () => {
       const res = await api.get<{ windows: { start: string; end: string; label: string; maxPatients: number; bookedCount: number; available: boolean }[] }>(
-        `/doctors/slots?date=${date}`,
+        `/doctor/slots?date=${date}`,
       )
       return res.windows.filter((w) => w.available)
     },

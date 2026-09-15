@@ -1,5 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { usePageMeta } from '../lib/usePageMeta';
 import { motion } from 'framer-motion';
 import {
   Sparkles,
@@ -90,6 +91,7 @@ const physioFaqs = [
 ];
 
 export const PricingPage: React.FC = () => {
+  usePageMeta('Pricing | PhysioPrime', 'Transparent pricing for home visits and online physiotherapy consultations.');
   return (
     <section className="py-12 lg:py-16 relative overflow-hidden">
       <div className="absolute top-0 right-1/4 w-96 h-96 bg-blue-100/60 rounded-full blur-3xl pointer-events-none" />

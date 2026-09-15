@@ -1,7 +1,7 @@
 import { and, eq } from 'drizzle-orm';
 import { Resend } from 'resend';
 import { db } from '../db/pool';
-import { appointments, doctors, notifications, users } from '../db/schema';
+import { adminNotifications, appointments, doctors, doctorNotifications, notifications, users } from '../db/schema';
 import { getConfig } from '../config';
 
 function isNotOnWhatsApp(err: unknown): boolean {
@@ -166,7 +166,7 @@ export async function sendNotification(params: {
   subject?: string;
   body?: string;
   template?: string;
-}): Promise<void> {
+}, opts: { skipAdminAlert?: boolean } = {}): Promise<void> {
   let row;
   try {
     const [inserted] = await db
@@ -201,6 +201,16 @@ export async function sendNotification(params: {
       await db.update(notifications).set({ status: 'failed', error: message }).where(eq(notifications.id, row.id));
     } catch {
       // ponytail: recording the failure is best-effort too
+    }
+    // Alert admins about failed outbound delivery (unless the caller opts out to
+    // avoid recursion, e.g. notifyAdmin emailing its own admin recipients).
+    if (!opts.skipAdminAlert) {
+      await notifyAdmin({
+        type: 'delivery_failed',
+        title: 'Notification delivery failed',
+        body: `Channel ${row.channel} to ${row.toAddress}: ${message}`,
+        metadata: { notificationId: row.id, channel: row.channel, toAddress: row.toAddress, error: message },
+      });
     }
   }
 }
@@ -270,5 +280,37 @@ export async function sendReminderPass(): Promise<number> {
     }
   }
   return sent;
+}
+
+export async function notifyDoctor(
+  doctorId: number,
+  { type, title, body, link, metadata }: { type: string; title: string; body?: string; link?: string; metadata?: Record<string, unknown> },
+): Promise<void> {
+  try {
+    await db.insert(doctorNotifications).values({ doctorId, type, title, body: body ?? null, link: link ?? null, metadata: metadata ?? {} });
+  } catch {
+    // ponytail: in-app alerts must never break callers
+  }
+}
+
+export async function notifyAdmin(
+  { type, title, body, link, metadata }: { type: string; title: string; body?: string; link?: string; metadata?: Record<string, unknown> },
+): Promise<void> {
+  try {
+    await db.insert(adminNotifications).values({ type, title, body: body ?? null, link: link ?? null, metadata: metadata ?? {} });
+  } catch {
+    return;
+  }
+  try {
+    const admins = await db.select({ email: users.email }).from(users).where(eq(users.role, 'admin'));
+    for (const { email } of admins) {
+      await sendNotification(
+        { channel: 'email', to: email, subject: title, body: body ?? title, template: type },
+        { skipAdminAlert: true },
+      );
+    }
+  } catch {
+    // ponytail: admin email dispatch is best-effort
+  }
 }
 

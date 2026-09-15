@@ -6,7 +6,7 @@ import { appointments, doctors, doctorSchedules, users } from '../db/schema';
 import { requireAuth, requireRole } from '../middleware/auth';
 import { availableFromSchedules, dayOfWeek, EXPIRED_REASON, isPast, isStaleUnpaid, isValidDate, PAYMENT_GRACE_MS } from '../lib/slots';
 import { createOrder, verifySignature } from '../lib/razorpay';
-import { sendNotification, templates, type NotificationCtx } from '../lib/notifications';
+import { sendNotification, notifyDoctor, templates, type NotificationCtx } from '../lib/notifications';
 
 export const appointmentsRouter = Router();
 
@@ -32,7 +32,7 @@ const bookSchema = z.object({
   slot: z.string().regex(/^\d{2}:\d{2}-\d{2}:\d{2}$/, 'slot must be HH:MM-HH:MM'),
   symptom: z.string().max(2000).optional(),
   patientName: z.string().min(1),
-  patientPhone: z.string().min(7).max(20),
+  patientPhone: z.string().regex(/^\d{10}$/, 'phone must be exactly 10 digits'),
   patientEmail: z.string().email().optional(),
   patientGender: z.enum(['male', 'female', 'other']).optional(),
   patientAge: z.coerce.number().int().min(1).max(120).optional(),
@@ -238,6 +238,19 @@ async function sendBookingNotifications(
         template: kind,
       });
     }
+
+    // ponytail: in-app alert for the doctor (appointment change + payment)
+    void notifyDoctor(row.doctorId, {
+      type: kind === 'confirmed' ? 'payment' : kind,
+      title:
+        kind === 'confirmed'
+          ? 'New appointment booked'
+          : kind === 'rescheduled'
+            ? 'Appointment rescheduled'
+            : 'Appointment cancelled',
+      body: `${row.patientName} — ${row.date} ${row.timeSlot}`,
+      link: '/dashboard/appointments',
+    });
   } catch {
     // ponytail: notifications must never affect the booking response
   }
@@ -289,14 +302,16 @@ async function bookTransaction(
   for (let attempt = 0; attempt < 2; attempt++) {
     const bookingId = randomBookingId();
     try {
-      return await db.transaction(async (tx) => {
+      // ponytail: transaction only holds the lock for DB work; the external
+      // Razorpay HTTP call happens after commit to avoid long lock durations.
+      const row = await db.transaction(async (tx) => {
         // serialize concurrent bookings for the same doctor
         await tx.select().from(doctors).where(eq(doctors.id, doctor.id)).for('update');
         const starts = await availableStarts(tx, doctor.id, body.date);
         if (!starts.has(body.slot.split('-')[0])) {
           throw new BookingError(409, 'This slot is no longer available');
         }
-        const [row] = await tx
+        const [inserted] = await tx
           .insert(appointments)
           .values({
             bookingId,
@@ -322,21 +337,39 @@ async function bookTransaction(
             videoCallLink: body.mode === 'online' ? `https://meet.physioprime.in/${bookingId}` : null,
           })
           .returning();
-        let order: { id: string; amountPaise: number } | null = null;
-        if ((body.paymentMode ?? 'prepay') === 'prepay') {
-          try {
-            order = await createOrder({ amountPaise: feePaise, receipt: bookingId });
-          } catch (err) {
-            if (!(err instanceof Error) || !err.message.includes('not configured')) throw err;
-            // ponytail: razorpay not configured — trial booking proceeds unpaid
-          }
-        }
-        if (order) {
-          await tx.update(appointments).set({ razorpayOrderId: order.id }).where(eq(appointments.id, row!.id));
-        }
-        return { row: { ...row!, razorpayOrderId: order?.id ?? null }, order };
+        return inserted!;
       });
+
+      // Razorpay order creation — outside the transaction so the DB lock is released.
+      let order: { id: string; amountPaise: number } | null = null;
+      if ((body.paymentMode ?? 'prepay') === 'prepay') {
+        try {
+          order = await createOrder({ amountPaise: feePaise, receipt: bookingId });
+        } catch (err) {
+          if (!(err instanceof Error) || !err.message.includes('not configured')) throw err;
+          // ponytail: razorpay not configured — trial booking proceeds unpaid
+        }
+      }
+      if (order) {
+        await db.update(appointments).set({ razorpayOrderId: order.id }).where(eq(appointments.id, row.id));
+      } else if ((body.paymentMode ?? 'prepay') === 'prepay' && !order) {
+        // Order creation failed or unavailable — clean up the orphaned row
+        await db.delete(appointments).where(eq(appointments.id, row.id));
+        throw new BookingError(502, 'Payment gateway unavailable. Please try again.');
+      }
+
+      const view = await db
+        .select({
+          ...appointmentColumns,
+          razorpayOrderId: appointments.razorpayOrderId,
+          razorpayPaymentId: appointments.razorpayPaymentId,
+          createdAt: appointments.createdAt,
+        })
+        .from(appointments)
+        .where(eq(appointments.id, row.id));
+      return { row: view[0] as AppointmentView, order };
     } catch (err) {
+      if (err instanceof BookingError) throw err;
       if (attempt === 0 && isUniqueViolation(err)) continue;
       throw err;
     }

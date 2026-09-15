@@ -111,7 +111,7 @@ export function AdminLayout({ children, portal = 'admin' }: { children: React.Re
             <span className="text-base font-extrabold tracking-tight text-slate-900">PhysioPrime</span>
           </div>
           <div className="flex items-center gap-2">
-            <NotificationsPanel />
+            <NotificationsPanel variant={isDoctor ? 'doctor' : 'admin'} />
             <div className="min-w-0 text-right">
               <div className="truncate text-xs font-bold text-slate-900">{user?.name || user?.email}</div>
               <div className="text-[10px] text-slate-500">{user?.role}</div>
@@ -126,7 +126,7 @@ export function AdminLayout({ children, portal = 'admin' }: { children: React.Re
               {user?.role}
             </div>
             <div className="flex items-center gap-3">
-              <NotificationsPanel />
+              <NotificationsPanel variant={isDoctor ? 'doctor' : 'admin'} />
               <div className="text-right">
                 <div className="text-sm font-bold text-slate-900">{user?.name || user?.email}</div>
                 <div className="text-xs text-slate-500">{user?.email}</div>

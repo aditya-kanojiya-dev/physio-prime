@@ -14,7 +14,11 @@
     "test": "npm run test -w server"
   },
   "devDependencies": {
+    "@types/dompurify": "^3.0.5",
     "concurrently": "^9.0.0",
     "esbuild": "^0.28.2"
+  },
+  "dependencies": {
+    "isomorphic-dompurify": "^3.19.0"
   }
 }

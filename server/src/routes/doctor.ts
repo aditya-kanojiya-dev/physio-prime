@@ -5,12 +5,12 @@ import { z } from 'zod';
 import { db } from '../db/pool';
 import { appointments, departments, doctors, doctorSchedules, patientProfiles, prescriptions, sessionOtps, users } from '../db/schema';
 import { requireAuth, requireRole } from '../middleware/auth';
-import { isValidDate, getNextFreeSlot } from '../lib/slots';
+import { isValidDate, isPast, getNextFreeSlot, getAvailableWindows } from '../lib/slots';
 import { requireDoctor, noProfile } from '../lib/doctor';
 import { computeCommission, resolvePlatformFeePercent } from '../lib/commission';
 import { recordCashEntry, recordPaymentTransaction } from '../lib/payments';
 import { createUpiQrCode } from '../lib/razorpay';
-import { sendSmartpingSms } from '../lib/notifications';
+import { sendNotification, sendSmartpingSms, templates } from '../lib/notifications';
 
 export const doctorRouter = Router();
 
@@ -73,6 +73,8 @@ const appointmentColumns = {
 };
 
 const profilePatchSchema = z.object({
+  name: z.string().trim().min(2).max(150).optional(),
+  gender: z.enum(['male', 'female', 'other']).nullable().optional(),
   bio: z.string().max(5000).optional(),
   expertise: z.array(z.string().max(100)).optional(),
   treatments: z.array(z.string().max(100)).optional(),
@@ -97,10 +99,21 @@ const schedulePutSchema = z.object({
   windows: z.array(windowSchema),
 });
 
+class DoctorRescheduleError extends Error {
+  constructor(
+    readonly status: number,
+    message: string,
+  ) {
+    super(message);
+  }
+}
+
+const slotTimeField = z.string().regex(/^\d{2}:\d{2}$/, 'time must be HH:MM');
+
 const rescheduleSchema = z.object({
-  date: z.string(),
-  windowStart: z.string(),
-  windowEnd: z.string(),
+  date: z.string().refine(isValidDate, 'date must be YYYY-MM-DD'),
+  windowStart: slotTimeField,
+  windowEnd: slotTimeField,
 });
 
 doctorRouter.get('/profile', async (req, res, next) => {
@@ -123,12 +136,19 @@ doctorRouter.patch('/profile', async (req, res, next) => {
       res.status(400).json({ error: { message: 'No editable fields provided' } });
       return;
     }
-    const [doctor] = await db.select({ id: doctors.id }).from(doctors).where(eq(doctors.userId, req.user!.id));
-    if (!doctor) {
+    const [dbDoctor] = await db.select({ id: doctors.id }).from(doctors).where(eq(doctors.userId, req.user!.id));
+    if (!dbDoctor) {
       res.status(noProfile.status).json({ error: { message: noProfile.message } });
       return;
     }
-    const [updated] = await db.update(doctors).set(body).where(eq(doctors.id, doctor.id)).returning(doctorColumns);
+    const updated = await db.transaction(async (tx) => {
+      const [row] = await tx.update(doctors).set(body).where(eq(doctors.id, dbDoctor.id)).returning(doctorColumns);
+      // keep users.name in sync so the panel header shows the edited profile name
+      if (row && body.name !== undefined) {
+        await tx.update(users).set({ name: body.name }).where(eq(users.id, req.user!.id));
+      }
+      return row;
+    });
     res.json({ doctor: updated });
   } catch (err) {
     next(err);
@@ -183,6 +203,25 @@ doctorRouter.get('/appointments', async (req, res, next) => {
       .where(and(...filters))
       .orderBy(asc(appointments.date), asc(appointments.timeSlot));
     res.json({ appointments: rows.map((row) => ({ ...row, id: row.bookingId })) });
+  } catch (err) {
+    next(err);
+  }
+});
+
+doctorRouter.get('/slots', async (req, res, next) => {
+  try {
+    const doctor = await requireDoctor(req.user!.id);
+    if (!doctor) {
+      res.status(noProfile.status).json({ error: { message: noProfile.message } });
+      return;
+    }
+    const date = String(req.query.date ?? '');
+    if (!isValidDate(date) || isPast(date)) {
+      res.status(400).json({ error: { message: 'date must be a valid future YYYY-MM-DD date' } });
+      return;
+    }
+    const windows = await getAvailableWindows(doctor.id, date);
+    res.json({ date, windows });
   } catch (err) {
     next(err);
   }
@@ -866,33 +905,76 @@ doctorRouter.patch('/appointments/:id/reschedule', async (req, res, next) => {
       return;
     }
     const { date, windowStart, windowEnd } = rescheduleSchema.parse(req.body);
-
-    const [row] = await db
-      .select({ id: appointments.id, doctorId: appointments.doctorId, status: appointments.status })
-      .from(appointments)
-      .where(eq(appointments.bookingId, req.params.id));
-    if (!row || row.doctorId !== doctor.id) {
-      res.status(404).json({ error: { message: 'Appointment not found' } });
-      return;
-    }
-    if (row.status !== 'upcoming') {
-      res.status(400).json({ error: { message: 'Only upcoming appointments can be rescheduled' } });
+    if (isPast(date)) {
+      res.status(400).json({ error: { message: 'Date is in the past' } });
       return;
     }
 
-    const newSlot = await getNextFreeSlot(doctor.id, date, windowStart, windowEnd);
-    if (!newSlot) {
-      res.status(400).json({ error: { message: 'No available slots in this window' } });
-      return;
-    }
+    const updated = await db.transaction(async (tx) => {
+      const [row] = await tx
+        .select({
+          id: appointments.id,
+          doctorId: appointments.doctorId,
+          status: appointments.status,
+          patientId: appointments.patientId,
+          patientName: appointments.patientName,
+          patientPhone: appointments.patientPhone,
+          mode: appointments.mode,
+          bookingId: appointments.bookingId,
+        })
+        .from(appointments)
+        .where(eq(appointments.bookingId, req.params.id))
+        .for('update');
+      if (!row || row.doctorId !== doctor.id) throw new DoctorRescheduleError(404, 'Appointment not found');
+      if (row.status !== 'upcoming') throw new DoctorRescheduleError(400, 'Only upcoming appointments can be rescheduled');
 
-    await db
-      .update(appointments)
-      .set({ date, timeSlot: newSlot })
-      .where(eq(appointments.id, row.id));
+      // serialize concurrent reschedules for the same doctor, mirroring the booking path
+      await tx.select().from(doctors).where(eq(doctors.id, row.doctorId)).for('update');
 
-    res.json({ success: true, newDate: date, newTimeSlot: newSlot });
+      const newSlot = await getNextFreeSlot(doctor.id, date, windowStart, windowEnd, tx);
+      if (!newSlot) throw new DoctorRescheduleError(400, 'No available slots in this window');
+
+      await tx
+        .update(appointments)
+        .set({ date, timeSlot: newSlot })
+        .where(eq(appointments.id, row.id));
+      return { newSlot, row };
+    });
+
+    res.json({ success: true, newDate: date, newTimeSlot: updated.newSlot });
+
+    // ponytail: best-effort patient alert on doctor-initiated reschedule
+    void (async () => {
+      try {
+        const [patientUser] = await db.select({ email: users.email }).from(users).where(eq(users.id, updated.row.patientId));
+        const tpl = templates.bookingRescheduled({
+          patientName: updated.row.patientName,
+          doctorName: doctor.name,
+          date,
+          timeSlot: updated.newSlot,
+          mode: updated.row.mode,
+          bookingId: updated.row.bookingId,
+        });
+        if (patientUser?.email) {
+          await sendNotification({
+            userId: updated.row.patientId,
+            appointmentId: updated.row.id,
+            channel: 'email',
+            to: patientUser.email,
+            subject: tpl.subject,
+            body: tpl.body,
+            template: 'rescheduled',
+          });
+        }
+      } catch {
+        // ponytail: reschedule response must never depend on notifications
+      }
+    })();
   } catch (err) {
+    if (err instanceof DoctorRescheduleError) {
+      res.status(err.status).json({ error: { message: err.message } });
+      return;
+    }
     next(err);
   }
 });

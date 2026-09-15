@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { usePageMeta } from '../lib/usePageMeta';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useBooking } from '../context/BookingContext';
 import { useLocationContext } from '../context/LocationContext';
@@ -262,6 +263,7 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
 };
 
 export const FindDoctorsPage: React.FC = () => {
+  usePageMeta('Find Physiotherapists | PhysioPrime', 'Browse verified physiotherapists by specialty, location, and availability. Book home visits or online consultations.');
   const navigate = useNavigate();
   const {
     selectedCategorySlug,

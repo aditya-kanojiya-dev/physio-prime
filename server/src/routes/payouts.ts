@@ -6,6 +6,7 @@ import { appointments, departments, doctorPayouts, doctors } from '../db/schema'
 import { requireAuth, requireRole } from '../middleware/auth';
 import { requireDoctor, noProfile } from '../lib/doctor';
 import { sumEarnedSql, resolvePlatformFeePercentSql } from '../lib/commission';
+import { notifyAdmin } from '../lib/notifications';
 
 export const doctorPayoutsRouter = Router();
 
@@ -173,6 +174,14 @@ doctorPayoutsRouter.post('/payouts/request', async (req, res, next) => {
       notes: payout.notes,
       createdAt: payout.createdAt.toISOString(),
       processedAt: payout.processedAt?.toISOString() ?? null,
+    });
+
+    void notifyAdmin({
+      type: 'payout_request',
+      title: 'Payout requested',
+      body: `${doctor.name} requested ₹${(payout.amountPaise / 100).toFixed(2)} (${payout.paymentMethod})`,
+      link: '/admin/payouts',
+      metadata: { payoutId: payout.id, doctorId: doctor.id, amountPaise: payout.amountPaise },
     });
   } catch (err) {
     next(err);

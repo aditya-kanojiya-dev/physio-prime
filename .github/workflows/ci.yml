@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  lint-typecheck-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Patient app typecheck
+        run: npx tsc --noEmit --project tsconfig.app.json
+
+      - name: Admin app typecheck
+        run: npx tsc --noEmit --project admin/tsconfig.json
+
+      - name: Server typecheck
+        run: npx tsc --noEmit --project server/tsconfig.json
+
+      - name: Build all apps
+        run: npm run build

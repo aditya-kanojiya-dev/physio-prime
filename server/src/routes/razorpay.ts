@@ -5,6 +5,7 @@ import { appointments, departments, doctors, paymentWebhooks } from '../db/schem
 import { computeCommission, resolvePlatformFeePercent } from '../lib/commission';
 import { recordPaymentTransaction, type Tx } from '../lib/payments';
 import { verifyWebhookSignature } from '../lib/razorpay';
+import { notifyDoctor } from '../lib/notifications';
 
 export const razorpayRouter = Router();
 
@@ -25,7 +26,7 @@ async function recordCaptured(
   tx: Tx,
   payment: PaymentEntity,
   opts: { orderId?: string; qrId?: string; transactionType: 'patient_prepay' | 'patient_postpay_upi' },
-): Promise<void> {
+): Promise<number | null> {
   const where = opts.orderId ? eq(appointments.razorpayOrderId, opts.orderId) : eq(appointments.razorpayQrId, opts.qrId!);
   const [row] = await tx
     .select({
@@ -42,7 +43,7 @@ async function recordCaptured(
     .leftJoin(departments, eq(departments.name, doctors.department))
     .where(where)
     .for('update', { of: [appointments] });
-  if (!row || row.paymentStatus === 'paid') return;
+  if (!row || row.paymentStatus === 'paid') return null;
   const c = computeCommission(row.feePaise, resolvePlatformFeePercent(row.platformFeePercent, row.departmentPlatformFeePercent));
   await tx
     .update(appointments)
@@ -69,6 +70,7 @@ async function recordCaptured(
     createdBy: null,
     metadata: { qrId: opts.qrId ?? null },
   });
+  return row.doctorId;
 }
 
 // Public endpoint. The raw body is parsed before the global express.json() (see
@@ -108,15 +110,16 @@ razorpayRouter.post('/webhook', async (req, res, next: NextFunction) => {
   }
   const eventId = `${event}:${payment.id}`;
 
+  let capturedDoctorId: number | null = null;
   try {
-    await db.transaction(async (tx) => {
+    const result = await db.transaction(async (tx) => {
       const seen = await tx
         .select({ processed: paymentWebhooks.processed })
         .from(paymentWebhooks)
         .where(eq(paymentWebhooks.eventId, eventId))
         .for('update');
       // Already processed (or currently processing) — acknowledge without side effects.
-      if (seen.length > 0) return;
+      if (seen.length > 0) return null;
 
       await tx.insert(paymentWebhooks).values({
         event,
@@ -128,9 +131,9 @@ razorpayRouter.post('/webhook', async (req, res, next: NextFunction) => {
 
       if (event === 'payment.captured') {
         if (payment.order_id) {
-          await recordCaptured(tx, payment, { orderId: payment.order_id, transactionType: 'patient_prepay' });
+          return await recordCaptured(tx, payment, { orderId: payment.order_id, transactionType: 'patient_prepay' });
         } else if (payment.qr_id) {
-          await recordCaptured(tx, payment, { qrId: payment.qr_id, transactionType: 'patient_postpay_upi' });
+          return await recordCaptured(tx, payment, { qrId: payment.qr_id, transactionType: 'patient_postpay_upi' });
         }
       } else if (event === 'payment.failed' && payment.order_id) {
         await tx
@@ -140,10 +143,20 @@ razorpayRouter.post('/webhook', async (req, res, next: NextFunction) => {
       }
 
       await tx.update(paymentWebhooks).set({ processed: true, processedAt: new Date() }).where(eq(paymentWebhooks.eventId, eventId));
+      return null;
     });
+    capturedDoctorId = result;
   } catch (err) {
     next(err);
     return;
+  }
+  if (capturedDoctorId !== null) {
+    void notifyDoctor(capturedDoctorId, {
+      type: 'payment',
+      title: 'Payment received',
+      body: `A consultation payment of ₹${(Number(payment?.amount ?? 0) / 100).toFixed(2)} was captured.`,
+      link: '/dashboard/appointments',
+    });
   }
   res.json({ received: true });
 });

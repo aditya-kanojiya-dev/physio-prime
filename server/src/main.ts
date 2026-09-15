@@ -5,9 +5,13 @@ import { pool } from './db/pool';
 import { sendReminderPass } from './lib/notifications';
 
 // Production entry: applies pending Drizzle migrations, then starts the API.
-// Idempotent — safe to run on every PM2 start/deploy. tsx is used because the
-// server's build step is type-check only (`tsc --noEmit`).
+// Idempotent — safe to run on every PM2 start/deploy. Bundled with esbuild into
+// dist/ (see `npm run build`); tsx is used only for dev.
 const port = Number(process.env.PORT) || 4000;
+
+let server: ReturnType<ReturnType<typeof createApp>['listen']> | undefined;
+let reminderTimer: NodeJS.Timeout | undefined;
+let shuttingDown = false;
 
 // Reminder job: runs once daily at the configured local hour. Safe to fire
 // repeatedly because sendReminderPass dedupes by appointment. Avoids a node-cron
@@ -21,21 +25,42 @@ function msUntil(hour: number, minute = 0): number {
   return next.getTime() - now.getTime();
 }
 function scheduleReminders(): void {
-  setTimeout(async () => {
+  reminderTimer = setTimeout(async () => {
     try {
       const sent = await sendReminderPass();
       console.log(`[reminders] sent ${sent} reminder(s)`);
     } catch (err) {
       console.error('[reminders] pass failed:', err);
     } finally {
-      scheduleReminders();
+      if (!shuttingDown) scheduleReminders();
     }
   }, msUntil(REMINDER_HOUR));
 }
 
+// Graceful shutdown: stop accepting connections, drain in-flight requests,
+// close the reminder timer and DB pool, then exit. PM2 sends SIGINT on stop.
+async function shutdown(signal: string): Promise<void> {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  console.log(`[shutdown] ${signal} received, draining`);
+
+  if (reminderTimer) clearTimeout(reminderTimer);
+  if (server) {
+    await new Promise<void>((resolve) =>
+      server!.close(() => resolve()),
+    );
+  }
+  await pool.end();
+  console.log('[shutdown] complete');
+  process.exit(0);
+}
+
+process.on('SIGTERM', () => void shutdown('SIGTERM'));
+process.on('SIGINT', () => void shutdown('SIGINT'));
+
 async function start() {
   await runMigrations();
-  createApp().listen(port, () => {
+  server = createApp().listen(port, () => {
     console.log(`API listening on http://localhost:${port}`);
   });
   scheduleReminders();

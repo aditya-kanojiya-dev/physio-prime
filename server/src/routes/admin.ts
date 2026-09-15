@@ -21,6 +21,7 @@ import {
 } from '../db/schema';
 import { requireAuth, requireRole } from '../middleware/auth';
 import { getEarnedNet } from './payouts';
+import { notifyDoctor } from '../lib/notifications';
 
 export const adminRouter = Router();
 
@@ -1540,6 +1541,24 @@ adminRouter.patch('/payouts/:id', async (req, res, next) => {
     }
     const [updated] = await db.update(doctorPayouts).set(update).where(eq(doctorPayouts.id, id)).returning();
     res.json({ payout: { ...updated, createdAt: updated.createdAt.toISOString(), processedAt: updated.processedAt?.toISOString() ?? null } });
+
+    if (status === 'completed') {
+      void notifyDoctor(payout.doctorId, {
+        type: 'payout',
+        title: 'Payout completed',
+        body: `Your payout of ₹${(payout.amountPaise / 100).toFixed(2)} has been processed.`,
+        link: '/dashboard/payouts',
+        metadata: { payoutId: payout.id },
+      });
+    } else if (status === 'failed') {
+      void notifyDoctor(payout.doctorId, {
+        type: 'payout',
+        title: 'Payout failed',
+        body: `Your payout request of ₹${(payout.amountPaise / 100).toFixed(2)} could not be processed. Please check your payout details.`,
+        link: '/dashboard/payouts',
+        metadata: { payoutId: payout.id },
+      });
+    }
   } catch (err) {
     next(err);
   }

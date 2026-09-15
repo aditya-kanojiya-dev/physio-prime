@@ -1,4 +1,5 @@
 import React from 'react';
+import { usePageMeta } from '../lib/usePageMeta';
 import { HeroSection } from '../components/home/HeroSection';
 import { SearchSection } from '../components/home/SearchSection';
 import { StatStrip } from '../components/home/StatStrip';
@@ -12,6 +13,7 @@ import { CareerSection } from '../components/home/CareerSection';
 import { ChatbotButton } from '../components/chatbot/ChatbotButton';
 
 export const HomePage: React.FC = () => {
+  usePageMeta('PhysioPrime | Premium Home & Online Physiotherapy', 'Book certified physiotherapists for personalized home visits or HD video consultations. Orthopedic, neuro, sports, and post-op rehabilitation.');
   return (
     <main className="min-h-screen">
       <HeroSection />

@@ -1,40 +1,41 @@
-import React from 'react'
+import React, { Suspense, lazy } from 'react'
 import { Navigate, Outlet, RouterProvider, createBrowserRouter } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AuthProvider, useAuth } from './lib/auth'
 import { LoginPage } from './pages/LoginPage'
-import { AppointmentsPage } from './pages/AppointmentsPage'
-import { PatientsPage as DoctorPatientsPage } from './pages/PatientsPage'
-import { SchedulePage } from './pages/SchedulePage'
-import { ProfilePage } from './pages/ProfilePage'
-import { EarningsPage } from './pages/EarningsPage'
-import { PatientPaymentsPage } from './pages/PatientPaymentsPage'
-import { PayoutsPage } from './pages/PayoutsPage'
-import { LocationsPage } from './pages/LocationsPage'
-import { MessagesPage } from './pages/MessagesPage'
-import { CommunityPage } from './pages/CommunityPage'
-import { CommunityDetailPage } from './pages/CommunityDetailPage'
-import { DashboardPage } from './pages/admin/DashboardPage'
-import { DoctorsPage } from './pages/admin/DoctorsPage'
-import { LocationsPage as AdminLocationsPage } from './pages/admin/LocationsPage'
-import { CommissionsPage } from './pages/admin/CommissionsPage'
-import { DoctorLedgerPage } from './pages/admin/DoctorLedgerPage'
-import { AppointmentsPage as AdminAppointmentsPage } from './pages/admin/AppointmentsPage'
-import { PatientsPage } from './pages/admin/PatientsPage'
-import { CategoriesPage } from './pages/admin/CategoriesPage'
-import { SymptomsPage } from './pages/admin/SymptomsPage'
-import { InsightsPage } from './pages/admin/InsightsPage'
-import { BlogsPage } from './pages/admin/BlogsPage'
-import { BlogFormPage } from './pages/admin/BlogFormPage'
-import { TestimonialsPage } from './pages/admin/TestimonialsPage'
-import { MediaLibraryPage } from './pages/admin/MediaLibraryPage'
-import { SettingsPage } from './pages/admin/SettingsPage'
-import { AdminProfilePage } from './pages/admin/AdminProfilePage'
-import { PaymentsPage } from './pages/admin/PaymentsPage'
-import { DoctorPayoutsPage } from './pages/admin/DoctorPayoutsPage'
-import { DoctorBlogsPage } from './pages/DoctorBlogsPage'
-import { DoctorBlogFormPage } from './pages/DoctorBlogFormPage'
-import { DoctorOverviewPage } from './pages/DoctorOverviewPage'
+
+const AppointmentsPage = lazy(() => import('./pages/AppointmentsPage').then(m => ({ default: m.AppointmentsPage })))
+const PatientsPage = lazy(() => import('./pages/PatientsPage').then(m => ({ default: m.PatientsPage as any })))
+const SchedulePage = lazy(() => import('./pages/SchedulePage').then(m => ({ default: m.SchedulePage })))
+const ProfilePage = lazy(() => import('./pages/ProfilePage').then(m => ({ default: m.ProfilePage })))
+const EarningsPage = lazy(() => import('./pages/EarningsPage').then(m => ({ default: m.EarningsPage })))
+const PatientPaymentsPage = lazy(() => import('./pages/PatientPaymentsPage').then(m => ({ default: m.PatientPaymentsPage })))
+const PayoutsPage = lazy(() => import('./pages/PayoutsPage').then(m => ({ default: m.PayoutsPage })))
+const LocationsPage = lazy(() => import('./pages/LocationsPage').then(m => ({ default: m.LocationsPage })))
+const MessagesPage = lazy(() => import('./pages/MessagesPage').then(m => ({ default: m.MessagesPage })))
+const CommunityPage = lazy(() => import('./pages/CommunityPage').then(m => ({ default: m.CommunityPage })))
+const CommunityDetailPage = lazy(() => import('./pages/CommunityDetailPage').then(m => ({ default: m.CommunityDetailPage })))
+const DoctorBlogsPage = lazy(() => import('./pages/DoctorBlogsPage').then(m => ({ default: m.DoctorBlogsPage })))
+const DoctorBlogFormPage = lazy(() => import('./pages/DoctorBlogFormPage').then(m => ({ default: m.DoctorBlogFormPage })))
+const DoctorOverviewPage = lazy(() => import('./pages/DoctorOverviewPage').then(m => ({ default: m.DoctorOverviewPage })))
+const DashboardPage = lazy(() => import('./pages/admin/DashboardPage').then(m => ({ default: m.DashboardPage })))
+const AdminDoctorsPage = lazy(() => import('./pages/admin/DoctorsPage').then(m => ({ default: m.DoctorsPage })))
+const AdminLocationsPage = lazy(() => import('./pages/admin/LocationsPage').then(m => ({ default: m.LocationsPage })))
+const CommissionsPage = lazy(() => import('./pages/admin/CommissionsPage').then(m => ({ default: m.CommissionsPage })))
+const DoctorLedgerPage = lazy(() => import('./pages/admin/DoctorLedgerPage').then(m => ({ default: m.DoctorLedgerPage })))
+const AdminAppointmentsPage = lazy(() => import('./pages/admin/AppointmentsPage').then(m => ({ default: m.AppointmentsPage })))
+const AdminPatientsPage = lazy(() => import('./pages/admin/PatientsPage').then(m => ({ default: m.PatientsPage })))
+const CategoriesPage = lazy(() => import('./pages/admin/CategoriesPage').then(m => ({ default: m.CategoriesPage })))
+const SymptomsPage = lazy(() => import('./pages/admin/SymptomsPage').then(m => ({ default: m.SymptomsPage })))
+const InsightsPage = lazy(() => import('./pages/admin/InsightsPage').then(m => ({ default: m.InsightsPage })))
+const BlogsPage = lazy(() => import('./pages/admin/BlogsPage').then(m => ({ default: m.BlogsPage })))
+const BlogFormPage = lazy(() => import('./pages/admin/BlogFormPage').then(m => ({ default: m.BlogFormPage })))
+const TestimonialsPage = lazy(() => import('./pages/admin/TestimonialsPage').then(m => ({ default: m.TestimonialsPage })))
+const MediaLibraryPage = lazy(() => import('./pages/admin/MediaLibraryPage').then(m => ({ default: m.MediaLibraryPage })))
+const SettingsPage = lazy(() => import('./pages/admin/SettingsPage').then(m => ({ default: m.SettingsPage })))
+const AdminProfilePage = lazy(() => import('./pages/admin/AdminProfilePage').then(m => ({ default: m.AdminProfilePage })))
+const PaymentsPage = lazy(() => import('./pages/admin/PaymentsPage').then(m => ({ default: m.PaymentsPage })))
+const DoctorPayoutsPage = lazy(() => import('./pages/admin/DoctorPayoutsPage').then(m => ({ default: m.DoctorPayoutsPage })))
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 30_000, refetchOnWindowFocus: false } },
@@ -67,7 +68,7 @@ const router = createBrowserRouter([
     children: [
       { index: true, element: <DoctorOverviewPage /> },
       { path: 'appointments', element: <AppointmentsPage /> },
-      { path: 'patients', element: <DoctorPatientsPage /> },
+      { path: 'patients', element: <PatientsPage /> },
       { path: 'schedule', element: <SchedulePage /> },
       { path: 'profile', element: <ProfilePage /> },
       { path: 'earnings', element: <EarningsPage /> },
@@ -91,12 +92,12 @@ const router = createBrowserRouter([
     children: [
       { index: true, element: <Navigate to="/admin/dashboard" replace /> },
       { path: 'dashboard', element: <DashboardPage /> },
-      { path: 'doctors', element: <DoctorsPage /> },
+      { path: 'doctors', element: <AdminDoctorsPage /> },
       { path: 'doctors/:id', element: <DoctorLedgerPage /> },
       { path: 'locations', element: <AdminLocationsPage /> },
       { path: 'commissions', element: <CommissionsPage /> },
       { path: 'appointments', element: <AdminAppointmentsPage /> },
-      { path: 'patients', element: <PatientsPage /> },
+      { path: 'patients', element: <AdminPatientsPage /> },
       { path: 'categories', element: <CategoriesPage /> },
       { path: 'symptoms', element: <SymptomsPage /> },
       { path: 'insights', element: <InsightsPage /> },
@@ -116,7 +117,9 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <RouterProvider router={router} />
+        <Suspense fallback={<div className="flex h-screen items-center justify-center text-slate-400">Loading…</div>}>
+          <RouterProvider router={router} />
+        </Suspense>
       </AuthProvider>
     </QueryClientProvider>
   )

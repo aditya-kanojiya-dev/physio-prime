@@ -5,6 +5,7 @@ import { createCorsOptions } from './lib/cors';
 import { createApiLimiter, createAuthLimiter } from './lib/rate-limit';
 import { securityHeaders } from './lib/security-headers';
 import { trustProxyHops } from './lib/trust-proxy';
+import { requestLogger } from './lib/request-log';
 import { errorHandler } from './middleware/error';
 import { healthRouter } from './routes/health';
 import { authRouter } from './routes/auth';
@@ -24,6 +25,7 @@ import { adminRouter } from './routes/admin';
 import { communityRouter } from './routes/community';
 import { doctorMessagesRouter } from './routes/messages';
 import { doctorNotificationsRouter } from './routes/doctor-notifications';
+import { adminNotificationsRouter } from './routes/admin-notifications';
 import { blogRouter } from './routes/blog';
 import { doctorBlogRouter } from './routes/doctor-blog';
 import { publicBlogRouter } from './routes/public-blog';
@@ -32,6 +34,7 @@ import { careersRouter } from './routes/careers';
 export function createApp() {
   const app = express();
   app.set('trust proxy', trustProxyHops());
+  app.use(requestLogger());
   app.use(securityHeaders());
   app.use(cors(createCorsOptions()));
   // ponytail: no-store the dynamic API so Vercel's edge never serves a cached
@@ -62,6 +65,7 @@ export function createApp() {
   app.use('/api/v1/doctor', doctorPayoutsRouter);
   app.use('/api/v1/doctor', doctorLocationsRouter);
   app.use('/api/v1/admin', adminRouter);
+  app.use('/api/v1/admin', adminNotificationsRouter);
   app.use('/api/v1/community', communityRouter);
   app.use('/api/v1/doctor', doctorMessagesRouter);
   app.use('/api/v1/doctor', doctorNotificationsRouter);

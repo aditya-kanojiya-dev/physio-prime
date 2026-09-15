@@ -1,9 +1,10 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Bell, MessageSquare, DollarSign, Calendar, Mail } from 'lucide-react'
+import { Bell, MessageSquare, DollarSign, Calendar, Mail, AlertTriangle } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 import { api } from '../lib/api'
+import { useAuth } from '../lib/auth'
 import type { DoctorNotification } from '../lib/types'
 
 const typeIcons: Record<string, typeof MessageSquare> = {
@@ -11,45 +12,56 @@ const typeIcons: Record<string, typeof MessageSquare> = {
   payment: DollarSign,
   appointment: Calendar,
   message: Mail,
+  payout: DollarSign,
+  server_error: AlertTriangle,
+  delivery_failed: AlertTriangle,
+  payout_request: DollarSign,
 }
 const typeColors: Record<string, string> = {
   community: 'text-blue-600 bg-blue-50',
   payment: 'text-emerald-600 bg-emerald-50',
   appointment: 'text-amber-600 bg-amber-50',
   message: 'text-purple-600 bg-purple-50',
+  payout: 'text-emerald-600 bg-emerald-50',
+  server_error: 'text-red-600 bg-red-50',
+  delivery_failed: 'text-red-600 bg-red-50',
+  payout_request: 'text-amber-600 bg-amber-50',
 }
 
-export function NotificationsPanel() {
+export function NotificationsPanel({ variant }: { variant?: 'doctor' | 'admin' }) {
+  const { user } = useAuth()
+  const isAdmin = variant === 'admin' || (variant === undefined && user?.role === 'admin')
+  const base = isAdmin ? '/admin' : '/doctor'
   const [isOpen, setIsOpen] = useState(false)
   const panelRef = useRef<HTMLDivElement>(null)
   const navigate = useNavigate()
   const queryClient = useQueryClient()
 
   const { data: countData } = useQuery({
-    queryKey: ['doctor-notifications/unread-count'],
-    queryFn: () => api.get('/doctor/notifications/unread-count') as Promise<{ count: number }>,
+    queryKey: [`${base}-notifications/unread-count`],
+    queryFn: () => api.get(`${base}/notifications/unread-count`) as Promise<{ count: number }>,
     refetchInterval: isOpen ? false : 30_000,
   })
 
   const { data: notifData } = useQuery({
-    queryKey: ['doctor-notifications'],
-    queryFn: () => api.get('/doctor/notifications?limit=30') as Promise<{ notifications: DoctorNotification[] }>,
+    queryKey: [`${base}-notifications`],
+    queryFn: () => api.get(`${base}/notifications?limit=30`) as Promise<{ notifications: DoctorNotification[] }>,
     enabled: isOpen,
   })
 
   const markRead = useMutation({
-    mutationFn: (id: number) => api.patch(`/doctor/notifications/${id}/read`, {}),
+    mutationFn: (id: number) => api.patch(`${base}/notifications/${id}/read`, {}),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['doctor-notifications/unread-count'] })
-      queryClient.invalidateQueries({ queryKey: ['doctor-notifications'] })
+      queryClient.invalidateQueries({ queryKey: [`${base}-notifications/unread-count`] })
+      queryClient.invalidateQueries({ queryKey: [`${base}-notifications`] })
     },
   })
 
   const markAll = useMutation({
-    mutationFn: () => api.patch('/doctor/notifications/read-all', {}),
+    mutationFn: () => api.patch(`${base}/notifications/read-all`, {}),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['doctor-notifications'] })
-      queryClient.invalidateQueries({ queryKey: ['doctor-notifications/unread-count'] })
+      queryClient.invalidateQueries({ queryKey: [`${base}-notifications`] })
+      queryClient.invalidateQueries({ queryKey: [`${base}-notifications/unread-count`] })
     },
   })
 
@@ -57,12 +69,12 @@ export function NotificationsPanel() {
   useEffect(() => {
     if (!isOpen) return
     const onFocus = () => {
-      queryClient.invalidateQueries({ queryKey: ['doctor-notifications'] })
-      queryClient.invalidateQueries({ queryKey: ['doctor-notifications/unread-count'] })
+      queryClient.invalidateQueries({ queryKey: [`${base}-notifications`] })
+      queryClient.invalidateQueries({ queryKey: [`${base}-notifications/unread-count`] })
     }
     window.addEventListener('focus', onFocus)
     return () => window.removeEventListener('focus', onFocus)
-  }, [isOpen, queryClient])
+  }, [isOpen, queryClient, base])
 
   // Close on click outside
   useEffect(() => {

@@ -23,7 +23,10 @@ careersRouter.use(
 const careerSchema = z.object({
   fullName: z.string().min(1).max(200),
   email: z.string().email(),
-  phone: z.string().max(20).optional(),
+  phone: z
+    .string()
+    .refine((v) => !v || /^\d{10}$/.test(v), 'phone must be exactly 10 digits')
+    .optional(),
   position: z.string().max(200).optional(),
   specialization: z.array(z.string()).optional(),
   qualification: z.string().max(200).optional(),

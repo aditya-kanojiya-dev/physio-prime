@@ -1,6 +1,7 @@
 // PM2 production config — Hostinger VPS (Node API).
-// Runs the API under PM2 so it survives reboots/restarts, and applies DB
-// migrations on every (re)start via server/src/main.ts.
+// Runs the API under PM2 so it survives reboots/restarts; `npm run prestart`
+// (esbuild → server/dist) and pending migration checks run on every (re)start
+// via server/src/main.ts.
 //
 // Usage (on the VPS, from repo root):
 //   pm2 start ecosystem.config.cjs

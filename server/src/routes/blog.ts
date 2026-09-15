@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { and, asc, count, desc, eq, getTableColumns, ilike, or, sql, type SQL } from 'drizzle-orm';
 import { z } from 'zod';
+import DOMPurify from 'isomorphic-dompurify';
 import { db } from '../db/pool';
 import {
   blogCategories,
@@ -35,7 +36,7 @@ const postSchema = z.object({
   title: z.string().min(1).max(200),
   slug: slugSchema,
   excerpt: z.string().max(500).nullable().optional(),
-  content: z.string().min(1),
+  content: z.string().min(1).transform((val) => DOMPurify.sanitize(val)),
   featuredImage: z.string().url().nullable().optional(),
   status: z.enum(['draft', 'published']).optional(),
   authorType: z.enum(['admin', 'doctor']).optional(),

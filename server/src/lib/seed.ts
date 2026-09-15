@@ -2,7 +2,7 @@ import bcrypt from 'bcryptjs';
 import { sql } from 'drizzle-orm';
 import { db, pool } from '../db/pool';
 import { runMigrations } from '../db/migrate';
-import { appointments, blogCategories, blogPosts, blogPostTags, blogTags, categories, communityCategories, communityPosts, communityReplies, communityVotes, conversations, departments, doctorApplications, doctorCashLedger, doctorLocations, doctorNotifications, doctorPayouts, doctors, doctorSchedules, messages, patientProfiles, paymentTransactions, prescriptions, refunds, reviews, serviceAreas, settlements, symptoms, users } from '../db/schema';
+import { appointments, adminNotifications, blogCategories, blogPosts, blogPostTags, blogTags, categories, communityCategories, communityPosts, communityReplies, communityVotes, conversations, departments, doctorApplications, doctorCashLedger, doctorLocations, doctorNotifications, doctorPayouts, doctors, doctorSchedules, messages, patientProfiles, paymentTransactions, prescriptions, refunds, reviews, serviceAreas, settlements, symptoms, users } from '../db/schema';
 import { CATEGORIES_DATA } from './seed-data/categories';
 import { SYMPTOMS_DATA } from './seed-data/symptoms';
 import { DOCTORS_DATA } from './seed-data/doctors';
@@ -12,7 +12,7 @@ import { SERVICE_AREAS } from './seed-data/service-areas';
 // this list once real registrations land in later phases.
 export async function seed(): Promise<void> {
   await db.execute(
-    sql`TRUNCATE users, doctors, doctor_applications, categories, departments, symptoms, patient_profiles, appointments, reviews, prescriptions, community_categories, doctor_locations, doctor_payouts, community_posts, community_replies, community_votes, conversations, messages, doctor_notifications, payment_transactions, doctor_cash_ledger, refunds, payment_webhooks, settlements, service_areas, blog_categories, blog_tags, blog_posts, blog_post_tags RESTART IDENTITY CASCADE`,
+    sql`TRUNCATE users, doctors, doctor_applications, categories, departments, symptoms, patient_profiles, appointments, reviews, prescriptions, community_categories, doctor_locations, doctor_payouts, community_posts, community_replies, community_votes, conversations, messages, doctor_notifications, admin_notifications, payment_transactions, doctor_cash_ledger, refunds, payment_webhooks, settlements, service_areas, blog_categories, blog_tags, blog_posts, blog_post_tags RESTART IDENTITY CASCADE`,
   );
 
   const passwordHash = bcrypt.hashSync('physio123', 10);

@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Loader2, MessageCircle, User, Briefcase, Lock, Save, Eye, EyeOff } from 'lucide-react'
-import { api, ApiError } from '../lib/api'
+import { api, ApiError, MeUser } from '../lib/api'
 import { DoctorProfile } from '../lib/types'
 import { AdminLayout } from '../components/admin/AdminLayout'
 import { ChangePasswordModal } from '../components/admin/ChangePasswordModal'
 import { ImageUpload } from '../components/admin/ImageUpload'
 import { DEPARTMENTS, DESIGNATIONS, EXPERIENCE_YEARS } from '../lib/options'
+import { useAuth } from '../lib/auth'
 
 const inputCls = 'w-full p-2.5 bg-white border border-slate-200 rounded-xl text-slate-900 font-bold focus:outline-none focus:border-teal-500 transition-colors'
 const labelCls = 'font-bold text-slate-600'
@@ -19,6 +20,7 @@ function splitList(value: string): string[] {
 
 export function ProfilePage() {
   const qc = useQueryClient()
+  const { updateUser } = useAuth()
   const [tab, setTab] = useState<Tab>('personal')
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -85,6 +87,8 @@ export function ProfilePage() {
       setMessage('Profile saved successfully')
       setError(null)
       qc.setQueryData(['doctor/profile'], res.doctor)
+      // keep the side-panel header in sync with the edited profile name
+      api.get<{ user: MeUser }>('/auth/me').then((me) => updateUser(me.user)).catch(() => {})
       setTimeout(() => setMessage(null), 3000)
     },
     onError: (err) => {
