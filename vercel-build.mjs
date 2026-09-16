@@ -13,16 +13,27 @@ const func = path.join(out, 'functions', 'api.func');
 mkdirSync(func, { recursive: true });
 // ponytail: isomorphic-dompurify pulls in jsdom, whose bundled copy crashes at
 // require-time (reads default-stylesheet.css from the wrong path). Externalize it
-// so the function installs real node_modules; Vercel resolves it from node_modules.
+// and npm-install it inside the func dir below (Vercel does NOT install .func
+// dependencies itself — the examples ship node_modules physically in the dir).
 // Vercel's Nodejs launcher also invokes the handler export as (req, res), so the
 // bundle must export the express app (callable), not the { createApp } object.
+const esbuildArgs = [
+  'npx esbuild server/index.ts',
+  '--bundle',
+  '--platform=node',
+  '--format=cjs',
+  '--target=node20',
+  '--external:isomorphic-dompurify',
+  '--footer:js=module.exports=module.exports.default',
+  '--outfile=' + path.join(func, 'index.js'),
+];
 const cmd = process.platform === 'win32'
-  ? `npx esbuild server/index.ts --bundle --platform=node --format=cjs --target=node20 --external:isomorphic-dompurify "--footer:js=module.exports=module.exports.default" --outfile=${path.join(func, 'index.js')}`
-  : ['npx esbuild server/index.ts', '--bundle', '--platform=node', '--format=cjs', '--target=node20', '--external:isomorphic-dompurify', '--footer:js=module.exports=module.exports.default', '--outfile=' + path.join(func, 'index.js')].join(' ');
+  ? 'npx esbuild server/index.ts --bundle --platform=node --format=cjs --target=node20 --external:isomorphic-dompurify "--footer:js=module.exports=module.exports.default" --outfile=' + path.join(func, 'index.js')
+  : esbuildArgs.join(' ');
 execSync(cmd, { cwd: root, stdio: 'inherit' });
 
-const serverPkg = JSON.parse(readFileSync(path.join(root, 'server', 'package.json'), 'utf8'));
-writeFileSync(path.join(func, 'package.json'), JSON.stringify({ dependencies: serverPkg.dependencies }, null, 2));
+writeFileSync(path.join(func, 'package.json'), JSON.stringify({ dependencies: { 'isomorphic-dompurify': '^3.19.0' } }, null, 2));
+execSync('npm install --omit=dev', { cwd: func, stdio: 'inherit' });
 writeFileSync(path.join(func, '.vc-config.json'), JSON.stringify({
   runtime: 'nodejs22.x',
   handler: 'index.js',
