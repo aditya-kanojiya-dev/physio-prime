@@ -11,10 +11,15 @@ cpSync(path.join(root, 'dist'), path.join(out, 'static'), { recursive: true });
 
 const func = path.join(out, 'functions', 'api.func');
 mkdirSync(func, { recursive: true });
-execSync('npx esbuild server/index.ts --bundle --platform=node --format=cjs --target=node20 --outfile=' + path.join(func, 'index.js'), {
-  cwd: root,
-  stdio: 'inherit',
-});
+// ponytail: isomorphic-dompurify pulls in jsdom, whose bundled copy crashes at
+// require-time (reads default-stylesheet.css from the wrong path). Externalize it
+// so the function installs real node_modules; Vercel resolves it from node_modules.
+// Vercel's Nodejs launcher also invokes the handler export as (req, res), so the
+// bundle must export the express app (callable), not the { createApp } object.
+const cmd = process.platform === 'win32'
+  ? `npx esbuild server/index.ts --bundle --platform=node --format=cjs --target=node20 --external:isomorphic-dompurify "--footer:js=module.exports=module.exports.default" --outfile=${path.join(func, 'index.js')}`
+  : ['npx esbuild server/index.ts', '--bundle', '--platform=node', '--format=cjs', '--target=node20', '--external:isomorphic-dompurify', '--footer:js=module.exports=module.exports.default', '--outfile=' + path.join(func, 'index.js')].join(' ');
+execSync(cmd, { cwd: root, stdio: 'inherit' });
 
 const serverPkg = JSON.parse(readFileSync(path.join(root, 'server', 'package.json'), 'utf8'));
 writeFileSync(path.join(func, 'package.json'), JSON.stringify({ dependencies: serverPkg.dependencies }, null, 2));
