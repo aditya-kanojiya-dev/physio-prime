@@ -381,6 +381,17 @@ export interface DoctorLocation {
   active: boolean;
 }
 
+export interface LocationRow {
+  id: number;
+  doctorId: number;
+  area: string | null;
+  isPrimary: boolean;
+  active: boolean;
+  doctorName: string;
+  specialty: string | null;
+  doctorStatus: 'active' | 'inactive';
+}
+
 // --- Community ---
 export interface CommunityCategory {
   id: number;

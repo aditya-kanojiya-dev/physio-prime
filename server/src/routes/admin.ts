@@ -586,6 +586,30 @@ adminRouter.delete('/locations/:id', async (req, res, next) => {
   }
 });
 
+adminRouter.get('/locations', async (_req, res, next) => {
+  try {
+    const rows = await db
+      .select({
+        id: doctorLocations.id,
+        doctorId: doctorLocations.doctorId,
+        area: doctorLocations.area,
+        isPrimary: doctorLocations.isPrimary,
+        active: doctorLocations.active,
+        doctorName: doctors.name,
+        specialty: doctors.specialty,
+        doctorStatus: users.status,
+      })
+      .from(doctorLocations)
+      .innerJoin(doctors, eq(doctors.id, doctorLocations.doctorId))
+      .innerJoin(users, eq(users.id, doctors.userId))
+      .where(eq(doctorLocations.active, true))
+      .orderBy(asc(doctors.name));
+    res.json({ locations: rows });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // --- doctor applications -----------------------------------------------
 
 adminRouter.get('/doctor-applications', async (_req, res, next) => {
