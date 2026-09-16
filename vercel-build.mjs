@@ -32,12 +32,12 @@ const cmd = process.platform === 'win32'
   : esbuildArgs.join(' ');
 execSync(cmd, { cwd: root, stdio: 'inherit' });
 
-// ponytail: jsdom29 -> html-encoding-sniffer@6 -> ESM-only @exodus/bytes crashes Vercel's
-// require(). html-encoding-sniffer@4 is the last CJS-safe line (same public API);
-// pin it via overrides instead of fighting runtime versions.
+// ponytail: jsdom29 deps (html-encoding-sniffer@6, whatwg-url@16) pull ESM-only
+// @exodus/bytes -> Vercel's Node crashes on require(). jsdom26's whole chain is
+// CJS-safe and DOMPurify only needs standard DOM APIs; pin it via overrides.
 writeFileSync(path.join(func, 'package.json'), JSON.stringify({
   dependencies: { 'isomorphic-dompurify': '^3.19.0' },
-  overrides: { 'html-encoding-sniffer': '4.0.0' },
+  overrides: { 'jsdom': '26.1.0' },
 }, null, 2));
 execSync('npm install --omit=dev', { cwd: func, stdio: 'inherit' });
 writeFileSync(path.join(func, '.vc-config.json'), JSON.stringify({
