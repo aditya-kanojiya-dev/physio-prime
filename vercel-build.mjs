@@ -34,8 +34,10 @@ execSync(cmd, { cwd: root, stdio: 'inherit' });
 
 writeFileSync(path.join(func, 'package.json'), JSON.stringify({ dependencies: { 'isomorphic-dompurify': '^3.19.0' } }, null, 2));
 execSync('npm install --omit=dev', { cwd: func, stdio: 'inherit' });
+// ponytail: nodejs22.x fails require(esm) on @exodus/bytes (jsdom -> html-encoding-sniffer dep);
+// nodejs24.x supports require(esm). Matrix-pin instead of chasing Vercel's 22.x build.
 writeFileSync(path.join(func, '.vc-config.json'), JSON.stringify({
-  runtime: 'nodejs22.x',
+  runtime: 'nodejs24.x',
   handler: 'index.js',
   launcherType: 'Nodejs',
 }, null, 2));
