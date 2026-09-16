@@ -80,7 +80,7 @@ export const ConditionDetailPage: React.FC = () => {
               Book an Appointment
             </Link>
             <a
-              href="tel:+919876543210"
+              href="tel:+918055541478"
               className="px-6 py-3 rounded-full font-bold text-sm text-blue-700 bg-white border border-blue-200 hover:bg-blue-50 transition-colors flex items-center gap-2"
             >
               <Phone className="w-4 h-4" />

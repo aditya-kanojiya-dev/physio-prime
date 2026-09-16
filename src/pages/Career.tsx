@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
+import { supabase } from '../lib/supabase';
 import { 
   Briefcase, 
   Mail, 
@@ -31,6 +32,8 @@ interface CareerFormData {
   coverLetter: string;
   joiningDate: string;
   consent: boolean;
+  supportingDocType: string;
+  supportingDoc: File | null;
 }
 
 export const Career: React.FC = () => {
@@ -47,12 +50,15 @@ export const Career: React.FC = () => {
     resume: null,
     coverLetter: '',
     joiningDate: '',
-    consent: false
+    consent: false,
+    supportingDocType: '',
+    supportingDoc: null,
   });
 
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [fileName, setFileName] = useState('');
+  const [supportingFileName, setSupportingFileName] = useState('');
   const [error, setError] = useState('');
 
   const positions = [
@@ -101,6 +107,15 @@ export const Career: React.FC = () => {
     'Other'
   ];
 
+  const documentTypes = [
+    'Aadhaar Card',
+    'PAN Card',
+    'Passport',
+    'Voter ID',
+    'Driving License',
+    'Other'
+  ];
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
@@ -123,6 +138,24 @@ export const Career: React.FC = () => {
     }
   };
 
+  const handleSupportingDocChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setFormData(prev => ({ ...prev, supportingDoc: file }));
+      setSupportingFileName(file.name);
+    }
+  };
+
+  // ponytail: client-side upload to Supabase "media" bucket, same path as admin ImageUpload
+  const uploadSupportingDoc = async (file: File): Promise<string> => {
+    const ext = file.name.split('.').pop() || 'jpg';
+    const path = `careers/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+    const { error } = await supabase.storage.from('media').upload(path, file, { upsert: false });
+    if (error) throw new Error(error.message);
+    const { data } = supabase.storage.from('media').getPublicUrl(path);
+    return data.publicUrl;
+  };
+
   // ponytail: wired to POST /api/v1/careers — resume upload deferred (needs storage infra)
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -135,7 +168,21 @@ export const Career: React.FC = () => {
       return;
     }
 
+    if (!formData.supportingDocType) {
+      setIsLoading(false);
+      setError('Please select the type of your supporting document.');
+      return;
+    }
+
+    if (!formData.supportingDoc) {
+      setIsLoading(false);
+      setError('Please upload a supporting document (Aadhaar, PAN, passport, etc.) for verification.');
+      return;
+    }
+
     try {
+      const supportingDocUrl = await uploadSupportingDoc(formData.supportingDoc);
+
       const res = await fetch('/api/v1/careers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -152,6 +199,8 @@ export const Career: React.FC = () => {
           coverLetter: formData.coverLetter,
           joiningDate: formData.joiningDate,
           consent: formData.consent,
+          supportingDocType: formData.supportingDocType,
+          supportingDocUrl,
         }),
       });
 
@@ -167,9 +216,10 @@ export const Career: React.FC = () => {
           fullName: '', email: '', phone: '', position: '', specialization: [],
           qualification: '', experience: '', currentOrganization: '',
           certifications: '', resume: null, coverLetter: '', joiningDate: '',
-          consent: false,
+          consent: false, supportingDocType: '', supportingDoc: null,
         });
         setFileName('');
+        setSupportingFileName('');
       }, 3000);
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Something went wrong');
@@ -408,6 +458,42 @@ export const Career: React.FC = () => {
                   </div>
                 </div>
                 <p className="text-[10px] text-slate-400">Upload your resume in PDF, DOC, or DOCX format.</p>
+              </div>
+
+              {/* Supporting Document (for verification) */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                  <FileText className="w-3.5 h-3.5 text-blue-500" />
+                  Supporting Document <span className="text-rose-500">*</span>
+                </label>
+                <select
+                  name="supportingDocType"
+                  value={formData.supportingDocType}
+                  onChange={handleInputChange}
+                  required
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 focus:outline-none focus:border-blue-600 focus:bg-white transition-all"
+                >
+                  <option value="">Select document type</option>
+                  {documentTypes.map(doc => (
+                    <option key={doc} value={doc}>{doc}</option>
+                  ))}
+                </select>
+                <div className="relative">
+                  <input
+                    type="file"
+                    accept=".pdf,.jpg,.jpeg,.png"
+                    onChange={handleSupportingDocChange}
+                    required
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  />
+                  <div className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 flex items-center justify-between">
+                    <span className="text-slate-500">
+                      {supportingFileName || 'Choose file (PDF/JPG/PNG)'}
+                    </span>
+                    <span className="text-blue-600 font-bold text-xs">Browse</span>
+                  </div>
+                </div>
+                <p className="text-[10px] text-slate-400">Upload a clear copy for identity verification (Aadhaar, PAN, passport, voter ID, driving license).</p>
               </div>
 
               {/* Cover Letter */}

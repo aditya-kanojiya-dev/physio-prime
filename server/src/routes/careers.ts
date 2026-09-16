@@ -36,6 +36,8 @@ const careerSchema = z.object({
   coverLetter: z.string().max(5000).optional(),
   joiningDate: z.string().max(100).optional(),
   consent: z.boolean(),
+  supportingDocType: z.string().min(1).max(100),
+  supportingDocUrl: z.string().url().max(1000),
 });
 
 careersRouter.post('/', async (req, res, next) => {
@@ -60,6 +62,8 @@ careersRouter.post('/', async (req, res, next) => {
         certifications: body.certifications ?? null,
         coverLetter: body.coverLetter ?? null,
         joiningDate: body.joiningDate ?? null,
+        documentType: body.supportingDocType,
+        documentUrl: body.supportingDocUrl,
         consent: true,
       })
       .returning();

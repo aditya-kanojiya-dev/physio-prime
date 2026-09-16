@@ -126,6 +126,8 @@ export interface AdminApplication {
   currentOrganization: string | null;
   certifications: string | null;
   coverLetter: string | null;
+  documentType: string | null;
+  documentUrl: string | null;
   joiningDate: string | null;
   consent: boolean;
 }

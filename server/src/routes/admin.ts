@@ -604,6 +604,8 @@ adminRouter.get('/doctor-applications', async (_req, res, next) => {
         currentOrganization: doctorApplications.currentOrganization,
         certifications: doctorApplications.certifications,
         coverLetter: doctorApplications.coverLetter,
+        documentType: doctorApplications.documentType,
+        documentUrl: doctorApplications.documentUrl,
         joiningDate: doctorApplications.joiningDate,
         consent: doctorApplications.consent,
         status: doctorApplications.status,

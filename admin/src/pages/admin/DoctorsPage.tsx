@@ -65,6 +65,7 @@ const emptyForm = {
 export function DoctorsPage() {
   const qc = useQueryClient()
   const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all')
   const [modalOpen, setModalOpen] = useState(false)
   const [form, setForm] = useState(emptyForm)
   const [error, setError] = useState<string | null>(null)
@@ -183,11 +184,19 @@ export function DoctorsPage() {
     setModalOpen(true)
   }
 
-  const filtered = (doctors || []).filter(
-    (d) =>
-      d.name.toLowerCase().includes(search.toLowerCase()) ||
-      (d.specialty || '').toLowerCase().includes(search.toLowerCase()),
-  )
+  const statusCounts = {
+    active: (doctors || []).filter((d) => d.status === 'active').length,
+    inactive: (doctors || []).filter((d) => d.status === 'inactive').length,
+  }
+
+  const filtered = (doctors || [])
+    .filter(
+      (d) =>
+        (statusFilter === 'all' || d.status === statusFilter) &&
+        (d.name.toLowerCase().includes(search.toLowerCase()) ||
+          (d.specialty || '').toLowerCase().includes(search.toLowerCase())),
+    )
+    .sort((a, b) => (a.status === b.status ? 0 : a.status === 'active' ? -1 : 1))
 
   return (
     <AdminLayout>
@@ -267,6 +276,16 @@ export function DoctorsPage() {
                         {a.currentOrganization && <div><span className="font-bold text-slate-500">Organization</span><p className="text-slate-900 font-semibold">{a.currentOrganization}</p></div>}
                         {a.joiningDate && <div><span className="font-bold text-slate-500">Joining Date</span><p className="text-slate-900 font-semibold">{a.joiningDate}</p></div>}
                         {a.certifications && <div><span className="font-bold text-slate-500">Certifications</span><p className="text-slate-900 font-semibold">{a.certifications}</p></div>}
+                        {a.documentUrl && (
+                          <div>
+                            <span className="font-bold text-slate-500">Supporting Document</span>
+                            <p className="mt-1">
+                              <a href={a.documentUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-bold text-blue-600 underline">
+                                {a.documentType || 'Download'}
+                              </a>
+                            </p>
+                          </div>
+                        )}
                       </div>
                       {a.specializations && a.specializations.length > 0 && (
                         <div><span className="font-bold text-slate-500">Specializations</span><div className="flex flex-wrap gap-1 mt-1">{a.specializations.map(s => <span key={s} className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded-full text-[10px] font-bold border border-blue-200">{s}</span>)}</div></div>
@@ -291,6 +310,34 @@ export function DoctorsPage() {
             placeholder="Search doctor by name or specialty..."
             className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-2xl text-xs font-bold text-slate-900 focus:outline-none focus:border-teal-500 transition-colors"
           />
+        </div>
+
+        {/* Status filter */}
+        <div className="flex items-center gap-2 flex-wrap">
+          {[
+            ['all', 'All', doctors?.length ?? 0] as const,
+            ['active', 'ON', statusCounts.active] as const,
+            ['inactive', 'OFF', statusCounts.inactive] as const,
+          ].map(([key, label, count]) => (
+            <button
+              key={key}
+              onClick={() => setStatusFilter(key)}
+              className={`px-3.5 py-2 rounded-xl text-xs font-extrabold border transition-all flex items-center gap-1.5 ${
+                statusFilter === key
+                  ? key === 'inactive'
+                    ? 'bg-rose-600 text-white border-rose-600'
+                    : key === 'active'
+                      ? 'bg-emerald-600 text-white border-emerald-600'
+                      : 'bg-teal-600 text-white border-teal-600'
+                  : 'bg-white text-slate-600 border-slate-200 hover:border-teal-300 hover:text-teal-600'
+              }`}
+            >
+              {label}
+              <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-black ${statusFilter === key ? 'bg-white/20' : 'bg-slate-100'}`}>
+                {count}
+              </span>
+            </button>
+          ))}
         </div>
 
         {/* Doctor cards */}

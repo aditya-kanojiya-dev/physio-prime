@@ -46,6 +46,8 @@ export const doctorApplications = pgTable('doctor_applications', {
   currentOrganization: text('current_organization'),
   certifications: text('certifications'),
   resumeUrl: text('resume_url'),
+  documentType: text('document_type'),
+  documentUrl: text('document_url'),
   coverLetter: text('cover_letter'),
   joiningDate: text('joining_date'),
   consent: boolean('consent').notNull().default(false),
