@@ -32,10 +32,14 @@ const cmd = process.platform === 'win32'
   : esbuildArgs.join(' ');
 execSync(cmd, { cwd: root, stdio: 'inherit' });
 
-writeFileSync(path.join(func, 'package.json'), JSON.stringify({ dependencies: { 'isomorphic-dompurify': '^3.19.0' } }, null, 2));
+// ponytail: jsdom29 -> html-encoding-sniffer@6 -> ESM-only @exodus/bytes crashes Vercel's
+// require(). html-encoding-sniffer@4 is the last CJS-safe line (same public API);
+// pin it via overrides instead of fighting runtime versions.
+writeFileSync(path.join(func, 'package.json'), JSON.stringify({
+  dependencies: { 'isomorphic-dompurify': '^3.19.0' },
+  overrides: { 'html-encoding-sniffer': '4.0.0' },
+}, null, 2));
 execSync('npm install --omit=dev', { cwd: func, stdio: 'inherit' });
-// ponytail: nodejs22.x fails require(esm) on @exodus/bytes (jsdom -> html-encoding-sniffer dep);
-// nodejs24.x supports require(esm). Matrix-pin instead of chasing Vercel's 22.x build.
 writeFileSync(path.join(func, '.vc-config.json'), JSON.stringify({
   runtime: 'nodejs24.x',
   handler: 'index.js',
