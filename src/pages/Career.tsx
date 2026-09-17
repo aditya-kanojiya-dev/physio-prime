@@ -34,6 +34,8 @@ interface CareerFormData {
   consent: boolean;
   supportingDocType: string;
   supportingDoc: File | null;
+  photo: File | null;
+  doctorCertificate: File | null;
 }
 
 export const Career: React.FC = () => {
@@ -53,13 +55,29 @@ export const Career: React.FC = () => {
     consent: false,
     supportingDocType: '',
     supportingDoc: null,
+    photo: null,
+    doctorCertificate: null,
   });
 
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [fileName, setFileName] = useState('');
   const [supportingFileName, setSupportingFileName] = useState('');
+  const [photoFileName, setPhotoFileName] = useState('');
+  const [certificateFileName, setCertificateFileName] = useState('');
   const [error, setError] = useState('');
+
+  const resetForm = () => {
+    setFormData({
+      fullName: '', email: '', phone: '', position: '', specialization: [],
+      qualification: '', experience: '', currentOrganization: '',
+      certifications: '', resume: null, coverLetter: '', joiningDate: '',
+      consent: false, supportingDocType: '', supportingDoc: null,
+      photo: null, doctorCertificate: null,
+    });
+    setFileName(''); setSupportingFileName(''); setPhotoFileName(''); setCertificateFileName('');
+    setIsSubmitted(false); setError('');
+  };
 
   const positions = [
     'Physiotherapist',
@@ -146,8 +164,24 @@ export const Career: React.FC = () => {
     }
   };
 
+  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setFormData(prev => ({ ...prev, photo: file }));
+      setPhotoFileName(file.name);
+    }
+  };
+
+  const handleCertificateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setFormData(prev => ({ ...prev, doctorCertificate: file }));
+      setCertificateFileName(file.name);
+    }
+  };
+
   // ponytail: client-side upload to Supabase "media" bucket, same path as admin ImageUpload
-  const uploadSupportingDoc = async (file: File): Promise<string> => {
+  const uploadFile = async (file: File): Promise<string> => {
     const ext = file.name.split('.').pop() || 'jpg';
     const path = `careers/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
     const { error } = await supabase.storage.from('media').upload(path, file, { upsert: false });
@@ -180,8 +214,24 @@ export const Career: React.FC = () => {
       return;
     }
 
+    if (!formData.photo) {
+      setIsLoading(false);
+      setError('Please upload your photo.');
+      return;
+    }
+
+    if (!formData.doctorCertificate) {
+      setIsLoading(false);
+      setError('Please upload your doctor certificate.');
+      return;
+    }
+
     try {
-      const supportingDocUrl = await uploadSupportingDoc(formData.supportingDoc);
+      const [supportingDocUrl, photoUrl, doctorCertificateUrl] = await Promise.all([
+        uploadFile(formData.supportingDoc),
+        uploadFile(formData.photo),
+        uploadFile(formData.doctorCertificate),
+      ]);
 
       const res = await fetch('/api/v1/careers', {
         method: 'POST',
@@ -201,6 +251,8 @@ export const Career: React.FC = () => {
           consent: formData.consent,
           supportingDocType: formData.supportingDocType,
           supportingDocUrl,
+          photoUrl,
+          doctorCertificateUrl,
         }),
       });
 
@@ -210,17 +262,6 @@ export const Career: React.FC = () => {
       }
 
       setIsSubmitted(true);
-      setTimeout(() => {
-        setIsSubmitted(false);
-        setFormData({
-          fullName: '', email: '', phone: '', position: '', specialization: [],
-          qualification: '', experience: '', currentOrganization: '',
-          certifications: '', resume: null, coverLetter: '', joiningDate: '',
-          consent: false, supportingDocType: '', supportingDoc: null,
-        });
-        setFileName('');
-        setSupportingFileName('');
-      }, 3000);
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Something went wrong');
     } finally {
@@ -257,7 +298,7 @@ export const Career: React.FC = () => {
           transition={{ delay: 0.1 }}
           className="bg-white rounded-3xl border border-slate-200 shadow-xl overflow-hidden"
         >
-          {!isSubmitted ? (
+          {!isSubmitted && (
             <form onSubmit={handleSubmit} className="p-6 sm:p-8 space-y-6">
               
               {/* Full Name */}
@@ -496,6 +537,54 @@ export const Career: React.FC = () => {
                 <p className="text-[10px] text-slate-400">Upload a clear copy for identity verification (Aadhaar, PAN, passport, voter ID, driving license).</p>
               </div>
 
+              {/* Photo Upload */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                  <Upload className="w-3.5 h-3.5 text-blue-500" />
+                  Photo Upload <span className="text-rose-500">*</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type="file"
+                    accept=".jpg,.jpeg,.png,.webp"
+                    onChange={handlePhotoChange}
+                    required
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  />
+                  <div className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 flex items-center justify-between">
+                    <span className="text-slate-500">
+                      {photoFileName || 'Choose photo (JPG/PNG)'}
+                    </span>
+                    <span className="text-blue-600 font-bold text-xs">Browse</span>
+                  </div>
+                </div>
+                <p className="text-[10px] text-slate-400">Upload a recent professional photo.</p>
+              </div>
+
+              {/* Doctor Certificate Upload */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                  <GraduationCap className="w-3.5 h-3.5 text-blue-500" />
+                  Doctor Certificate <span className="text-rose-500">*</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type="file"
+                    accept=".pdf,.jpg,.jpeg,.png"
+                    onChange={handleCertificateChange}
+                    required
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  />
+                  <div className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 flex items-center justify-between">
+                    <span className="text-slate-500">
+                      {certificateFileName || 'Choose certificate (PDF/JPG/PNG)'}
+                    </span>
+                    <span className="text-blue-600 font-bold text-xs">Browse</span>
+                  </div>
+                </div>
+                <p className="text-[10px] text-slate-400">Upload your physiotherapy degree / registration certificate.</p>
+              </div>
+
               {/* Cover Letter */}
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
@@ -575,21 +664,28 @@ export const Career: React.FC = () => {
               </button>
 
             </form>
-          ) : (
-            // Success State
-            <div className="p-12 text-center space-y-6">
-              <div className="w-20 h-20 rounded-full bg-green-50 border border-green-200 text-green-600 flex items-center justify-center mx-auto shadow-md">
-                <CheckCircle className="w-10 h-10" />
-              </div>
-              <div>
-                <h3 className="text-2xl font-extrabold text-slate-900">Application Submitted!</h3>
-                <p className="text-slate-500 text-sm mt-2">
-                  Thank you for applying to PhysioPrime. Our HR team will review your application and get back to you within 48 hours.
-                </p>
-              </div>
-              <div className="flex items-center justify-center gap-2 text-xs text-slate-400">
-                <Sparkles className="w-3.5 h-3.5 text-teal-500" />
-                <span>You'll receive a confirmation email shortly.</span>
+          )}
+
+          {/* Success Popup */}
+          {isSubmitted && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
+              <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-8 text-center space-y-5">
+                <div className="w-20 h-20 rounded-full bg-green-50 border border-green-200 text-green-600 flex items-center justify-center mx-auto shadow-md">
+                  <CheckCircle className="w-10 h-10" />
+                </div>
+                <div>
+                  <h3 className="text-2xl font-extrabold text-slate-900">Application Submitted!</h3>
+                  <p className="text-slate-500 text-sm mt-3 leading-relaxed">
+                    Your data will only be shared by our representative, and they will contact you shortly.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={resetForm}
+                  className="w-full btn-gradient text-white py-3 rounded-2xl font-extrabold text-sm shadow-lg shadow-blue-500/25 hover:scale-[1.02] active:scale-[0.98] transition-all"
+                >
+                  Done
+                </button>
               </div>
             </div>
           )}

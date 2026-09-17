@@ -8,6 +8,7 @@ import {
   contentSections,
   departments,
   doctorApplications,
+  doctorCategoryCommissions,
   doctorLocations,
   doctorPayouts,
   doctorSchedules,
@@ -21,7 +22,10 @@ import {
 } from '../db/schema';
 import { requireAuth, requireRole } from '../middleware/auth';
 import { getEarnedNet } from './payouts';
-import { notifyDoctor } from '../lib/notifications';
+import { notifyDoctor, sendNotification } from '../lib/notifications';
+import { getSupabaseAdmin } from '../lib/supabase';
+import { getConfig } from '../config';
+import { randomBytes } from 'node:crypto';
 
 export const adminRouter = Router();
 
@@ -215,7 +219,23 @@ adminRouter.get('/doctors', async (_req, res, next) => {
       .leftJoin(departments, eq(departments.name, doctors.department))
       .leftJoin(categories, eq(categories.id, doctors.categoryId))
       .orderBy(asc(doctors.name));
-    res.json({ doctors: rows });
+    const commissions = await db
+      .select({
+        doctorId: doctorCategoryCommissions.doctorId,
+        categoryId: doctorCategoryCommissions.categoryId,
+        categoryTitle: categories.title,
+        platformFeePercent: doctorCategoryCommissions.platformFeePercent,
+        consultationFeePaise: doctorCategoryCommissions.consultationFeePaise,
+      })
+      .from(doctorCategoryCommissions)
+      .leftJoin(categories, eq(categories.id, doctorCategoryCommissions.categoryId));
+    const byDoctor = new Map<number, typeof commissions>();
+    for (const c of commissions) {
+      const list = byDoctor.get(c.doctorId) ?? [];
+      list.push(c);
+      byDoctor.set(c.doctorId, list);
+    }
+    res.json({ doctors: rows.map((d) => ({ ...d, categoryCommissions: byDoctor.get(d.id) ?? [] })) });
   } catch (err) {
     next(err);
   }
@@ -610,6 +630,82 @@ adminRouter.get('/locations', async (_req, res, next) => {
   }
 });
 
+// --- doctor category commissions ----------------------------------------
+// Per-doctor, per-category commission override + consultation fee.
+
+adminRouter.get('/doctors/:id/category-commissions', async (req, res, next) => {
+  try {
+    const id = parseId(req.params.id);
+    if (id === null) return res.status(400).json({ error: { message: 'id must be an integer' } });
+    const rows = await db
+      .select({
+        id: doctorCategoryCommissions.id,
+        categoryId: doctorCategoryCommissions.categoryId,
+        categoryTitle: categories.title,
+        platformFeePercent: doctorCategoryCommissions.platformFeePercent,
+        consultationFeePaise: doctorCategoryCommissions.consultationFeePaise,
+      })
+      .from(doctorCategoryCommissions)
+      .leftJoin(categories, eq(categories.id, doctorCategoryCommissions.categoryId))
+      .where(eq(doctorCategoryCommissions.doctorId, id))
+      .orderBy(asc(categories.sortOrder), asc(categories.id));
+    res.json({ commissions: rows });
+  } catch (err) {
+    next(err);
+  }
+});
+
+const categoryCommissionSchema = z.object({
+  platformFeePercent: z.number().int().min(0).max(100).nullable().optional(),
+  consultationFeePaise: z.number().int().min(0).nullable().optional(),
+});
+
+adminRouter.put('/doctors/:id/category-commissions/:categoryId', async (req, res, next) => {
+  try {
+    const id = parseId(req.params.id);
+    const categoryId = parseId(req.params.categoryId);
+    if (id === null || categoryId === null) {
+      return res.status(400).json({ error: { message: 'id must be an integer' } });
+    }
+    const body = categoryCommissionSchema.parse(req.body);
+    const [row] = await db
+      .insert(doctorCategoryCommissions)
+      .values({
+        doctorId: id,
+        categoryId,
+        platformFeePercent: body.platformFeePercent ?? null,
+        consultationFeePaise: body.consultationFeePaise ?? null,
+      })
+      .onConflictDoUpdate({
+        target: [doctorCategoryCommissions.doctorId, doctorCategoryCommissions.categoryId],
+        set: {
+          platformFeePercent: body.platformFeePercent ?? null,
+          consultationFeePaise: body.consultationFeePaise ?? null,
+        },
+      })
+      .returning();
+    res.json({ commission: row });
+  } catch (err) {
+    next(err);
+  }
+});
+
+adminRouter.delete('/doctors/:id/category-commissions/:categoryId', async (req, res, next) => {
+  try {
+    const id = parseId(req.params.id);
+    const categoryId = parseId(req.params.categoryId);
+    if (id === null || categoryId === null) {
+      return res.status(400).json({ error: { message: 'id must be an integer' } });
+    }
+    await db
+      .delete(doctorCategoryCommissions)
+      .where(and(eq(doctorCategoryCommissions.doctorId, id), eq(doctorCategoryCommissions.categoryId, categoryId)));
+    res.status(204).send();
+  } catch (err) {
+    next(err);
+  }
+});
+
 // --- doctor applications -----------------------------------------------
 
 adminRouter.get('/doctor-applications', async (_req, res, next) => {
@@ -630,6 +726,9 @@ adminRouter.get('/doctor-applications', async (_req, res, next) => {
         coverLetter: doctorApplications.coverLetter,
         documentType: doctorApplications.documentType,
         documentUrl: doctorApplications.documentUrl,
+        resumeUrl: doctorApplications.resumeUrl,
+        photoUrl: doctorApplications.photoUrl,
+        doctorCertificateUrl: doctorApplications.doctorCertificateUrl,
         joiningDate: doctorApplications.joiningDate,
         consent: doctorApplications.consent,
         status: doctorApplications.status,
@@ -707,11 +806,69 @@ adminRouter.post('/doctor-applications/:id/decide', async (req, res, next) => {
         }
       }
     });
+    if (body.approve) {
+      await notifyAcceptedDoctor(application);
+    } else {
+      sendNotification({
+        channel: 'email',
+        to: application.candidateEmail,
+        subject: 'Your PhysioPrime application status',
+        body:
+          `Hi ${application.candidateName},<br/><br/>` +
+          `Thank you for applying to PhysioPrime for the <strong>${application.position ?? 'physiotherapist'}</strong> role. ` +
+          `After careful review, we have decided not to proceed with your application at this time.<br/>` +
+          `We encourage you to apply again in the future.<br/><br/>Best regards,<br/>PhysioPrime Team`,
+      }).catch(() => {});
+    }
     res.json({ application: { id, status, reviewedAt: new Date(), notes: body.notes ?? null } });
   } catch (err) {
     next(err);
   }
 });
+
+// Creates the Supabase auth account (temp password) and emails the doctor their
+// login + doctor-panel link. Best-effort: an applicant who already has a Supabase
+// account keeps their own password, and the panel link is omitted when
+// DOCTOR_PANEL_URL is unconfigured — the email still goes out either way.
+async function notifyAcceptedDoctor(application: typeof doctorApplications.$inferSelect): Promise<void> {
+  const panelUrl = getConfig().DOCTOR_PANEL_URL;
+  let tempPassword: string | null = null;
+  try {
+    tempPassword = randomBytes(6).toString('hex');
+    const { error } = await getSupabaseAdmin().auth.admin.createUser({
+      email: application.candidateEmail,
+      password: tempPassword,
+      email_confirm: true,
+      user_metadata: { role: 'doctor', name: application.candidateName },
+    });
+    if (error) {
+      console.error('[careers] auth user create failed:', error.message);
+      tempPassword = null;
+    }
+  } catch (err) {
+    console.error('[careers] auth user create threw:', err);
+    tempPassword = null;
+  }
+  const credentials =
+    tempPassword !== null
+      ? `Login email: <strong>${application.candidateEmail}</strong><br/>Temporary password: <strong>${tempPassword}</strong>`
+      : 'Use your existing account password with your email.';
+  const panel = panelUrl
+    ? `Open the doctor panel at <a href="${panelUrl}">${panelUrl}</a>`
+    : 'Open the doctor panel and sign in with this email';
+  await sendNotification({
+    channel: 'email',
+    to: application.candidateEmail,
+    subject: 'Welcome to PhysioPrime — your doctor account is ready',
+    body:
+      `Hi ${application.candidateName},<br/><br/>` +
+      `Congratulations! Your application for <strong>${application.position ?? 'the physiotherapist position'}</strong> has been approved.<br/><br/>` +
+      `Your account is ready.<br/>${credentials}<br/>` +
+      `${panel}.<br/>` +
+      `After logging in, change your password and complete your profile from <strong>Profile → Security</strong>.<br/><br/>` +
+      `Best regards,<br/>PhysioPrime Team`,
+  }).catch(() => {});
+}
 
 function slugify(name: string, seed: number): string {
   const base = name

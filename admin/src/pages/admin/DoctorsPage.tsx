@@ -4,8 +4,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   AlertCircle,
   CheckCircle,
-  ChevronDown,
-  ChevronUp,
   FileText,
   Loader2,
   MapPin,
@@ -19,6 +17,7 @@ import {
   X,
   UserRound,
   Trash2,
+  Download,
 } from 'lucide-react'
 import { api, ApiError } from '../../lib/api'
 import { AdminApplication, AdminClient, AdminDoctor, ServiceArea } from '../../lib/types'
@@ -71,7 +70,7 @@ export function DoctorsPage() {
   const [error, setError] = useState<string | null>(null)
   const [appError, setAppError] = useState<string | null>(null)
   const [clientsDoctor, setClientsDoctor] = useState<AdminDoctor | null>(null)
-  const [expandedApp, setExpandedApp] = useState<number | null>(null)
+  const [viewApp, setViewApp] = useState<AdminApplication | null>(null)
 
   const { data: doctors, isLoading } = useQuery({
     queryKey: ['admin/doctors'],
@@ -229,6 +228,7 @@ export function DoctorsPage() {
         {applications && applications.some((a) => a.status === 'pending') && (
           <div className="space-y-3">
             <h3 className="text-sm font-extrabold text-slate-900">Pending Doctor Applications</h3>
+            <p className="text-xs text-slate-500 -mt-2">Review the applicant's documents and choose to view, approve, or reject.</p>
             {applications
               .filter((a) => a.status === 'pending')
               .map((a) => (
@@ -245,11 +245,10 @@ export function DoctorsPage() {
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       <button
-                        onClick={() => setExpandedApp(expandedApp === a.id ? null : a.id)}
-                        className="p-2 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200 transition-all"
-                        title="Toggle details"
+                        onClick={() => setViewApp(a)}
+                        className="px-3 py-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 font-bold text-xs transition-all flex items-center gap-1.5"
                       >
-                        {expandedApp === a.id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                        <FileText className="w-3.5 h-3.5" /> View
                       </button>
                       <button
                         onClick={() => decide.mutate({ id: a.id, approve: true })}
@@ -267,34 +266,6 @@ export function DoctorsPage() {
                       </button>
                     </div>
                   </div>
-                  {expandedApp === a.id && (
-                    <div className="px-4 pb-4 pt-0 border-t border-slate-100 space-y-3 text-xs">
-                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-3">
-                        {a.phone && <div><span className="font-bold text-slate-500">Phone</span><p className="text-slate-900 font-semibold">{a.phone}</p></div>}
-                        {a.qualification && <div><span className="font-bold text-slate-500">Qualification</span><p className="text-slate-900 font-semibold">{a.qualification}</p></div>}
-                        {a.experience && <div><span className="font-bold text-slate-500">Experience</span><p className="text-slate-900 font-semibold">{a.experience}</p></div>}
-                        {a.currentOrganization && <div><span className="font-bold text-slate-500">Organization</span><p className="text-slate-900 font-semibold">{a.currentOrganization}</p></div>}
-                        {a.joiningDate && <div><span className="font-bold text-slate-500">Joining Date</span><p className="text-slate-900 font-semibold">{a.joiningDate}</p></div>}
-                        {a.certifications && <div><span className="font-bold text-slate-500">Certifications</span><p className="text-slate-900 font-semibold">{a.certifications}</p></div>}
-                        {a.documentUrl && (
-                          <div>
-                            <span className="font-bold text-slate-500">Supporting Document</span>
-                            <p className="mt-1">
-                              <a href={a.documentUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-bold text-blue-600 underline">
-                                {a.documentType || 'Download'}
-                              </a>
-                            </p>
-                          </div>
-                        )}
-                      </div>
-                      {a.specializations && a.specializations.length > 0 && (
-                        <div><span className="font-bold text-slate-500">Specializations</span><div className="flex flex-wrap gap-1 mt-1">{a.specializations.map(s => <span key={s} className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded-full text-[10px] font-bold border border-blue-200">{s}</span>)}</div></div>
-                      )}
-                      {a.coverLetter && (
-                        <div><span className="font-bold text-slate-500">Cover Letter</span><p className="text-slate-700 mt-1 whitespace-pre-wrap">{a.coverLetter}</p></div>
-                      )}
-                    </div>
-                  )}
                 </div>
               ))}
           </div>
@@ -491,6 +462,101 @@ export function DoctorsPage() {
           </div>
         )}
       </div>
+
+      {/* Application Detail Modal */}
+      {viewApp && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white border border-slate-200 rounded-3xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white p-6 pb-4 border-b border-slate-200 flex items-start justify-between gap-3 z-10">
+              <div>
+                <h3 className="text-lg font-extrabold text-slate-900">Application — {viewApp.candidateName || viewApp.name}</h3>
+                <p className="text-xs text-slate-500">
+                  {viewApp.position ?? 'No position'} · applied {viewApp.appliedAt.slice(0, 10)} · {viewApp.status}
+                </p>
+              </div>
+              <button onClick={() => setViewApp(null)} className="text-slate-500 hover:text-slate-900 transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6 space-y-5 text-xs">
+              {viewApp.photoUrl && (
+                <div>
+                  <span className="font-bold text-slate-500">Photo</span>
+                  <div className="mt-2">
+                    <img src={viewApp.photoUrl} alt="Applicant" className="w-28 h-28 rounded-2xl object-cover border border-slate-200" />
+                  </div>
+                </div>
+              )}
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                <Detail label="Name" value={viewApp.candidateName} />
+                <Detail label="Email" value={viewApp.candidateEmail} />
+                <Detail label="Phone" value={viewApp.phone} />
+                <Detail label="Position" value={viewApp.position} />
+                <Detail label="Qualification" value={viewApp.qualification} />
+                <Detail label="Experience" value={viewApp.experience} />
+                <Detail label="Organization" value={viewApp.currentOrganization} />
+                <Detail label="Joining Date" value={viewApp.joiningDate} />
+                <Detail label="Certifications" value={viewApp.certifications} />
+              </div>
+              {viewApp.specializations && viewApp.specializations.length > 0 && (
+                <div>
+                  <span className="font-bold text-slate-500">Specializations</span>
+                  <div className="flex flex-wrap gap-1.5 mt-1">
+                    {viewApp.specializations.map((s) => (
+                      <span key={s} className="px-2.5 py-1 bg-blue-50 text-blue-700 rounded-full text-[10px] font-bold border border-blue-200">{s}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {viewApp.coverLetter && (
+                <div>
+                  <span className="font-bold text-slate-500">Cover Letter</span>
+                  <p className="text-slate-700 mt-1 whitespace-pre-wrap bg-slate-50 border border-slate-200 rounded-xl p-3">{viewApp.coverLetter}</p>
+                </div>
+              )}
+              <div className="space-y-2">
+                <span className="font-bold text-slate-500">Documents</span>
+                <div className="flex flex-wrap gap-2 mt-1">
+                  {viewApp.resumeUrl && (
+                    <a href={viewApp.resumeUrl} target="_blank" rel="noreferrer"
+                       className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-teal-50 border border-teal-200 text-teal-700 font-bold hover:bg-teal-100 transition-all">
+                      <Download className="w-3.5 h-3.5" /> Resume
+                    </a>
+                  )}
+                  {viewApp.documentUrl && (
+                    <a href={viewApp.documentUrl} target="_blank" rel="noreferrer"
+                       className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-blue-50 border border-blue-200 text-blue-700 font-bold hover:bg-blue-100 transition-all">
+                      <Download className="w-3.5 h-3.5" /> {viewApp.documentType || 'Supporting Document'}
+                    </a>
+                  )}
+                  {viewApp.doctorCertificateUrl && (
+                    <a href={viewApp.doctorCertificateUrl} target="_blank" rel="noreferrer"
+                       className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-violet-50 border border-violet-200 text-violet-700 font-bold hover:bg-violet-100 transition-all">
+                      <Download className="w-3.5 h-3.5" /> Doctor Certificate
+                    </a>
+                  )}
+                </div>
+              </div>
+              <div className="pt-3 border-t border-slate-200 flex items-center gap-2 justify-end">
+                <button
+                  onClick={() => decide.mutate({ id: viewApp.id, approve: false })}
+                  disabled={decide.isPending}
+                  className="px-4 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold text-xs transition-all disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  <X className="w-3.5 h-3.5" /> Reject
+                </button>
+                <button
+                  onClick={() => decide.mutate({ id: viewApp.id, approve: true })}
+                  disabled={decide.isPending}
+                  className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition-all disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  <CheckCircle className="w-3.5 h-3.5" /> Approve
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Clients Modal */}
       {clientsDoctor && (
@@ -761,6 +827,16 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
     <div className="space-y-1">
       <label className="font-bold text-slate-600">{label}</label>
       {children}
+    </div>
+  )
+}
+
+function Detail({ label, value }: { label: string; value: string | number | null | undefined }) {
+  if (!value) return null
+  return (
+    <div>
+      <span className="font-bold text-slate-500">{label}</span>
+      <p className="text-slate-900 font-semibold">{value}</p>
     </div>
   )
 }

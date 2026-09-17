@@ -1,11 +1,11 @@
 import { describe, it, beforeAll, afterAll, beforeEach, expect, vi } from 'vitest';
 import request from 'supertest';
-import { eq } from 'drizzle-orm';
+import { desc, eq } from 'drizzle-orm';
 import { db } from '../src/db/pool';
 import { runMigrations } from '../src/db/migrate';
 import { seed } from '../src/lib/seed';
 import { createApp } from '../src/index';
-import { appointments, doctors } from '../src/db/schema';
+import { appointments, doctors, doctorApplications, notifications, users } from '../src/db/schema';
 import { registerPatient, registerAdmin } from './helpers';
 
 vi.mock('../src/lib/razorpay', () => ({
@@ -249,6 +249,47 @@ describe('admin doctor applications', () => {
     expect(res.status).toBe(200);
     expect(res.body.applications.length).toBeGreaterThan(0);
     expect(res.body.applications[0].email).toBeDefined();
+  });
+
+  it('reject emails the candidate and leaves no auth user', async () => {
+    const [application] = await db
+      .insert(doctorApplications)
+      .values({ candidateName: 'Reject Test', candidateEmail: 'reject.test@example.com', position: 'Physiotherapist' })
+      .returning();
+    const res = await api
+      .post(`/api/v1/admin/doctor-applications/${application.id}/decide`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ approve: false, notes: 'Not a fit' });
+    expect(res.status).toBe(200);
+    expect(res.body.application.status).toBe('rejected');
+    const [notice] = await db
+      .select()
+      .from(notifications)
+      .where(eq(notifications.toAddress, 'reject.test@example.com'))
+      .orderBy(desc(notifications.id));
+    expect(notice?.subject).toContain('application status');
+  });
+
+  it('approve creates the doctor login and emails credentials', async () => {
+    const [application] = await db
+      .insert(doctorApplications)
+      .values({ candidateName: 'Approve Test', candidateEmail: 'approve.test@example.com', position: 'Physiotherapist' })
+      .returning();
+    const res = await api
+      .post(`/api/v1/admin/doctor-applications/${application.id}/decide`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ approve: true });
+    expect(res.status).toBe(200);
+    expect(res.body.application.status).toBe('approved');
+    const [notice] = await db
+      .select()
+      .from(notifications)
+      .where(eq(notifications.toAddress, 'approve.test@example.com'))
+      .orderBy(desc(notifications.id));
+    expect(notice?.subject).toContain('doctor account is ready');
+    expect(notice?.body).toContain('Temporary password');
+    const [createdUser] = await db.select().from(users).where(eq(users.email, 'approve.test@example.com'));
+    expect(createdUser?.role).toBe('doctor');
   });
 });
 

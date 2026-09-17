@@ -162,6 +162,20 @@
       "when": 1789300000000,
       "tag": "0022_career_documents",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1789400000000,
+      "tag": "0023_career_photo_cert",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1789500000000,
+      "tag": "0024_doctor_category_commissions",
+      "breakpoints": true
     }
   ]
 }

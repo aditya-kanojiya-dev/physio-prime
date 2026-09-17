@@ -103,6 +103,7 @@ export interface AdminDoctor {
   categoryId: number | null;
   categoryTitle?: string | null;
   departmentPlatformFeePercent?: number | null;
+  categoryCommissions?: { categoryId: number; categoryTitle: string | null; platformFeePercent: number | null; consultationFeePaise: number | null }[];
   deletionRequestedAt: string | null;
   status: 'active' | 'inactive';
 }
@@ -128,6 +129,9 @@ export interface AdminApplication {
   coverLetter: string | null;
   documentType: string | null;
   documentUrl: string | null;
+  resumeUrl: string | null;
+  photoUrl: string | null;
+  doctorCertificateUrl: string | null;
   joiningDate: string | null;
   consent: boolean;
 }
@@ -364,6 +368,14 @@ export interface ServiceArea {
   city: string | null;
   active: boolean;
   sortOrder: number;
+}
+
+export interface DoctorCategoryCommission {
+  id: number;
+  categoryId: number;
+  categoryTitle: string | null;
+  platformFeePercent: number | null;
+  consultationFeePaise: number | null;
 }
 
 export interface DoctorLocation {

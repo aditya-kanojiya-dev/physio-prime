@@ -46,8 +46,10 @@ export const doctorApplications = pgTable('doctor_applications', {
   currentOrganization: text('current_organization'),
   certifications: text('certifications'),
   resumeUrl: text('resume_url'),
+  photoUrl: text('photo_url'),
   documentType: text('document_type'),
   documentUrl: text('document_url'),
+  doctorCertificateUrl: text('doctor_certificate_url'),
   coverLetter: text('cover_letter'),
   joiningDate: text('joining_date'),
   consent: boolean('consent').notNull().default(false),
@@ -263,6 +265,20 @@ export const doctorLocations = pgTable('doctor_locations', {
   active: boolean('active').notNull().default(true),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
+
+// Per-doctor, per-category commission + consultation fee. NULL fee percent
+// inherits the department default; NULL consult fee inherits the doctor's fee.
+export const doctorCategoryCommissions = pgTable(
+  'doctor_category_commissions',
+  {
+    id: serial('id').primaryKey(),
+    doctorId: integer('doctor_id').notNull().references(() => doctors.id, { onDelete: 'cascade' }),
+    categoryId: integer('category_id').notNull().references(() => categories.id, { onDelete: 'cascade' }),
+    platformFeePercent: integer('platform_fee_percent'),
+    consultationFeePaise: integer('consultation_fee_paise'),
+  },
+  (t) => [unique().on(t.doctorId, t.categoryId)],
+);
 
 // DB-backed master list of serviceable neighborhoods, managed by admin. Replaces
 // the old hardcoded SERVICE_AREAS as the single source of truth for location

@@ -30,6 +30,8 @@ const envSchema = coreSchema.extend({
   TWILIO_FROM_NUMBER: z.string().optional(),
   RESEND_API_KEY: z.string().optional(),
   RESEND_FROM_EMAIL: z.string().optional(),
+  // Doctor portal base URL for acceptance emails; omitting it just sends emails without the link.
+  DOCTOR_PANEL_URL: z.string().optional(),
   // Smartping (Satzilio) SMS: optional — OTP gating degrades to a logged error when unconfigured.
   SMARTPING_API_BASE: z.string().optional(),
   SMARTPING_API_USER: z.string().optional(),

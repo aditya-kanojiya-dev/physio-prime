@@ -19,6 +19,9 @@ vi.mock('../src/lib/supabase', () => ({
               error: null,
             }
           : { data: { user: null }, error: { message: 'invalid token' } },
+      admin: {
+        createUser: vi.fn(async () => ({ data: { user: { id: 'u-test' } }, error: null })),
+      },
     },
   }),
 }));
