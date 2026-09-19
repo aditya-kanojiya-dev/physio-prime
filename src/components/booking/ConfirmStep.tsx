@@ -82,6 +82,11 @@ export const ConfirmStep: React.FC<ConfirmStepProps> = ({
   const [agreed, setAgreed] = useState(false);
   const [paymentMode, setPaymentMode] = useState<'prepay' | 'postpay'>('prepay');
 
+  // Online consultations are always prepaid — no server-side postpay path exists.
+  useEffect(() => {
+    if (mode === 'online') setPaymentMode('prepay');
+  }, [mode]);
+
   const [processing, setProcessing] = useState(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
   const [createdAppointment, setCreatedAppointment] = useState<CreatedAppointment['appointment'] | null>(null);
@@ -216,7 +221,8 @@ export const ConfirmStep: React.FC<ConfirmStepProps> = ({
       });
       setCreatedAppointment(appointment);
 
-      if (paymentMode === 'postpay') {
+      if (paymentMode === 'postpay' || mode === 'online') {
+        // ponytail: online consults free during testing — skip checkout.
         return;
       }
 
@@ -606,15 +612,17 @@ export const ConfirmStep: React.FC<ConfirmStepProps> = ({
               >
                 Pay Now Online
               </button>
-              <button
-                type="button"
-                onClick={() => setPaymentMode('postpay')}
-                className={`flex-1 px-4 py-2.5 rounded-lg font-extrabold text-xs transition-all ${
-                  paymentMode === 'postpay' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-                }`}
-              >
-                Pay at Visit
-              </button>
+              {mode !== 'online' && (
+                <button
+                  type="button"
+                  onClick={() => setPaymentMode('postpay')}
+                  className={`flex-1 px-4 py-2.5 rounded-lg font-extrabold text-xs transition-all ${
+                    paymentMode === 'postpay' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  Pay at Visit
+                </button>
+              )}
             </div>
 
             {paymentMode === 'prepay' ? (

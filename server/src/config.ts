@@ -39,6 +39,10 @@ const envSchema = coreSchema.extend({
   SMARTPING_SENDER: z.string().optional(),
   SMARTPING_PE_ID: z.string().optional(),
   SMARTPING_HEADER_ID: z.string().optional(),
+  // JaaS (8x8) video consults — optional; join endpoints 503 until configured.
+  JAAS_APP_ID: z.string().optional(),
+  JAAS_API_KEY_ID: z.string().optional(),
+  JAAS_PRIVATE_KEY: z.string().optional(),
 });
 
 type Config = z.infer<typeof envSchema>;

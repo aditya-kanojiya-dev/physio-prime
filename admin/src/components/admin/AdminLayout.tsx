@@ -25,9 +25,11 @@ import {
   Settings,
   Receipt,
   Percent,
+  HandHeart,
 } from 'lucide-react'
 import { useAuth } from '../../lib/auth'
 import { NotificationsPanel } from '../NotificationsPanel'
+import { ConfirmDialogHost } from './ConfirmDialog'
 
 const adminNav = [
   { to: '/admin/dashboard', label: 'Dashboard', icon: Activity },
@@ -40,6 +42,7 @@ const adminNav = [
   { to: '/admin/symptoms', label: 'Symptoms', icon: FileText },
   { to: '/admin/blogs', label: 'Blogs', icon: BookOpen },
   { to: '/admin/testimonials', label: 'Testimonials', icon: Star },
+  { to: '/admin/caretaker-inquiries', label: 'Inquiries', icon: HandHeart },
   { to: '/admin/payments', label: 'Payments', icon: Receipt },
   { to: '/admin/payouts', label: 'Doctor Payouts', icon: Wallet },
   { to: '/admin/media', label: 'Media', icon: Image },
@@ -76,7 +79,8 @@ export function AdminLayout({ children, portal = 'admin' }: { children: React.Re
   }
 
   return (
-    <div className="flex min-h-screen bg-white">
+    <>
+      <div className="flex min-h-screen bg-white">
       <aside className="hidden lg:sticky lg:top-0 lg:flex lg:h-screen lg:w-64 lg:shrink-0 lg:flex-col lg:overflow-y-auto lg:border-r lg:border-slate-200 lg:bg-white lg:px-4 lg:py-6">
         <SideNav nav={nav} isDoctor={isDoctor} onLogout={handleLogout} />
       </aside>
@@ -136,7 +140,9 @@ export function AdminLayout({ children, portal = 'admin' }: { children: React.Re
           {children}
         </main>
       </div>
-    </div>
+      </div>
+      <ConfirmDialogHost />
+    </>
   )
 }
 

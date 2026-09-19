@@ -73,17 +73,22 @@ careersRouter.post('/', async (req, res, next) => {
       })
       .returning();
 
-    // confirmation email — best-effort, don't fail the submission
-    sendNotification({
-      channel: 'email',
-      to: body.email,
-      subject: 'Application received — PhysioPrime',
-      body:
-        `<p>Hi ${body.fullName},</p>` +
-        `<p>Thank you for applying to PhysioPrime. We have received your application for the <strong>${body.position ?? 'open position'}</strong> role.</p>` +
-        `<p>Our HR team will review your application and get back to you within 48 hours.</p>` +
-        `<p>Best regards,<br/>PhysioPrime Team</p>`,
-    }).catch(() => {});
+    // confirmation email — best-effort, don't fail the submission.
+    // awaited so the serverless function doesn't freeze mid-dispatch.
+    try {
+      await sendNotification({
+        channel: 'email',
+        to: body.email,
+        subject: 'Application received — PhysioPrime',
+        body:
+          `<p>Hi ${body.fullName},</p>` +
+          `<p>Thank you for applying to PhysioPrime. We have received your application for the <strong>${body.position ?? 'open position'}</strong> role.</p>` +
+          `<p>Our HR team will review your application and get back to you within 48 hours.</p>` +
+          `<p>Best regards,<br/>PhysioPrime Team</p>`,
+      });
+    } catch {
+      // ponytail: best-effort
+    }
 
     res.status(201).json({ application: { id: application.id, status: application.status } });
   } catch (err) {

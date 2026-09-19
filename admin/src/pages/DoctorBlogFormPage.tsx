@@ -14,6 +14,7 @@ import { api } from '../lib/api'
 import { uploadBlogImage } from '../lib/upload'
 import { BlogPost, BlogCategory, BlogTag } from '../lib/types'
 import { AdminLayout } from '../components/admin/AdminLayout'
+import { confirmDialog } from '../components/admin/ConfirmDialog'
 import { TipTapEditor } from '../components/admin/TipTapEditor'
 
 function slugify(text: string) {
@@ -147,7 +148,7 @@ export function DoctorBlogFormPage() {
           <div className="flex items-center gap-2">
             {!isNew && (
               <button
-                onClick={() => { if (confirm('Delete this post?')) deleteMutation.mutate() }}
+                onClick={async () => { if (await confirmDialog({ title: 'Delete Post', message: `Delete this post?` })) deleteMutation.mutate() }}
                 className="p-2.5 rounded-xl text-red-500 hover:bg-red-50 transition-all"
                 title="Delete"
               >

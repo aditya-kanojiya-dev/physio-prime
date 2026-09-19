@@ -4,6 +4,7 @@ import { AlertCircle, Edit3, Layers, Loader2, Plus, Trash2, X } from 'lucide-rea
 import { api, ApiError } from '../../lib/api'
 import { AdminCategory } from '../../lib/types'
 import { AdminLayout } from '../../components/admin/AdminLayout'
+import { confirmDialog } from '../../components/admin/ConfirmDialog'
 import { StatusPill } from './AppointmentsPage'
 import { ImageUpload } from '../../components/admin/ImageUpload'
 
@@ -142,8 +143,8 @@ export function CategoriesPage() {
                     <Edit3 className="w-4 h-4" />
                   </button>
                   <button
-                    onClick={() => {
-                      if (confirm('Delete this category?')) remove.mutate(c.id)
+                    onClick={async () => {
+                      if (await confirmDialog({ title: 'Delete Category', message: `Delete this category?` })) remove.mutate(c.id)
                     }}
                     className="p-2 rounded-xl bg-rose-100 hover:bg-rose-100 text-rose-700 border border-rose-200 transition-all"
                     title="Delete"

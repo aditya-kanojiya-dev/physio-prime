@@ -10,6 +10,7 @@ import { WhyChooseUs } from '../components/home/WhyChooseUs';
 import { RecoveryTimeline } from '../components/home/RecoveryTimeline';
 import { PatientStories } from '../components/home/PatientStories';
 import { CareerSection } from '../components/home/CareerSection';
+import { CaretakerSection } from '../components/home/CaretakerSection';
 import { ChatbotButton } from '../components/chatbot/ChatbotButton';
 
 export const HomePage: React.FC = () => {
@@ -26,6 +27,7 @@ export const HomePage: React.FC = () => {
       <PatientStories />
       <WhyChooseUs />
       <CareerSection />
+      <CaretakerSection />
       <ChatbotButton />
     </main>
   );

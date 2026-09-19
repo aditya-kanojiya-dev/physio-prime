@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { RefreshCw, DollarSign, CheckCircle, XCircle, Clock, CreditCard, Banknote, ChevronLeft, ChevronRight, Filter } from 'lucide-react'
 import { api } from '../../lib/api'
 import { AdminLayout } from '../../components/admin/AdminLayout'
+import { confirmDialog } from '../../components/admin/ConfirmDialog'
 import { StatusPill } from './AppointmentsPage'
 
 interface AdminPayout {
@@ -172,7 +173,7 @@ export function DoctorPayoutsPage() {
                                 <RefreshCw className="w-3 h-3" /> Process
                               </button>
                               <button
-                                onClick={() => { if (confirm('Reject this payout?')) updateMutation.mutate({ id: payout.id, status: 'failed', notes: 'Rejected by admin' }) }}
+                                onClick={async () => { if (await confirmDialog({ title: 'Reject Payout', message: `Reject this payout?` })) updateMutation.mutate({ id: payout.id, status: 'failed', notes: 'Rejected by admin' }) }}
                                 disabled={updateMutation.isPending}
                                 className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-red-50 text-red-600 text-[10px] font-bold hover:bg-red-100 transition-all"
                               >
@@ -190,7 +191,7 @@ export function DoctorPayoutsPage() {
                                 <CheckCircle className="w-3 h-3" /> Complete
                               </button>
                               <button
-                                onClick={() => { if (confirm('Mark as failed?')) updateMutation.mutate({ id: payout.id, status: 'failed' }) }}
+                                onClick={async () => { if (await confirmDialog({ title: 'Mark Payout Failed', message: `Mark as failed?` })) updateMutation.mutate({ id: payout.id, status: 'failed' }) }}
                                 disabled={updateMutation.isPending}
                                 className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-red-50 text-red-600 text-[10px] font-bold hover:bg-red-100 transition-all"
                               >

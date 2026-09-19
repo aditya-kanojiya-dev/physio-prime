@@ -22,6 +22,7 @@ import {
 import { api, ApiError } from '../../lib/api'
 import { AdminApplication, AdminClient, AdminDoctor, ServiceArea } from '../../lib/types'
 import { AdminLayout } from '../../components/admin/AdminLayout'
+import { confirmDialog } from '../../components/admin/ConfirmDialog'
 import { ImageUpload } from '../../components/admin/ImageUpload'
 import { ChipMultiSelect } from '../../components/ChipMultiSelect'
 import { CITIES, DEPARTMENTS, DESIGNATIONS, EXPERIENCE_YEARS, HOME_RADIUS_KM, SPECIALTIES, STATES } from '../../lib/options'
@@ -439,8 +440,8 @@ export function DoctorsPage() {
                       <Users className="w-4 h-4" />
                     </button>
                     <button
-                      onClick={() => {
-                        if (window.confirm(`Delete ${d.name} permanently? This also removes their login.`)) {
+                      onClick={async () => {
+                        if (await confirmDialog({ title: 'Delete Doctor', message: `Delete ${d.name} permanently? This also removes their login.`, confirmLabel: 'Yes, Delete' })) {
                           deleteDoctor.mutate(d.id)
                         }
                       }}

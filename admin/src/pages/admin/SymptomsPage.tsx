@@ -4,6 +4,7 @@ import { AlertCircle, Edit3, FileText, Loader2, Plus, Trash2 } from 'lucide-reac
 import { api, ApiError } from '../../lib/api'
 import { AdminSymptom } from '../../lib/types'
 import { AdminLayout } from '../../components/admin/AdminLayout'
+import { confirmDialog } from '../../components/admin/ConfirmDialog'
 import { StatusPill } from './AppointmentsPage'
 import { Field, Modal, inputCls } from './CategoriesPage'
 import { ImageUpload } from '../../components/admin/ImageUpload'
@@ -149,8 +150,8 @@ export function SymptomsPage() {
                       <Edit3 className="w-4 h-4" />
                     </button>
                     <button
-                      onClick={() => {
-                        if (confirm('Delete this symptom?')) remove.mutate(s.id)
+                      onClick={async () => {
+                        if (await confirmDialog({ title: 'Delete Symptom', message: `Delete this symptom?` })) remove.mutate(s.id)
                       }}
                       className="p-2 rounded-xl bg-rose-100 hover:bg-rose-100 text-rose-700 border border-rose-200 transition-all"
                       title="Delete"

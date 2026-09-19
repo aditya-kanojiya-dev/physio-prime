@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { db } from '../db/pool';
 import {
   appointments,
+  caretakerInquiries,
   categories,
   contentSections,
   departments,
@@ -23,6 +24,7 @@ import {
 import { requireAuth, requireRole } from '../middleware/auth';
 import { getEarnedNet } from './payouts';
 import { notifyDoctor, sendNotification } from '../lib/notifications';
+import { jaasConfigured, signJaasJwt } from '../lib/jaas';
 import { getSupabaseAdmin } from '../lib/supabase';
 import { getConfig } from '../config';
 import { randomBytes } from 'node:crypto';
@@ -809,16 +811,21 @@ adminRouter.post('/doctor-applications/:id/decide', async (req, res, next) => {
     if (body.approve) {
       await notifyAcceptedDoctor(application);
     } else {
-      sendNotification({
-        channel: 'email',
-        to: application.candidateEmail,
-        subject: 'Your PhysioPrime application status',
-        body:
-          `Hi ${application.candidateName},<br/><br/>` +
-          `Thank you for applying to PhysioPrime for the <strong>${application.position ?? 'physiotherapist'}</strong> role. ` +
-          `After careful review, we have decided not to proceed with your application at this time.<br/>` +
-          `We encourage you to apply again in the future.<br/><br/>Best regards,<br/>PhysioPrime Team`,
-      }).catch(() => {});
+      // awaited so the serverless function doesn't freeze mid-dispatch
+      try {
+        await sendNotification({
+          channel: 'email',
+          to: application.candidateEmail,
+          subject: 'Your PhysioPrime application status',
+          body:
+            `Hi ${application.candidateName},<br/><br/>` +
+            `Thank you for applying to PhysioPrime for the <strong>${application.position ?? 'physiotherapist'}</strong> role. ` +
+            `After careful review, we have decided not to proceed with your application at this time.<br/>` +
+            `We encourage you to apply again in the future.<br/><br/>Best regards,<br/>PhysioPrime Team`,
+        });
+      } catch {
+        // ponytail: best-effort
+      }
     }
     res.json({ application: { id, status, reviewedAt: new Date(), notes: body.notes ?? null } });
   } catch (err) {
@@ -1201,6 +1208,37 @@ adminRouter.get('/appointments', async (req, res, next) => {
   }
 });
 
+adminRouter.get('/appointments/:id/video-token', async (req, res, next) => {
+  try {
+    if (!jaasConfigured()) {
+      res.status(503).json({ error: { message: 'Video consultations are not configured yet' } });
+      return;
+    }
+    const [row] = await db.select(appointmentColumns).from(appointments).where(eq(appointments.bookingId, req.params.id));
+    if (!row) {
+      res.status(404).json({ error: { message: 'Appointment not found' } });
+      return;
+    }
+    if (row.mode !== 'online') {
+      res.status(400).json({ error: { message: 'This appointment is not a video consultation' } });
+      return;
+    }
+    if (row.status !== 'upcoming') {
+      res.status(400).json({ error: { message: 'Only upcoming appointments can join a video call' } });
+      return;
+    }
+    const session = signJaasJwt({
+      bookingId: row.bookingId,
+      userId: row.patientId,
+      displayName: row.patientName,
+      moderator: true,
+    });
+    res.json({ session });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // --- users -------------------------------------------------------------
 
 const createUserSchema = z.object({
@@ -1537,6 +1575,67 @@ adminRouter.patch('/profile', async (req, res, next) => {
       .where(eq(users.id, req.user!.id))
       .returning({ id: users.id, email: users.email, name: users.name, phone: users.phone, role: users.role });
     res.json({ user: updated });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// --- caretaker inquiries -------------------------------------------------
+
+adminRouter.get('/caretaker-inquiries', async (req, res, next) => {
+  try {
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const pageSize = Math.min(100, Math.max(1, Number(req.query.pageSize) || 20));
+    const statusFilter = typeof req.query.status === 'string' ? req.query.status : undefined;
+
+    const filters: SQL[] = [];
+    if (statusFilter) filters.push(eq(caretakerInquiries.status, statusFilter));
+
+    const [{ total }] = await db
+      .select({ total: count(caretakerInquiries.id) })
+      .from(caretakerInquiries)
+      .where(filters.length ? and(...filters) : undefined);
+
+    const rows = await db
+      .select()
+      .from(caretakerInquiries)
+      .where(filters.length ? and(...filters) : undefined)
+      .orderBy(desc(caretakerInquiries.createdAt))
+      .limit(pageSize)
+      .offset((page - 1) * pageSize);
+
+    res.json({ inquiries: rows, pagination: { page, pageSize, total, pages: Math.ceil(total / pageSize) } });
+  } catch (err) {
+    next(err);
+  }
+});
+
+adminRouter.patch('/caretaker-inquiries/:id', async (req, res, next) => {
+  try {
+    const id = parseId(req.params.id);
+    if (id === null) return res.status(400).json({ error: { message: 'id must be an integer' } });
+    const body = z.object({ status: z.enum(['new', 'contacted', 'closed']) }).parse(req.body);
+    const [updated] = await db.update(caretakerInquiries).set(body).where(eq(caretakerInquiries.id, id)).returning();
+    if (!updated) {
+      res.status(404).json({ error: { message: 'Inquiry not found' } });
+      return;
+    }
+    res.json({ inquiry: updated });
+  } catch (err) {
+    next(err);
+  }
+});
+
+adminRouter.delete('/caretaker-inquiries/:id', async (req, res, next) => {
+  try {
+    const id = parseId(req.params.id);
+    if (id === null) return res.status(400).json({ error: { message: 'id must be an integer' } });
+    const deleted = await db.delete(caretakerInquiries).where(eq(caretakerInquiries.id, id)).returning({ id: caretakerInquiries.id });
+    if (deleted.length === 0) {
+      res.status(404).json({ error: { message: 'Inquiry not found' } });
+      return;
+    }
+    res.status(204).end();
   } catch (err) {
     next(err);
   }

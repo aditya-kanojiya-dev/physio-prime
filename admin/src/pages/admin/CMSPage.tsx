@@ -4,6 +4,7 @@ import { AlertCircle, Edit3, FileJson, LayoutDashboard, Loader2, Trash2 } from '
 import { api, ApiError } from '../../lib/api'
 import { AdminSection } from '../../lib/types'
 import { AdminLayout } from '../../components/admin/AdminLayout'
+import { confirmDialog } from '../../components/admin/ConfirmDialog'
 import { Field, inputCls, Modal } from './CategoriesPage'
 import { StatusPill } from './AppointmentsPage'
 
@@ -100,8 +101,8 @@ export function CMSPage() {
                               <Edit3 className="w-4 h-4" />
                             </button>
                             <button
-                              onClick={() => {
-                                if (confirm(`Delete section "${s.key}" on ${s.page}?`)) remove.mutate(s)
+                              onClick={async () => {
+                                if (await confirmDialog({ title: 'Delete Section', message: `Delete section "${s.key}" on ${s.page}?` })) remove.mutate(s)
                               }}
                               className="p-2 rounded-xl bg-rose-100 text-rose-700 border border-rose-200 transition-all"
                               title="Delete"

@@ -517,6 +517,15 @@ export interface AdminReview {
   patientEmail: string | null;
 }
 
+export interface CaretakerInquiry {
+  id: number;
+  name: string;
+  phone: string;
+  message: string | null;
+  status: 'new' | 'contacted' | 'closed';
+  createdAt: string;
+}
+
 // --- Admin Profile ---
 export interface AdminProfile {
   id: number;

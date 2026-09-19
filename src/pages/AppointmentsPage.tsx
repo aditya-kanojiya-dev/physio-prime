@@ -9,6 +9,7 @@ import { Appointment } from '../types';
 import { Calendar, Video, Home, MapPin, RotateCcw, XCircle, Sparkles, Loader2, User, Mail, Phone, Ruler, Weight, Users, CreditCard, Timer } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { DoctorTrackingModal } from '../components/tracking/DoctorTrackingModal';
+import { VideoConsultModal } from '../components/video/VideoConsultModal';
 
 // Mirrors server PAYMENT_GRACE_MS: unpaid online bookings auto-cancel after this.
 const PAYMENT_HOLD_MS = 15 * 60 * 1000;
@@ -49,6 +50,7 @@ export const AppointmentsPage: React.FC = () => {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<'upcoming' | 'pending' | 'completed' | 'cancelled'>('upcoming');
   const [trackingApt, setTrackingApt] = useState<Appointment | null>(null);
+  const [videoApt, setVideoApt] = useState<Appointment | null>(null);
   const [payingId, setPayingId] = useState<string | null>(null);
 
   // Reschedule state
@@ -377,15 +379,13 @@ export const AppointmentsPage: React.FC = () => {
                     </button>
 
                     {apt.consultationMode === 'online' && (
-                      <a
-                        href={apt.videoCallLink || '#'}
-                        target="_blank"
-                        rel="noreferrer"
+                      <button
+                        onClick={() => setVideoApt(apt)}
                         className="btn-gradient text-white px-5 py-2.5 rounded-xl font-bold text-xs shadow-md flex items-center gap-2"
                       >
                         <Video className="w-4 h-4 text-cyan-300" />
                         <span>Join HD Consultation</span>
-                      </a>
+                      </button>
                     )}
                     {apt.consultationMode === 'home' && (
                       <button
@@ -672,6 +672,16 @@ export const AppointmentsPage: React.FC = () => {
       {/* Tracking Modal */}
       {trackingApt && (
         <DoctorTrackingModal appointment={trackingApt} onClose={() => setTrackingApt(null)} />
+      )}
+
+      {/* Video Consultation Modal */}
+      {videoApt && (
+        <VideoConsultModal
+          bookingId={videoApt.id}
+          title={`Consultation with Dr. ${videoApt.doctorName}`}
+          doctorName={`Dr. ${videoApt.doctorName}`}
+          onClose={() => { setVideoApt(null); refetchAppointments(); }}
+        />
       )}
 
     </div>

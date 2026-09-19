@@ -4,12 +4,14 @@ import { and, asc, count, desc, eq, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '../db/pool';
 import { appointments, departments, doctors, doctorSchedules, patientProfiles, prescriptions, sessionOtps, users } from '../db/schema';
+import { randomBookingId } from './appointments';
 import { requireAuth, requireRole } from '../middleware/auth';
 import { isValidDate, isPast, getNextFreeSlot, getAvailableWindows } from '../lib/slots';
 import { requireDoctor, noProfile } from '../lib/doctor';
 import { computeCommission, resolvePlatformFeePercent } from '../lib/commission';
 import { recordCashEntry, recordPaymentTransaction } from '../lib/payments';
 import { createUpiQrCode } from '../lib/razorpay';
+import { jaasConfigured, signJaasJwt } from '../lib/jaas';
 import { sendNotification, sendSmartpingSms, templates } from '../lib/notifications';
 
 export const doctorRouter = Router();
@@ -836,6 +838,49 @@ doctorRouter.get('/appointments/:id', async (req, res, next) => {
   }
 });
 
+doctorRouter.get('/appointments/:id/video-token', async (req, res, next) => {
+  try {
+    if (!jaasConfigured()) {
+      res.status(503).json({ error: { message: 'Video consultations are not configured yet' } });
+      return;
+    }
+    const doctor = await requireDoctor(req.user!.id);
+    if (!doctor) {
+      res.status(noProfile.status).json({ error: { message: noProfile.message } });
+      return;
+    }
+    const [row] = await db
+      .select({ ...appointmentColumns, doctorId: appointments.doctorId })
+      .from(appointments)
+      .where(eq(appointments.bookingId, req.params.id));
+    if (!row) {
+      res.status(404).json({ error: { message: 'Appointment not found' } });
+      return;
+    }
+    if (row.doctorId !== doctor.id) {
+      res.status(403).json({ error: { message: 'Forbidden' } });
+      return;
+    }
+    if (row.mode !== 'online') {
+      res.status(400).json({ error: { message: 'This appointment is not a video consultation' } });
+      return;
+    }
+    if (row.status !== 'upcoming') {
+      res.status(400).json({ error: { message: 'Only upcoming appointments can join a video call' } });
+      return;
+    }
+    const session = signJaasJwt({
+      bookingId: row.bookingId,
+      userId: doctor.userId,
+      displayName: doctor.name,
+      moderator: true,
+    });
+    res.json({ session });
+  } catch (err) {
+    next(err);
+  }
+});
+
 doctorRouter.get('/schedules', async (req, res, next) => {
   try {
     const doctor = await requireDoctor(req.user!.id);
@@ -978,3 +1023,149 @@ doctorRouter.patch('/appointments/:id/reschedule', async (req, res, next) => {
     next(err);
   }
 });
+
+// --- end-of-call flow ---------------------------------------------------
+
+// Idempotent "Session Done": finalizes the appointment even if the patient
+// already finalized it (their call-end handler may have fired first).
+doctorRouter.post('/appointments/:id/finalize', async (req, res, next) => {
+  try {
+    const doctor = await requireDoctor(req.user!.id);
+    if (!doctor) {
+      res.status(noProfile.status).json({ error: { message: noProfile.message } });
+      return;
+    }
+    const [row] = await db
+      .select({ id: appointments.id, doctorId: appointments.doctorId, status: appointments.status })
+      .from(appointments)
+      .where(eq(appointments.bookingId, req.params.id));
+    if (!row) {
+      res.status(404).json({ error: { message: 'Appointment not found' } });
+      return;
+    }
+    if (row.doctorId !== doctor.id) {
+      res.status(403).json({ error: { message: 'Forbidden' } });
+      return;
+    }
+    let status = row.status;
+    if (row.status !== 'completed') {
+      const [updated] = await db
+        .update(appointments)
+        .set({ status: 'completed', sessionCompletedAt: new Date() })
+        .where(and(eq(appointments.id, row.id), eq(appointments.status, 'upcoming')))
+        .returning({ status: appointments.status });
+      status = updated?.status ?? row.status;
+    }
+    res.json({ ok: true, status });
+  } catch (err) {
+    next(err);
+  }
+});
+
+const followUpSchema = z.object({
+  date: z.string().refine(isValidDate, 'date must be YYYY-MM-DD'),
+  windowStart: slotTimeField,
+  windowEnd: slotTimeField,
+  sessions: z.number().int().min(1).max(4).default(1),
+});
+
+async function uniqueBookingId(): Promise<string> {
+  for (let i = 0; i < 5; i++) {
+    const id = randomBookingId();
+    const [exists] = await db
+      .select({ bookingId: appointments.bookingId })
+      .from(appointments)
+      .where(eq(appointments.bookingId, id))
+      .limit(1);
+    if (!exists) return id;
+  }
+  throw Object.assign(new Error('Could not generate a unique booking id'), { status: 500 });
+}
+
+// Schedules N follow-up appointments for a completed consultation: same slot,
+// weekly spacing from the chosen date. Existing slot logic guarantees no
+// double-booking with real (paid) appointments. Follow-ups are marked free.
+doctorRouter.post('/appointments/:id/follow-ups', async (req, res, next) => {
+  try {
+    const body = followUpSchema.parse(req.body);
+    const doctor = await requireDoctor(req.user!.id);
+    if (!doctor) {
+      res.status(noProfile.status).json({ error: { message: noProfile.message } });
+      return;
+    }
+    if (isPast(body.date)) {
+      res.status(400).json({ error: { message: 'Follow-up date must be in the future' } });
+      return;
+    }
+    const created = await db.transaction(async (tx) => {
+      const [row] = await tx
+        .select({
+          id: appointments.id,
+          doctorId: appointments.doctorId,
+          status: appointments.status,
+          patientId: appointments.patientId,
+          mode: appointments.mode,
+          patientName: appointments.patientName,
+          patientPhone: appointments.patientPhone,
+          patientEmail: appointments.patientEmail,
+          patientGender: appointments.patientGender,
+          patientAge: appointments.patientAge,
+          patientWeight: appointments.patientWeight,
+          patientHeight: appointments.patientHeight,
+          patientRelation: appointments.patientRelation,
+        })
+        .from(appointments)
+        .where(eq(appointments.bookingId, req.params.id))
+        .for('update');
+      if (!row || row.doctorId !== doctor.id) throw Object.assign(new Error('Appointment not found'), { status: 404 });
+      if (row.status !== 'completed') throw Object.assign(new Error('Follow-ups can only be scheduled for completed appointments'), { status: 400 });
+      // serialize concurrent bookings/reschedules/follow-ups for the same doctor
+      await tx.select().from(doctors).where(eq(doctors.id, doctor.id)).for('update');
+
+      const bookingIds: string[] = [];
+      for (let i = 0; i < body.sessions; i++) {
+        const dateI = addDays(body.date, i * 7);
+        const slot = await getNextFreeSlot(doctor.id, dateI, body.windowStart, body.windowEnd, tx);
+        if (!slot) throw Object.assign(new Error(`No availability for follow-up ${i + 1} on ${dateI}`), { status: 400 });
+        const [apt] = await tx
+          .insert(appointments)
+          .values({
+            bookingId: await uniqueBookingId(),
+            patientId: row.patientId,
+            doctorId: doctor.id,
+            mode: row.mode,
+            date: dateI,
+            timeSlot: slot,
+            status: 'upcoming',
+            feePaise: 0,
+            paymentMode: 'prepay',
+            paymentStatus: 'paid',
+            patientName: row.patientName,
+            patientPhone: row.patientPhone,
+            patientEmail: row.patientEmail,
+            patientGender: row.patientGender,
+            patientAge: row.patientAge,
+            patientWeight: row.patientWeight,
+            patientHeight: row.patientHeight,
+            patientRelation: row.patientRelation,
+          })
+          .returning({ bookingId: appointments.bookingId });
+        bookingIds.push(apt!.bookingId);
+      }
+      return bookingIds;
+    });
+    res.status(201).json({ ok: true, bookingIds: created });
+  } catch (err) {
+    if (err instanceof Error && 'status' in err) {
+      res.status((err as { status: number }).status).json({ error: { message: err.message } });
+      return;
+    }
+    next(err);
+  }
+});
+
+function addDays(dateStr: string, days: number): string {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const dt = new Date(y, m - 1, d + days);
+  return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+}

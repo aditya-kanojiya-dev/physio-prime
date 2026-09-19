@@ -1,10 +1,11 @@
 import React, { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Calendar, Loader2, Phone, Search, X } from 'lucide-react'
+import { Calendar, Loader2, Phone, Search, X, Video } from 'lucide-react'
 import { api } from '../../lib/api'
 import { AdminAppointment } from '../../lib/types'
 import { AdminLayout } from '../../components/admin/AdminLayout'
 import { formatDate, formatFee } from '../../lib/types'
+import { VideoConsultModal } from '../../components/video/VideoConsultModal'
 
 const FILTERS = ['all', 'upcoming', 'completed', 'cancelled', 'no_show'] as const
 
@@ -202,6 +203,7 @@ export function AppointmentsPage() {
 }
 
 function AppointmentDetailModal({ appointment: a, onClose }: { appointment: AdminAppointment; onClose: () => void }) {
+  const [videoOpen, setVideoOpen] = useState(false)
   const payTone =
     a.paymentStatus === 'paid'
       ? 'emerald'
@@ -276,16 +278,14 @@ function AppointmentDetailModal({ appointment: a, onClose }: { appointment: Admi
             </div>
           )}
 
-          {a.videoCallLink && (
+          {a.mode === 'online' && (
             <div className="mt-4">
-              <a
-                href={a.videoCallLink}
-                target="_blank"
-                rel="noreferrer"
-                className="text-xs font-bold text-teal-600 hover:underline"
+              <button
+                onClick={() => setVideoOpen(true)}
+                className="w-full py-2.5 bg-gradient-to-r from-violet-600 to-blue-600 text-white font-extrabold text-sm rounded-2xl transition-all hover:opacity-90 flex items-center justify-center gap-2"
               >
-                Join video call →
-              </a>
+                <Video className="w-4 h-4" /> Join Video Call
+              </button>
             </div>
           )}
 
@@ -301,6 +301,15 @@ function AppointmentDetailModal({ appointment: a, onClose }: { appointment: Admi
           )}
         </div>
       </div>
+
+      {videoOpen && (
+        <VideoConsultModal
+          bookingId={a.bookingId}
+          title={`Consultation — ${a.patientName}`}
+          endpoint="/admin/appointments"
+          onClose={() => setVideoOpen(false)}
+        />
+      )}
     </div>
   )
 }

@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Image, RefreshCw, Trash2, Copy, Check, Folder } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { AdminLayout } from '../../components/admin/AdminLayout'
+import { confirmDialog } from '../../components/admin/ConfirmDialog'
 
 interface StorageFile {
   name: string
@@ -40,7 +41,7 @@ export function MediaLibraryPage() {
   }
 
   const deleteFile = async (name: string) => {
-    if (!confirm(`Delete ${name}?`)) return
+    if (!(await confirmDialog({ title: 'Delete File', message: `Delete ${name}?` }))) return
     await supabase.storage.from(BUCKET).remove([`posts/${name}`])
     refetch()
   }

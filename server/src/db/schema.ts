@@ -381,6 +381,16 @@ export const doctorNotifications = pgTable('doctor_notifications', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
+// Caretaker availability inquiries submitted via the home-page contact form.
+export const caretakerInquiries = pgTable('caretaker_inquiries', {
+  id: serial('id').primaryKey(),
+  name: text('name').notNull(),
+  phone: text('phone').notNull(),
+  message: text('message'),
+  status: text('status').notNull().default('new'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const adminNotifications = pgTable('admin_notifications', {
   id: serial('id').primaryKey(),
   type: text('type').notNull(),

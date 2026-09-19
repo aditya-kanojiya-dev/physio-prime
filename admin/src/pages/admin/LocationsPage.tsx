@@ -4,6 +4,7 @@ import { AlertCircle, Edit3, Loader2, MapPin, Plus, Trash2 } from 'lucide-react'
 import { api, ApiError } from '../../lib/api'
 import { AdminDoctor, LocationRow, ServiceArea } from '../../lib/types'
 import { AdminLayout } from '../../components/admin/AdminLayout'
+import { confirmDialog } from '../../components/admin/ConfirmDialog'
 import { StatusPill } from './AppointmentsPage'
 import { Field, Modal, inputCls } from './CategoriesPage'
 import { CITIES } from '../../lib/options'
@@ -151,7 +152,7 @@ export function LocationsPage() {
                         <Edit3 className="w-4 h-4" />
                       </button>
                       <button
-                        onClick={() => { if (confirm(`Delete area "${a.name}"?`)) removeArea.mutate(a.id) }}
+                        onClick={async () => { if (await confirmDialog({ title: 'Delete Service Area', message: `Delete area "${a.name}"?` })) removeArea.mutate(a.id) }}
                         className="p-2 rounded-xl bg-rose-100 hover:bg-rose-100 text-rose-700 border border-rose-200 transition-all"
                         title="Delete"
                       >
@@ -299,7 +300,7 @@ function LocationDetailModal({
               <p className="text-[11px] text-slate-400">{row.specialty || 'No specialty'}</p>
             </div>
             <button
-              onClick={() => { if (confirm(`Remove ${row.doctorName} from ${area.name}?`)) removeLocation.mutate(row.id) }}
+              onClick={async () => { if (await confirmDialog({ title: 'Remove Doctor', message: `Remove ${row.doctorName} from ${area.name}?` })) removeLocation.mutate(row.id) }}
               disabled={removeLocation.isPending}
               className="p-2 rounded-xl bg-rose-100 hover:bg-rose-100 text-rose-700 border border-rose-200 transition-all shrink-0"
               title="Remove"

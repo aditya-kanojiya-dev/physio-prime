@@ -4,6 +4,7 @@ import { AlertCircle, Check, CheckCircle, Loader2, Percent, Plus, Trash2 } from 
 import { api, ApiError } from '../../lib/api'
 import { AdminDoctor, DoctorCategoryCommission } from '../../lib/types'
 import { AdminLayout } from '../../components/admin/AdminLayout'
+import { confirmDialog } from '../../components/admin/ConfirmDialog'
 import { Modal, Field, inputCls } from './CategoriesPage'
 
 const FALLBACK = 30
@@ -262,7 +263,7 @@ function CommissionRow({
           {save.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
         </button>
         <button
-          onClick={() => { if (confirm('Remove this category commission?')) remove.mutate({ doctorId, categoryId: commission.categoryId }) }}
+          onClick={async () => { if (await confirmDialog({ title: 'Remove Commission', message: `Remove this category commission?` })) remove.mutate({ doctorId, categoryId: commission.categoryId }) }}
           disabled={remove.isPending}
           className="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 transition-all"
           title="Remove"

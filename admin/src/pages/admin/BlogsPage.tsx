@@ -17,6 +17,7 @@ import {
 import { api } from '../../lib/api'
 import { BlogPost, BlogPostsResponse } from '../../lib/types'
 import { AdminLayout } from '../../components/admin/AdminLayout'
+import { confirmDialog } from '../../components/admin/ConfirmDialog'
 
 export function BlogsPage() {
   const queryClient = useQueryClient()
@@ -95,8 +96,8 @@ export function BlogsPage() {
                 <PostCard
                   key={post.id}
                   post={post}
-                  onDelete={() => {
-                    if (confirm('Delete this post?')) deleteMutation.mutate(post.id)
+                  onDelete={async () => {
+                    if (await confirmDialog({ title: 'Delete Post', message: `Delete this post?` })) deleteMutation.mutate(post.id)
                   }}
                 />
               ))}

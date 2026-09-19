@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { CheckCircle, Loader2, XCircle, CalendarDays, X, Clock, FileText, AlertCircle } from 'lucide-react'
+import { CheckCircle, Loader2, XCircle, CalendarDays, X, Clock, FileText, AlertCircle, Video } from 'lucide-react'
 import { api, ApiError } from '../lib/api'
 import { Appointment, AppointmentStatus, formatFee, DoctorAppointmentDetail } from '../lib/types'
 import { AdminLayout } from '../components/admin/AdminLayout'
+import { VideoConsultModal } from '../components/video/VideoConsultModal'
+import { SessionEndModal } from '../components/video/SessionEndModal'
 
 const FILTERS: { label: string; value: '' | AppointmentStatus }[] = [
   { label: 'All', value: '' },
@@ -49,6 +51,8 @@ export function AppointmentsPage() {
   const [otpModal, setOtpModal] = useState<{ open: boolean; appointmentId: string; kind: 'start' | 'complete'; phase: 'sending' | 'waiting'; otp: string }>({
     open: false, appointmentId: '', kind: 'start', phase: 'waiting', otp: '',
   })
+  const [videoApt, setVideoApt] = useState<Appointment | null>(null)
+  const [endFlowApt, setEndFlowApt] = useState<Appointment | null>(null)
 
   const { data, isLoading } = useQuery({
     queryKey: ['doctor/appointments', date, filter],
@@ -259,6 +263,14 @@ export function AppointmentsPage() {
                   <div className="flex gap-2 sm:flex-col sm:items-end">
                     {a.status === 'upcoming' && (
                       <>
+                        {a.mode === 'online' && (
+                          <button
+                            onClick={() => setVideoApt(a)}
+                            className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-violet-600 to-blue-600 text-white font-bold text-[10px] transition-all hover:opacity-90 flex items-center gap-1"
+                          >
+                            <Video className="w-3 h-3" /> Join Video
+                          </button>
+                        )}
                         <button
                           onClick={() => {
                             setNoShowModal({ open: true, appointmentId: a.id, reason: '', note: '' })
@@ -423,6 +435,28 @@ export function AppointmentsPage() {
               ? startSession.mutate({ id: otpModal.appointmentId, otp: otpModal.otp })
               : completeSession.mutate({ id: otpModal.appointmentId, otp: otpModal.otp })
           }
+        />
+      )}
+
+      {videoApt && (
+        <VideoConsultModal
+          bookingId={videoApt.id}
+          title={`Consultation with ${videoApt.patientName}`}
+          endpoint="/doctor/appointments"
+          onClose={() => {
+            setEndFlowApt(videoApt)
+            setVideoApt(null)
+          }}
+        />
+      )}
+
+      {endFlowApt && (
+        <SessionEndModal
+          appointment={endFlowApt}
+          onClose={() => {
+            setEndFlowApt(null)
+            qc.invalidateQueries({ queryKey: ['doctor/appointments'] })
+          }}
         />
       )}
     </AdminLayout>

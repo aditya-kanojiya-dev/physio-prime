@@ -34,6 +34,7 @@ const TestimonialsPage = lazy(() => import('./pages/admin/TestimonialsPage').the
 const MediaLibraryPage = lazy(() => import('./pages/admin/MediaLibraryPage').then(m => ({ default: m.MediaLibraryPage })))
 const SettingsPage = lazy(() => import('./pages/admin/SettingsPage').then(m => ({ default: m.SettingsPage })))
 const AdminProfilePage = lazy(() => import('./pages/admin/AdminProfilePage').then(m => ({ default: m.AdminProfilePage })))
+const CaretakerInquiriesPage = lazy(() => import('./pages/admin/CaretakerInquiriesPage').then(m => ({ default: m.CaretakerInquiriesPage })))
 const PaymentsPage = lazy(() => import('./pages/admin/PaymentsPage').then(m => ({ default: m.PaymentsPage })))
 const DoctorPayoutsPage = lazy(() => import('./pages/admin/DoctorPayoutsPage').then(m => ({ default: m.DoctorPayoutsPage })))
 
@@ -104,6 +105,7 @@ const router = createBrowserRouter([
       { path: 'blogs', element: <BlogsPage /> },
       { path: 'blogs/:id', element: <BlogFormPage /> },
       { path: 'testimonials', element: <TestimonialsPage /> },
+      { path: 'caretaker-inquiries', element: <CaretakerInquiriesPage /> },
       { path: 'payments', element: <PaymentsPage /> },
       { path: 'payouts', element: <DoctorPayoutsPage /> },
       { path: 'media', element: <MediaLibraryPage /> },

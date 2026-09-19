@@ -6,6 +6,7 @@ import { appointments, doctors, doctorSchedules, users } from '../db/schema';
 import { requireAuth, requireRole } from '../middleware/auth';
 import { availableFromSchedules, dayOfWeek, EXPIRED_REASON, isPast, isStaleUnpaid, isValidDate, PAYMENT_GRACE_MS } from '../lib/slots';
 import { createOrder, verifySignature } from '../lib/razorpay';
+import { jaasConfigured, signJaasJwt, jaasMeetingUrl } from '../lib/jaas';
 import { sendNotification, notifyDoctor, templates, type NotificationCtx } from '../lib/notifications';
 
 export const appointmentsRouter = Router();
@@ -63,7 +64,7 @@ function isUniqueViolation(err: unknown): boolean {
   return e.code === '23505' || e.cause?.code === '23505';
 }
 
-function randomBookingId(): string {
+export function randomBookingId(): string {
   return `APT-${String(Math.floor(100000 + Math.random() * 900000))}`;
 }
 
@@ -301,6 +302,9 @@ async function bookTransaction(
 ): Promise<{ row: AppointmentView; order: { id: string; amountPaise: number } | null }> {
   for (let attempt = 0; attempt < 2; attempt++) {
     const bookingId = randomBookingId();
+    // ponytail: online consultations free during testing — mark paid immediately,
+    // no Razorpay order. Remove `freeMode` to restore the prepay flow.
+    const freeMode = body.mode === 'online';
     try {
       // ponytail: transaction only holds the lock for DB work; the external
       // Razorpay HTTP call happens after commit to avoid long lock durations.
@@ -325,7 +329,7 @@ async function bookTransaction(
             feePaise,
             address: body.address ?? {},
             paymentMode: body.paymentMode ?? 'prepay',
-            paymentStatus: 'pending',
+            paymentStatus: freeMode ? 'paid' : 'pending',
             patientName: body.patientName,
             patientPhone: body.patientPhone,
             patientEmail: body.patientEmail ?? patientEmail,
@@ -334,7 +338,7 @@ async function bookTransaction(
             patientWeight: body.patientWeight != null ? String(body.patientWeight) : null,
             patientHeight: body.patientHeight != null ? String(body.patientHeight) : null,
             patientRelation: body.patientRelation ?? null,
-            videoCallLink: body.mode === 'online' ? `https://meet.physioprime.in/${bookingId}` : null,
+            videoCallLink: body.mode === 'online' ? jaasMeetingUrl(bookingId) : null,
           })
           .returning();
         return inserted!;
@@ -342,7 +346,7 @@ async function bookTransaction(
 
       // Razorpay order creation — outside the transaction so the DB lock is released.
       let order: { id: string; amountPaise: number } | null = null;
-      if ((body.paymentMode ?? 'prepay') === 'prepay') {
+      if (!freeMode && (body.paymentMode ?? 'prepay') === 'prepay') {
         try {
           order = await createOrder({ amountPaise: feePaise, receipt: bookingId });
         } catch (err) {
@@ -352,7 +356,7 @@ async function bookTransaction(
       }
       if (order) {
         await db.update(appointments).set({ razorpayOrderId: order.id }).where(eq(appointments.id, row.id));
-      } else if ((body.paymentMode ?? 'prepay') === 'prepay' && !order) {
+      } else if (!freeMode && (body.paymentMode ?? 'prepay') === 'prepay' && !order) {
         // Order creation failed or unavailable — clean up the orphaned row
         await db.delete(appointments).where(eq(appointments.id, row.id));
         throw new BookingError(502, 'Payment gateway unavailable. Please try again.');
@@ -408,6 +412,10 @@ appointmentsRouter.get('/', async (req, res, next) => {
 appointmentsRouter.post('/', async (req, res, next) => {
   try {
     const body = bookSchema.parse(req.body);
+    if (body.mode === 'online' && (body.paymentMode ?? 'prepay') !== 'prepay') {
+      res.status(400).json({ error: { message: 'Online consultations must be prepaid' } });
+      return;
+    }
     if (isPast(body.date)) {
       res.status(400).json({ error: { message: 'Date is in the past' } });
       return;
@@ -473,6 +481,77 @@ appointmentsRouter.get('/:id', async (req, res, next) => {
       row.status = 'cancelled';
     }
     res.json({ appointment: serializeAppointment(row) });
+  } catch (err) {
+    next(err);
+  }
+});
+
+appointmentsRouter.get('/:id/video-token', async (req, res, next) => {
+  try {
+    if (!jaasConfigured()) {
+      res.status(503).json({ error: { message: 'Video consultations are not configured yet' } });
+      return;
+    }
+    const [row] = await db.select(appointmentColumns).from(appointments).where(eq(appointments.bookingId, req.params.id));
+    if (!row) {
+      res.status(404).json({ error: { message: 'Appointment not found' } });
+      return;
+    }
+    if (row.patientId !== req.user!.id) {
+      res.status(403).json({ error: { message: 'Forbidden' } });
+      return;
+    }
+    if (row.mode !== 'online') {
+      res.status(400).json({ error: { message: 'This appointment is not a video consultation' } });
+      return;
+    }
+    if (row.status !== 'upcoming') {
+      res.status(400).json({ error: { message: 'Only upcoming appointments can join a video call' } });
+      return;
+    }
+    if (row.paymentStatus !== 'paid') {
+      res.status(400).json({ error: { message: 'Payment is required to join the video call' } });
+      return;
+    }
+    const session = signJaasJwt({
+      bookingId: row.bookingId,
+      userId: row.patientId,
+      displayName: row.patientName,
+      // ponytail: patient joins as moderator so no lobby approval is needed during testing; set false for the moderator-gated flow
+      moderator: true,
+    });
+    res.json({ session });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// End-of-call default flow: the patient leaving the video consultation finalizes
+// the appointment. Idempotent — already-finalized bookings return ok.
+appointmentsRouter.post('/:id/finalize', async (req, res, next) => {
+  try {
+    const [row] = await db
+      .select({ id: appointments.id, patientId: appointments.patientId, mode: appointments.mode, status: appointments.status })
+      .from(appointments)
+      .where(eq(appointments.bookingId, req.params.id));
+    if (!row) {
+      res.status(404).json({ error: { message: 'Appointment not found' } });
+      return;
+    }
+    if (row.patientId !== req.user!.id) {
+      res.status(403).json({ error: { message: 'Forbidden' } });
+      return;
+    }
+    if (row.mode !== 'online') {
+      res.status(400).json({ error: { message: 'Only video consultations can be finalized this way' } });
+      return;
+    }
+    const [updated] = await db
+      .update(appointments)
+      .set({ status: 'completed', sessionCompletedAt: new Date() })
+      .where(and(eq(appointments.id, row.id), eq(appointments.status, 'upcoming')))
+      .returning({ status: appointments.status });
+    res.json({ ok: true, status: updated?.status ?? row.status });
   } catch (err) {
     next(err);
   }

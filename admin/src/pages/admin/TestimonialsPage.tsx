@@ -4,6 +4,7 @@ import { RefreshCw, Star, Trash2, CheckCircle, XCircle, Eye, ChevronLeft, Chevro
 import { api } from '../../lib/api'
 import { AdminReview } from '../../lib/types'
 import { AdminLayout } from '../../components/admin/AdminLayout'
+import { confirmDialog } from '../../components/admin/ConfirmDialog'
 
 export function TestimonialsPage() {
   const queryClient = useQueryClient()
@@ -71,7 +72,7 @@ export function TestimonialsPage() {
                   onApprove={() => updateMutation.mutate({ id: review.id, status: 'approved' })}
                   onReject={() => updateMutation.mutate({ id: review.id, status: 'rejected' })}
                   onToggleFeatured={() => updateMutation.mutate({ id: review.id, featured: !review.featured })}
-                  onDelete={() => { if (confirm('Delete this review?')) deleteMutation.mutate(review.id) }}
+                  onDelete={async () => { if (await confirmDialog({ title: 'Delete Review', message: `Delete this review?` })) deleteMutation.mutate(review.id) }}
                 />
               ))}
               {!data?.reviews.length && (

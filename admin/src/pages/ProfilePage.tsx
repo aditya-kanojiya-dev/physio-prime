@@ -4,6 +4,7 @@ import { Loader2, MessageCircle, User, Briefcase, Lock, Save, Eye, EyeOff } from
 import { api, ApiError, MeUser } from '../lib/api'
 import { DoctorProfile } from '../lib/types'
 import { AdminLayout } from '../components/admin/AdminLayout'
+import { confirmDialog } from '../components/admin/ConfirmDialog'
 import { ChangePasswordModal } from '../components/admin/ChangePasswordModal'
 import { ImageUpload } from '../components/admin/ImageUpload'
 import { DEPARTMENTS, DESIGNATIONS, EXPERIENCE_YEARS } from '../lib/options'
@@ -294,8 +295,8 @@ export function ProfilePage() {
                   </p>
                 </div>
                 <button
-                  onClick={() => {
-                    if (window.confirm('Request permanent deletion of your profile? An admin must approve this.')) {
+                  onClick={async () => {
+                    if (await confirmDialog({ title: 'Delete Profile', message: 'Request permanent deletion of your profile? An admin must approve this.', confirmLabel: 'Request Deletion' })) {
                       requestDeletion.mutate()
                     }
                   }}
