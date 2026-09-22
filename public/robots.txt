@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://physio-prime.in/sitemap.xml
+Sitemap: https://www.physio-prime.in/sitemap.xml

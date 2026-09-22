@@ -63,7 +63,7 @@ function CanonicalLink() {
       link.rel = 'canonical';
       document.head.appendChild(link);
     }
-    const base = 'https://physio-prime.in';
+    const base = 'https://www.physio-prime.in';
     link.href = pathname === '/home' ? `${base}/` : `${base}${pathname.replace(/\/$/, '') || '/'}`;
   }, [pathname]);
   return null;
