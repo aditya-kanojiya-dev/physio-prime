@@ -97,7 +97,7 @@ export const PrivacyPolicyPage: React.FC = () => {
             <p>For questions about this Privacy Policy or to exercise your data rights:</p>
             <div className="mt-2 p-4 rounded-xl bg-slate-50 border border-slate-200">
               <p className="font-semibold text-slate-900">PhysioPrime Data Protection Officer</p>
-              <p>Email: <a href="mailto:privacy@physioprime.health" className="text-teal-600 hover:underline">privacy@physioprime.health</a></p>
+              <p>Email: <a href="mailto:care@physio-prime.in" className="text-teal-600 hover:underline">care@physio-prime.in</a></p>
               <p>Address: IT Park, South Ambazari Road, Nagpur, MH 440022</p>
             </div>
           </section>

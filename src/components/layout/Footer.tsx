@@ -182,9 +182,9 @@ export const Footer: React.FC = () => {
                 <Phone className="w-3.5 h-3.5 text-blue-500" />
                 +91 80555 41478
               </a>
-              <a href="mailto:care@physioprime.health" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-50 border border-slate-200 text-sm text-slate-600 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-600 transition-all duration-200">
+              <a href="mailto:care@physio-prime.in" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-50 border border-slate-200 text-sm text-slate-600 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-600 transition-all duration-200">
                 <Mail className="w-3.5 h-3.5 text-blue-500" />
-                care@physioprime.health
+                care@physio-prime.in
               </a>
               <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-50 border border-slate-200 text-sm text-slate-600">
                 <MapPin className="w-3.5 h-3.5 text-blue-500" />
