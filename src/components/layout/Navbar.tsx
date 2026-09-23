@@ -439,7 +439,7 @@ export const Navbar: React.FC = () => {
                   </button>
 
                   <div className="mt-3 flex items-center justify-center gap-4 text-xs text-slate-500">
-                    <a href="tel:+918055541478" className="flex items-center gap-1 hover:text-teal-600 transition-colors">
+                    <a href="tel:+919623204165" className="flex items-center gap-1 hover:text-teal-600 transition-colors">
                       <Phone className="w-3 h-3" />
                       <span>24/7 Support</span>
                     </a>

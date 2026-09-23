@@ -79,9 +79,9 @@ export const CaretakerSection: React.FC = () => {
             </p>
 
             <div className="flex flex-wrap items-center gap-2 pt-1">
-              <a href="tel:+918055541478" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-50 border border-slate-200 text-sm text-slate-600 hover:border-teal-200 hover:bg-teal-50 hover:text-teal-700 transition-all duration-200">
+              <a href="tel:+919623204165" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-50 border border-slate-200 text-sm text-slate-600 hover:border-teal-200 hover:bg-teal-50 hover:text-teal-700 transition-all duration-200">
                 <Phone className="w-3.5 h-3.5 text-teal-500" />
-                +91 80555 41478
+                +91 96232 04165
               </a>
               <a href="mailto:care@physio-prime.in" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-50 border border-slate-200 text-sm text-slate-600 hover:border-teal-200 hover:bg-teal-50 hover:text-teal-700 transition-all duration-200">
                 <Mail className="w-3.5 h-3.5 text-teal-500" />

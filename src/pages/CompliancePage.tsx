@@ -119,7 +119,7 @@ export const CompliancePage: React.FC = () => {
           <p className="text-sm text-slate-600 mb-3">For HIPAA-related inquiries, data access requests, or to report a potential breach:</p>
           <div className="text-sm text-slate-600 space-y-1">
             <p><strong className="text-slate-700">Email:</strong> <a href="mailto:care@physio-prime.in" className="text-teal-600 hover:underline">care@physio-prime.in</a></p>
-            <p><strong className="text-slate-700">Phone:</strong> +91 (0712) 2800-PHYSIO</p>
+            <p><strong className="text-slate-700">Phone:</strong> <a href="tel:+919623204165" className="text-teal-600 hover:underline">+91 96232 04165</a></p>
             <p><strong className="text-slate-700">Mail:</strong> PhysioPrime Privacy Officer, IT Park, South Ambazari Road, Nagpur, MH 440022</p>
           </div>
         </div>
