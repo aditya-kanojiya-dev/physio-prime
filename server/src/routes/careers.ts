@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { rateLimit } from 'express-rate-limit';
 import { db } from '../db/pool';
 import { doctorApplications } from '../db/schema';
-import { sendNotification } from '../lib/notifications';
+import { notifyAdmin, sendNotification } from '../lib/notifications';
 
 export const careersRouter = Router();
 
@@ -72,6 +72,20 @@ careersRouter.post('/', async (req, res, next) => {
         consent: true,
       })
       .returning();
+
+    // admin alert — best-effort, awaited so the serverless function doesn't
+    // freeze mid-dispatch (same lesson as the confirmation email)
+    try {
+      await notifyAdmin({
+        type: 'doctor_application',
+        title: `New ${body.position ?? 'doctor'} application`,
+        body: `${body.fullName} (${body.email})${body.phone ? ` ${body.phone}` : ''}${body.qualification ? ` — ${body.qualification}` : ''}${body.experience ? `, ${body.experience} experience` : ''}`,
+        link: '/admin/doctors',
+        metadata: { applicationId: application.id, name: body.fullName, email: body.email },
+      });
+    } catch {
+      // ponytail: best-effort
+    }
 
     // confirmation email — best-effort, don't fail the submission.
     // awaited so the serverless function doesn't freeze mid-dispatch.
