@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ChevronDown, Phone, Mail, MapPin, ArrowRight } from 'lucide-react';
 import logo from '../../assets/logo.png';
@@ -29,28 +29,18 @@ const doctorLinks = [
   { to: '/blog', label: 'Resources' },
 ];
 
-const socials = [
-  {
-    label: 'Instagram',
-    href: 'https://www.instagram.com/physioprimeindia',
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-[18px] h-[18px]">
-        <rect x="2" y="2" width="20" height="20" rx="5" />
-        <circle cx="12" cy="12" r="5" />
-        <circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none" />
-      </svg>
-    ),
-  },
-  {
-    label: 'Facebook',
-    href: '#',
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-[18px] h-[18px]">
-        <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z" />
-      </svg>
-    ),
-  },
-];
+const InstagramIcon = (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-[18px] h-[18px]">
+    <rect x="2" y="2" width="20" height="20" rx="5" />
+    <circle cx="12" cy="12" r="5" />
+    <circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none" />
+  </svg>
+);
+const FacebookIcon = (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-[18px] h-[18px]">
+    <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z" />
+  </svg>
+);
 
 function FooterColumn({
   title,
@@ -100,6 +90,24 @@ function FooterColumn({
 
 export const Footer: React.FC = () => {
   const navigate = useNavigate();
+  const [socials, setSocials] = useState<{ label: string; href: string; icon: React.ReactNode }[]>([
+    { label: 'Instagram', href: 'https://www.instagram.com/physioprimeindia', icon: InstagramIcon },
+  ]);
+
+  useEffect(() => {
+    fetch('/api/v1/cms/settings')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((body) => {
+        const social = body?.social as Record<string, string> | undefined;
+        if (!social) return;
+        const next = [
+          { label: 'Instagram', href: social.instagram || 'https://www.instagram.com/physioprimeindia', icon: InstagramIcon },
+          { label: 'Facebook', href: social.facebook, icon: FacebookIcon },
+        ].filter((s) => s.href);
+        if (next.length) setSocials(next);
+      })
+      .catch(() => {});
+  }, []);
 
   return (
     <footer className="relative bg-white border-t border-slate-200/80 overflow-hidden">

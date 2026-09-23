@@ -6,7 +6,7 @@ import { contentSections } from '../db/schema';
 
 export const cmsRouter = Router();
 
-const pageSchema = z.enum(['home', 'about', 'footer']);
+const pageSchema = z.enum(['home', 'about', 'footer', 'settings']);
 
 cmsRouter.get('/:page', async (req, res) => {
   const page = pageSchema.parse(req.params.page);
