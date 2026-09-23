@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
+import { FilterSelect } from '../ui/FilterSelect';
 import { HeartHandshake, Phone, Mail, MapPin, Send, CheckCircle2, Loader2 } from 'lucide-react';
 
 export const CaretakerSection: React.FC = () => {
@@ -130,17 +131,18 @@ export const CaretakerSection: React.FC = () => {
                   <label htmlFor="caretaker-service" className="block text-sm font-semibold text-slate-700 mb-1.5">
                     Service You Need
                   </label>
-                  <select
-                    id="caretaker-service"
+                  <FilterSelect
                     value={serviceType}
-                    onChange={(e) => setServiceType(e.target.value)}
-                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 focus:outline-none focus:border-blue-600 focus:bg-white transition-all"
-                  >
-                    <option value="Caretaker">Caretaker</option>
-                    <option value="Occupational Therapist">Occupational Therapist</option>
-                    <option value="Speech Therapist">Speech Therapist</option>
-                    <option value="Nursing Care">Nursing Care</option>
-                  </select>
+                    onChange={setServiceType}
+                    placeholder="Select a service"
+                    searchable={false}
+                    options={[
+                      { value: 'Caretaker', label: 'Caretaker' },
+                      { value: 'Occupational Therapist', label: 'Occupational Therapist' },
+                      { value: 'Speech Therapist', label: 'Speech Therapist' },
+                      { value: 'Nursing Care', label: 'Nursing Care' },
+                    ]}
+                  />
                 </div>
 
                 <div>
