@@ -29,7 +29,7 @@ function like(value: string): string {
 // ponytail: category/symptom titles are token-matched (OR across tokens, a doctor
 // wins if ANY token appears in specialty/expertise/treatments, +bio for symptoms)
 // so real seeds like "Orthopedic Physiotherapy" vs "Orthopedic & Post-Op" match.
-const ignoredTokens = new Set(['and', 'for', 'the', 'of']);
+const ignoredTokens = new Set(['and', 'for', 'the', 'of', 'doctor', 'doctors']);
 function tokens(title: string): string[] {
   return title
     .split(/\s+/)

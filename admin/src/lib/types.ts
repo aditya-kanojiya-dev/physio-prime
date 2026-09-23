@@ -521,6 +521,7 @@ export interface CaretakerInquiry {
   id: number;
   name: string;
   phone: string;
+  serviceType: string;
   message: string | null;
   status: 'new' | 'contacted' | 'closed';
   createdAt: string;

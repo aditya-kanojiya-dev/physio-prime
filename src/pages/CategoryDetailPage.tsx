@@ -23,7 +23,7 @@ function matchesCategory(doc: Doctor, title: string): boolean {
   const hay = [doc.specialty, ...doc.expertise, ...doc.treatments, doc.bio].join(' ').toLowerCase();
   const t = title.toLowerCase();
   if (hay.includes(t)) return true;
-  return t.split(' ').filter((w) => w.length > 3).some((term) => hay.includes(term));
+  return t.split(' ').filter((w) => w.length > 3 && w !== 'doctor').some((term) => hay.includes(term));
 }
 
 export const CategoryDetailPage: React.FC = () => {

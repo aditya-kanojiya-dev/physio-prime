@@ -183,6 +183,13 @@
       "when": 1789600000000,
       "tag": "0025_caretaker_inquiries",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1789700000000,
+      "tag": "0026_caretaker_inquiries_service_type",
+      "breakpoints": true
     }
   ]
 }

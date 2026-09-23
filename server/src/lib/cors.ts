@@ -9,6 +9,10 @@ const DEV_ORIGINS = [
   'http://127.0.0.1:5175',
 ] as const;
 
+// Admin panel is a fixed deployment at its own subdomain (Vercel env can't be
+// trusted to carry CORS_ORIGINS on every machine), so allow it by default.
+const ADMIN_ORIGINS = ['https://admin.physio-prime.in'] as const;
+
 function originFromUrl(value: string): string | null {
   try {
     const url = new URL(value);
@@ -62,6 +66,8 @@ export function parseAllowedOrigins(env: {
   if (env.NODE_ENV !== 'production') {
     for (const origin of DEV_ORIGINS) allowed.add(origin);
   }
+
+  for (const origin of ADMIN_ORIGINS) allowed.add(origin);
 
   return allowed;
 }

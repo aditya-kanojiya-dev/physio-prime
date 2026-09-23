@@ -386,6 +386,7 @@ export const caretakerInquiries = pgTable('caretaker_inquiries', {
   id: serial('id').primaryKey(),
   name: text('name').notNull(),
   phone: text('phone').notNull(),
+  serviceType: text('service_type').notNull().default('Caretaker'),
   message: text('message'),
   status: text('status').notNull().default('new'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

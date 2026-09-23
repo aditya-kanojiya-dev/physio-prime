@@ -5,6 +5,7 @@ import { HeartHandshake, Phone, Mail, MapPin, Send, CheckCircle2, Loader2 } from
 export const CaretakerSection: React.FC = () => {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
+  const [serviceType, setServiceType] = useState('Caretaker');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -28,7 +29,12 @@ export const CaretakerSection: React.FC = () => {
       const res = await fetch('/api/v1/caretaker', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name.trim(), phone: phone.replace(/\D/g, ''), message: message.trim() || undefined }),
+        body: JSON.stringify({
+          name: name.trim(),
+          phone: phone.replace(/\D/g, ''),
+          serviceType,
+          message: message.trim() || undefined,
+        }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => null);
@@ -118,6 +124,23 @@ export const CaretakerSection: React.FC = () => {
                     placeholder="e.g. Rahul Sharma"
                     className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:border-teal-400 focus:ring-2 focus:ring-teal-100 outline-none transition-all"
                   />
+                </div>
+
+                <div>
+                  <label htmlFor="caretaker-service" className="block text-sm font-semibold text-slate-700 mb-1.5">
+                    Service You Need
+                  </label>
+                  <select
+                    id="caretaker-service"
+                    value={serviceType}
+                    onChange={(e) => setServiceType(e.target.value)}
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 focus:outline-none focus:border-blue-600 focus:bg-white transition-all"
+                  >
+                    <option value="Caretaker">Caretaker</option>
+                    <option value="Occupational Therapist">Occupational Therapist</option>
+                    <option value="Speech Therapist">Speech Therapist</option>
+                    <option value="Nursing Care">Nursing Care</option>
+                  </select>
                 </div>
 
                 <div>

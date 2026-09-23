@@ -317,7 +317,7 @@ export const FindDoctorsPage: React.FC = () => {
 
       if (symptomTitle || categoryTitle) {
         const hay = [doc.specialty, ...doc.expertise, ...doc.treatments, doc.bio].join(' ').toLowerCase();
-        const terms = [symptomTitle, categoryTitle].filter(Boolean).join(' ').split(' ').filter(w => w.length > 3);
+        const terms = [symptomTitle, categoryTitle].filter(Boolean).join(' ').split(' ').filter(w => w.length > 3 && w !== 'doctor');
         const fullMatch = [symptomTitle, categoryTitle].filter(Boolean).some(t => hay.includes(t as string));
         if (!fullMatch && !terms.some(t => hay.includes(t))) return false;
       }

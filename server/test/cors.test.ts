@@ -12,6 +12,7 @@ describe('parseAllowedOrigins', () => {
     });
     expect(allowed.has('https://physio-prime.com')).toBe(true);
     expect(allowed.has('https://www.physio-prime.com')).toBe(true);
+    expect(allowed.has('https://admin.physio-prime.in')).toBe(true);
     expect(allowed.has('http://localhost:5173')).toBe(false);
   });
 

@@ -20,9 +20,12 @@ caretakerRouter.use(
   }),
 );
 
+const SERVICE_TYPES = ['Caretaker', 'Occupational Therapist', 'Speech Therapist', 'Nursing Care'] as const;
+
 const inquirySchema = z.object({
   name: z.string().trim().min(1).max(200),
   phone: z.string().refine((v) => /^\d{10}$/.test(v.replace(/\D/g, '')), 'phone must be a valid 10-digit number'),
+  serviceType: z.enum(SERVICE_TYPES).default('Caretaker'),
   message: z.string().trim().max(2000).optional(),
 });
 
@@ -33,7 +36,7 @@ caretakerRouter.post('/', async (req, res, next) => {
 
     const [inquiry] = await db
       .insert(caretakerInquiries)
-      .values({ name: body.name, phone, message: body.message ?? null })
+      .values({ name: body.name, phone, serviceType: body.serviceType, message: body.message ?? null })
       .returning();
 
     // admin alert — best-effort, awaited so the serverless function doesn't
@@ -41,8 +44,10 @@ caretakerRouter.post('/', async (req, res, next) => {
     try {
       await notifyAdmin({
         type: 'caretaker_inquiry',
-        title: 'New caretaker inquiry',
-        body: `${body.name} (${phone})${body.message ? ` — ${body.message}` : ''}`,
+        title: `New ${body.serviceType} inquiry`,
+        body: `${body.name} (${phone})${
+          body.serviceType !== 'Caretaker' ? ` — seeking ${body.serviceType}` : ''
+        }${body.message ? ` — ${body.message}` : ''}`,
       });
     } catch {
       // ponytail: best-effort

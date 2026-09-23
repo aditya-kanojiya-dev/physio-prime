@@ -1,0 +1,1 @@
+ALTER TABLE "caretaker_inquiries" ADD COLUMN "service_type" text DEFAULT 'Caretaker' NOT NULL;

@@ -1,4 +1,6 @@
-const BASE = (import.meta.env.VITE_API_URL as string | undefined) || '/api/v1';
+const BASE =
+  (import.meta.env.VITE_API_URL as string | undefined) ||
+  (import.meta.env.DEV ? '/api/v1' : 'https://www.physio-prime.in/api/v1');
 const TOKEN_KEY = 'physioprime_admin_token';
 const USER_KEY = 'physioprime_admin_user';
 

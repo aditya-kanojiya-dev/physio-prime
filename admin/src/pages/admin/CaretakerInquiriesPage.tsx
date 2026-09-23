@@ -70,6 +70,7 @@ export function CaretakerInquiriesPage() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-sm font-bold text-slate-900">{inquiry.name}</span>
+                        <span className="px-2 py-0.5 rounded-full bg-teal-50 text-teal-700 border border-teal-200 text-[10px] font-bold">{inquiry.serviceType}</span>
                         <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${statusColor(inquiry.status)}`}>{inquiry.status}</span>
                       </div>
                       <div className="flex items-center gap-3 text-xs text-slate-500 mt-0.5">
