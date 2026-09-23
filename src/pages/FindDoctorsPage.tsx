@@ -211,12 +211,10 @@ export const FindDoctorsPage: React.FC = () => {
     return doctors.filter(doc => {
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
-        const matches =
-          doc.name.toLowerCase().includes(q) ||
-          doc.specialty.toLowerCase().includes(q) ||
-          doc.location.area.toLowerCase().includes(q) ||
-          doc.location.city.toLowerCase().includes(q);
-        if (!matches) return false;
+        const hay = [doc.name, doc.specialty, ...doc.expertise, ...doc.treatments, doc.bio, doc.location.area, doc.location.city]
+          .join(' ')
+          .toLowerCase();
+        if (!hay.includes(q)) return false;
       }
 
       if (symptomTitle || categoryTitle) {
