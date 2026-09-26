@@ -110,7 +110,6 @@ export interface Appointment {
   address?: string;
   createdAt: string;
   createdAtIso: string;
-  videoCallLink?: string;
   videoJoinable?: boolean;
   cancellationReason?: string;
   paymentMethod?: string;

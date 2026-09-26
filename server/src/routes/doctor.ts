@@ -69,7 +69,6 @@ const appointmentColumns = {
   patientName: appointments.patientName,
   patientPhone: appointments.patientPhone,
   patientRelation: appointments.patientRelation,
-  videoCallLink: appointments.videoCallLink,
   cancellationReason: appointments.cancellationReason,
   createdAt: appointments.createdAt,
 };

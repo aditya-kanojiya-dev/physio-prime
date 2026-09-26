@@ -49,7 +49,6 @@ export interface Appointment {
   patientName: string;
   patientPhone?: string | null;
   patientRelation?: string | null;
-  videoCallLink?: string | null;
   address?: Record<string, unknown> | null;
   cancellationReason?: string | null;
   createdAt?: string | null;

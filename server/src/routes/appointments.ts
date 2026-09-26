@@ -6,7 +6,7 @@ import { appointments, doctors, doctorSchedules, users } from '../db/schema';
 import { requireAuth, requireRole } from '../middleware/auth';
 import { availableFromSchedules, dayOfWeek, EXPIRED_REASON, isJoinableNow, isPast, isStaleUnpaid, isValidDate, PAYMENT_GRACE_MS } from '../lib/slots';
 import { createOrder, verifySignature } from '../lib/razorpay';
-import { jaasConfigured, signJaasJwt, jaasMeetingUrl } from '../lib/jaas';
+import { jaasConfigured, signJaasJwt } from '../lib/jaas';
 import { sendNotification, notifyDoctor, templates, type NotificationCtx } from '../lib/notifications';
 
 export const appointmentsRouter = Router();
@@ -92,7 +92,6 @@ interface AppointmentView {
   patientWeight: string | null;
   patientHeight: string | null;
   patientRelation: string | null;
-  videoCallLink: string | null;
   cancellationReason: string | null;
   createdAt: Date;
   doctor?: {
@@ -129,7 +128,6 @@ const appointmentColumns = {
   patientWeight: appointments.patientWeight,
   patientHeight: appointments.patientHeight,
   patientRelation: appointments.patientRelation,
-  videoCallLink: appointments.videoCallLink,
   cancellationReason: appointments.cancellationReason,
   createdAt: appointments.createdAt,
 };
@@ -178,7 +176,6 @@ function serializeAppointment(row: AppointmentView) {
     patientWeight: row.patientWeight,
     patientHeight: row.patientHeight,
     patientRelation: row.patientRelation,
-    videoCallLink: row.videoCallLink,
     videoJoinable: isJoinableNow(row),
     cancellationReason: row.cancellationReason,
     createdAt: row.createdAt,
@@ -336,7 +333,6 @@ async function bookTransaction(
             patientWeight: body.patientWeight != null ? String(body.patientWeight) : null,
             patientHeight: body.patientHeight != null ? String(body.patientHeight) : null,
             patientRelation: body.patientRelation ?? null,
-            videoCallLink: body.mode === 'online' ? jaasMeetingUrl(bookingId) : null,
           })
           .returning();
         return inserted!;

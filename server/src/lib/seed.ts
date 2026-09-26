@@ -7,7 +7,6 @@ import { CATEGORIES_DATA } from './seed-data/categories';
 import { SYMPTOMS_DATA } from './seed-data/symptoms';
 import { DOCTORS_DATA } from './seed-data/doctors';
 import { SERVICE_AREAS } from './seed-data/service-areas';
-import { jaasMeetingUrl } from './jaas';
 
 // ponytail: truncates users too so dev seed stays idempotent; drop `users` from
 // this list once real registrations land in later phases.
@@ -667,9 +666,6 @@ async function seedShowcase(insertedDoctors: { id: number }[]): Promise<SeedAppo
           patientWeight: p.weight,
           patientHeight: p.height,
           patientRelation: a.relation ?? null,
-          // Same helper the booking route uses, so demo rows carry a real JaaS
-          // room (and stay null when JaaS is unconfigured) instead of a stale domain.
-          videoCallLink: a.mode === 'online' ? jaasMeetingUrl(a.bookingId) : null,
           cancellationReason: a.status === 'cancelled' ? 'Schedule conflict at work' : null,
         };
       }),

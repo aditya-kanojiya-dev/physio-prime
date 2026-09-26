@@ -80,9 +80,8 @@ export function signJaasJwt(input: {
   };
 }
 
-// Non-token room URL stored on older bookings / used as a materialized hint.
-// Null when JaaS is unconfigured so the UI never stamps a dead link.
-export function jaasMeetingUrl(bookingId: string): string | null {
-  const { JAAS_APP_ID } = getConfig();
-  return JAAS_APP_ID ? `https://8x8.vc/${JAAS_APP_ID}/${bookingId}` : null;
-}
+// NOTE: there is deliberately no room-URL helper here. Both the patient and the
+// doctor join through the *-token endpoints, which return a signed JaaS session.
+// A bare https://8x8.vc/<appId>/<room> URL carries no JWT and cannot join a JaaS
+// room, so the old videoCallLink field was never a working link. If a shareable
+// link is ever wanted, mint a token endpoint variant, not a stored string.

@@ -64,10 +64,6 @@ jobs:
       RAZORPAY_KEY_ID: ci_test_key
       RAZORPAY_KEY_SECRET: ci_test_secret
       RAZORPAY_WEBHOOK_SECRET: ci_test_webhook_secret
-      # jaasMeetingUrl() only reads JAAS_APP_ID. The patient join flow uses the
-      # video-token endpoint, but booking also stores this link, so the suite
-      # asserts the stored value.
-      JAAS_APP_ID: ci-test-app
     steps:
       - uses: actions/checkout@v4
 

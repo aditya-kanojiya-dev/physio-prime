@@ -142,7 +142,10 @@ export const appointments = pgTable('appointments', {
   patientWeight: numeric('patient_weight'),
   patientHeight: numeric('patient_height'),
   patientRelation: text('patient_relation'),
-  videoCallLink: text('video_call_link'),
+  // video_call_link is intentionally not mapped: the JaaS room is a pure function of
+  // booking_id + JAAS_APP_ID (jaasMeetingUrl), so persisting it was a stale-prone
+  // duplicate. The nullable column still exists in the DB; drop it in a migration
+  // once no deployed client reads the field.
   cancellationReason: text('cancellation_reason'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });

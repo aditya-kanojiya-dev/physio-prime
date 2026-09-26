@@ -141,7 +141,8 @@ describe('GET /api/v1/doctor/appointments', () => {
     const ours = res.body.appointments.filter((a: { patientName: string }) => a.patientName === 'Doctor Test Patient');
     expect(ours.length).toBe(1);
     expect(ours[0].id).toBe(ours[0].bookingId);
-    expect(ours[0].videoCallLink).toBeDefined();
+    // No stored room URL. The doctor joins via /doctor/appointments/:id/video-token.
+    expect(ours[0].videoCallLink).toBeUndefined();
   });
 
   it('filters by status and date', async () => {
