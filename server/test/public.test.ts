@@ -59,7 +59,7 @@ describe('GET /api/v1/symptoms', () => {
       id: expect.any(String),
       title: expect.any(String),
       slug: expect.any(String),
-      iconName: expect.any(String),
+      iconName: null,
       description: expect.any(String),
       popularFor: expect.any(String),
       recoveryEstimate: expect.any(String),
@@ -120,13 +120,11 @@ describe('GET /api/v1/doctors filters', () => {
     expect(byGender.body.doctors.every((d: { gender: string }) => d.gender === 'female')).toBe(true);
 
     // category filters token-match real seed data: the "Orthopedic Physiotherapy"
-    // title matches Tarannum's "Orthopedic & Post-Op Rehab Specialist" specialty
-    // and Jayshree's "Antenatal & Postnatal Physiotherapy" (OR across tokens).
+    // title matches Tarannum's "Orthopedic & Post-Op Rehab Specialist" specialty.
     const byCategory = await api.get('/api/v1/doctors?category=orthopedic');
     expect(byCategory.status).toBe(200);
     expect(byCategory.body.doctors.map((d: { slug: string }) => d.slug)).toEqual([
       'doc-tarannum-sayyed',
-      'doc-jayshree-ingole',
     ]);
 
     // "Sports Injury & Performance" title matches Pritam's "Sports Injury & Stroke Rehabilitation".

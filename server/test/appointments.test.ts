@@ -24,6 +24,7 @@ const DOCTOR = 'doc-tarannum-sayyed';
 const SECOND_DOCTOR = 'doc-pritam-rathod';
 
 const MONDAY = futureWeekday(1);
+const TUESDAY = futureWeekday(2);
 const SUNDAY = futureWeekday(0);
 
 const bookPayload = (overrides: Record<string, unknown> = {}) => ({
@@ -467,11 +468,13 @@ describe('auto-cancel of unpaid prepay appointments', () => {
 
   it('does not cancel a fresh unpaid booking within the grace window', async () => {
     const { token } = await registerPatient('apt.inwindow@example.com');
-    const slot = await pickSlot(MONDAY, DOCTOR);
+    // ponytail: own weekday -- earlier tests in this file exhaust the seeded MONDAY
+    // capacity, so reusing it makes this depend on test order.
+    const slot = await pickSlot(TUESDAY, DOCTOR);
     const booked = await api
       .post('/api/v1/appointments')
       .set('Authorization', `Bearer ${token}`)
-      .send(bookPayload({ slot }))
+      .send(bookPayload({ date: TUESDAY, slot }))
       .expect(201);
     const id = booked.body.appointment.id;
 
