@@ -119,6 +119,7 @@ export interface ApiAppointment {
   patientHeight: string | null;
   patientRelation: string | null;
   videoCallLink: string | null;
+  videoJoinable: boolean;
   cancellationReason: string | null;
   createdAt: string;
 }
@@ -293,6 +294,7 @@ export function toAppointment(a: ApiAppointment): Appointment {
     createdAt: (a.createdAt || '').slice(0, 10),
     createdAtIso: a.createdAt || '',
     videoCallLink: a.videoCallLink || undefined,
+    videoJoinable: a.videoJoinable,
     cancellationReason: a.cancellationReason || undefined,
     paymentMethod: a.paymentStatus === 'paid' ? 'Paid online' : a.paymentStatus === 'pending' ? 'Payment pending' : a.paymentStatus,
     paymentStatus: a.paymentStatus,

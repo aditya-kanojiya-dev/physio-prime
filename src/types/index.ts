@@ -111,6 +111,7 @@ export interface Appointment {
   createdAt: string;
   createdAtIso: string;
   videoCallLink?: string;
+  videoJoinable?: boolean;
   cancellationReason?: string;
   paymentMethod?: string;
   paymentStatus?: string;

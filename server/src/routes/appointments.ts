@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { db } from '../db/pool';
 import { appointments, doctors, doctorSchedules, users } from '../db/schema';
 import { requireAuth, requireRole } from '../middleware/auth';
-import { availableFromSchedules, dayOfWeek, EXPIRED_REASON, isPast, isStaleUnpaid, isValidDate, PAYMENT_GRACE_MS } from '../lib/slots';
+import { availableFromSchedules, dayOfWeek, EXPIRED_REASON, isJoinableNow, isPast, isStaleUnpaid, isValidDate, PAYMENT_GRACE_MS } from '../lib/slots';
 import { createOrder, verifySignature } from '../lib/razorpay';
 import { jaasConfigured, signJaasJwt, jaasMeetingUrl } from '../lib/jaas';
 import { sendNotification, notifyDoctor, templates, type NotificationCtx } from '../lib/notifications';
@@ -179,6 +179,7 @@ function serializeAppointment(row: AppointmentView) {
     patientHeight: row.patientHeight,
     patientRelation: row.patientRelation,
     videoCallLink: row.videoCallLink,
+    videoJoinable: isJoinableNow(row),
     cancellationReason: row.cancellationReason,
     createdAt: row.createdAt,
   };
@@ -508,6 +509,14 @@ appointmentsRouter.get('/:id/video-token', async (req, res, next) => {
     }
     if (row.paymentStatus !== 'paid') {
       res.status(400).json({ error: { message: 'Payment is required to join the video call' } });
+      return;
+    }
+    if (!isJoinableNow(row)) {
+      res.status(400).json({
+        error: {
+          message: `The video room opens 15 minutes before your ${row.timeSlot} slot on ${row.date} and closes when it ends`,
+        },
+      });
       return;
     }
     const session = signJaasJwt({

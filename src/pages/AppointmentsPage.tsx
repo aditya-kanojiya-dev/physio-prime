@@ -381,10 +381,22 @@ export const AppointmentsPage: React.FC = () => {
                     {apt.consultationMode === 'online' && (
                       <button
                         onClick={() => setVideoApt(apt)}
-                        className="btn-gradient text-white px-5 py-2.5 rounded-xl font-bold text-xs shadow-md flex items-center gap-2"
+                        disabled={!apt.videoJoinable}
+                        title={
+                          apt.videoJoinable
+                            ? 'Join your video consultation'
+                            : `Available 15 minutes before your ${apt.timeSlot} slot`
+                        }
+                        className={`btn-gradient text-white px-5 py-2.5 rounded-xl font-bold text-xs shadow-md flex items-center gap-2 ${
+                          apt.videoJoinable ? '' : 'opacity-40 cursor-not-allowed shadow-none'
+                        }`}
                       >
                         <Video className="w-4 h-4 text-cyan-300" />
-                        <span>Join HD Consultation</span>
+                        <span>
+                          {apt.videoJoinable
+                            ? 'Join HD Consultation'
+                            : `Available from ${apt.timeSlot}`}
+                        </span>
                       </button>
                     )}
                     {apt.consultationMode === 'home' && (

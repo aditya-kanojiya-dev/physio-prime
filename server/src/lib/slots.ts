@@ -48,6 +48,21 @@ function nowHHmm(): string {
   return new Intl.DateTimeFormat('en-GB', { timeZone: IST_TZ, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date());
 }
 
+// The video room opens JOIN_LEAD_MIN minutes before the booked slot and closes
+// when it ends, so a patient cannot sit in an empty room an hour early. Slot
+// times are IST wall-clock, so compare IST strings rather than Date objects.
+export const JOIN_LEAD_MIN = 15;
+
+export function isJoinableNow(row: { date: string; timeSlot: string; mode: string; status: string }): boolean {
+  if (row.mode !== 'online' || row.status !== 'upcoming') return false;
+  if (row.date !== todayStr()) return false;
+  const [start, end] = row.timeSlot.split('-');
+  if (!start || !end) return false;
+  const mins = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
+  const now = mins(nowHHmm());
+  return now >= mins(start) - JOIN_LEAD_MIN && now <= mins(end);
+}
+
 export function isValidDate(dateStr: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return false;
   const [y, m, d] = dateStr.split('-').map(Number);
