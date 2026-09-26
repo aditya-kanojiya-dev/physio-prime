@@ -61,7 +61,7 @@ describe('GET /api/v1/symptoms', () => {
       slug: expect.any(String),
       iconName: null,
       description: expect.any(String),
-      popularFor: expect.any(String),
+      popularFor: expect.any(Array),
       recoveryEstimate: expect.any(String),
       image: expect.any(String),
       sortOrder: expect.any(Number),
