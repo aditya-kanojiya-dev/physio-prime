@@ -60,7 +60,16 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
       },
     });
   } catch {
-    throw new ApiError('Cannot reach the server. Is the API running?', 0);
+    // A blocked cross-origin call and a dead API look identical to fetch(), so
+    // name the usual cause: this panel is only allowed to call the API from
+    // admin.physio-prime.in, and any other origin (including a raw
+    // *.vercel.app deployment URL) fails CORS before a request is ever sent.
+    throw new ApiError(
+      `Cannot reach ${BASE}. If you opened this panel on a *.vercel.app or other ` +
+        'non-admin.physio-prime.in address, the browser blocked the request (CORS). ' +
+        'Use https://admin.physio-prime.in.',
+      0,
+    );
   }
   if (!res.ok) {
     let message = `Request failed (${res.status})`;
