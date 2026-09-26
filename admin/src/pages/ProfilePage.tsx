@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Loader2, MessageCircle, User, Briefcase, Lock, Save, Eye, EyeOff } from 'lucide-react'
+  import { Loader2, MessageCircle, User, Briefcase, Lock, Save } from 'lucide-react'
 import { api, ApiError, MeUser } from '../lib/api'
 import { DoctorProfile } from '../lib/types'
 import { AdminLayout } from '../components/admin/AdminLayout'

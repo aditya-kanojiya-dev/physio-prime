@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { useSymptoms, useCategories } from '../../hooks/queries';
+import { useSymptoms } from '../../hooks/queries';
 import { Symptom } from '../../types';
 import { motion } from 'framer-motion';
 import { staggerContainer, fadeUp } from '../../lib/motion';
@@ -11,7 +11,6 @@ interface ConditionStepProps {
 
 export const ConditionStep: React.FC<ConditionStepProps> = ({ onSelect }) => {
   const { data: symptoms = [], isLoading: symptomsLoading } = useSymptoms();
-  const { data: categories = [] } = useCategories();
   const [search, setSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState('All');
 

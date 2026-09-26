@@ -336,7 +336,7 @@ doctorRouter.post('/appointments/:id/session/send-otp', async (req, res, next) =
     const ttlMs = OTP_TTL_MIN * 60 * 1000;
     const text =
       `Your PhysioPrime start-OTP is ${startOtp} and end-OTP is ${endOtp}. ` +
-      `Use these OTPs to start and end your session with Dr. ${doctor.name}. Reg. https://physio-prime.in/`;
+      `Use these OTPs to start and end your session with Dr. ${doctor.name}. Reg. https://www.physio-prime.in/`;
 
     const sent = await sendSmartpingSms({ to: row.patientPhone, text });
     if (!sent) {

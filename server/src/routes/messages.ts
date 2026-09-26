@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { and, asc, desc, eq, or, sql, ilike, lt, gt, count } from 'drizzle-orm';
+  import { and, asc, desc, eq, or, sql, ilike, lt, count } from 'drizzle-orm';
 import { db } from '../db/pool';
 import { doctors, conversations, messages } from '../db/schema';
 import { requireAuth, requireRole } from '../middleware/auth';

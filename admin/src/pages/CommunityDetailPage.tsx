@@ -26,7 +26,8 @@ const tagColors = [
 export function CommunityDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const { user } = useAuth()
+    // ponytail: bare call kept for the auth subscription side effect
+    useAuth()
   const queryClient = useQueryClient()
   const [replyBody, setReplyBody] = useState('')
 

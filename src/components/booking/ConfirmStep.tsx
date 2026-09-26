@@ -160,7 +160,6 @@ export const ConfirmStep: React.FC<ConfirmStepProps> = ({
     return () => clearTimeout(t);
   }, [heldFor]);
 
-  const ageNum = parseInt(patientAge);
   const canSubmit = useMemo(() => {
     if (!user) return false;
     if (Object.keys(errors).length > 0) return false;
@@ -221,10 +220,8 @@ export const ConfirmStep: React.FC<ConfirmStepProps> = ({
       });
       setCreatedAppointment(appointment);
 
-      if (paymentMode === 'postpay' || mode === 'online') {
-        // ponytail: online consults free during testing — skip checkout.
-        return;
-      }
+      // postpay books with no Razorpay order on purpose; the patient pays by UPI later.
+      if (paymentMode === 'postpay') return;
 
       setLastPending({ appointment, razorpayOrder });
       await openCheckout(appointment, razorpayOrder);

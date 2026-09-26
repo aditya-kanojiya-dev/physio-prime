@@ -1,11 +1,11 @@
 import React, { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { AlertCircle, Check, CheckCircle, Loader2, Percent, Plus, Trash2 } from 'lucide-react'
+  import { AlertCircle, Check, Loader2, Percent, Plus, Trash2 } from 'lucide-react'
 import { api, ApiError } from '../../lib/api'
 import { AdminDoctor, DoctorCategoryCommission } from '../../lib/types'
 import { AdminLayout } from '../../components/admin/AdminLayout'
 import { confirmDialog } from '../../components/admin/ConfirmDialog'
-import { Modal, Field, inputCls } from './CategoriesPage'
+  import { Modal, inputCls } from './CategoriesPage'
 
 const FALLBACK = 30
 

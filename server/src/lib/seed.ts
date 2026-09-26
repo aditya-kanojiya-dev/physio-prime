@@ -2,7 +2,7 @@ import bcrypt from 'bcryptjs';
 import { sql } from 'drizzle-orm';
 import { db, pool } from '../db/pool';
 import { runMigrations } from '../db/migrate';
-import { appointments, adminNotifications, blogCategories, blogPosts, blogPostTags, blogTags, categories, communityCategories, communityPosts, communityReplies, communityVotes, conversations, departments, doctorApplications, doctorCashLedger, doctorLocations, doctorNotifications, doctorPayouts, doctors, doctorSchedules, messages, patientProfiles, paymentTransactions, prescriptions, refunds, reviews, serviceAreas, settlements, symptoms, users } from '../db/schema';
+import { appointments, blogCategories, blogPosts, blogPostTags, blogTags, categories, communityCategories, communityPosts, communityReplies, conversations, departments, doctorApplications, doctorCashLedger, doctorLocations, doctorNotifications, doctorPayouts, doctors, doctorSchedules, messages, patientProfiles, paymentTransactions, prescriptions, refunds, reviews, serviceAreas, settlements, symptoms, users } from '../db/schema';
 import { CATEGORIES_DATA } from './seed-data/categories';
 import { SYMPTOMS_DATA } from './seed-data/symptoms';
 import { DOCTORS_DATA } from './seed-data/doctors';

@@ -2,6 +2,8 @@ import { describe, it, beforeAll, afterAll, expect } from 'vitest';
 import { db } from '../src/db/pool';
 import { runMigrations } from '../src/db/migrate';
 import { seed } from '../src/lib/seed';
+import { CATEGORIES_DATA } from '../src/lib/seed-data/categories';
+import { SYMPTOMS_DATA } from '../src/lib/seed-data/symptoms';
 import { doctors, categories, symptoms } from '../src/db/schema';
 import { sql } from 'drizzle-orm';
 
@@ -21,7 +23,8 @@ describe('seed', () => {
     const c = await db.select().from(categories);
     const s = await db.select().from(symptoms);
     expect(d.length).toBeGreaterThan(0);
-    expect(c.length).toBe(9);
-    expect(s.length).toBe(12);
+    // assert against the seed arrays so content edits never stale these counts
+    expect(c.length).toBe(CATEGORIES_DATA.length);
+    expect(s.length).toBe(SYMPTOMS_DATA.length);
   });
 });

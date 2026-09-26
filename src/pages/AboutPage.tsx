@@ -12,7 +12,6 @@ function CountUp({ target, suffix }: { target: number; suffix: string }) {
 
   useEffect(() => {
     if (!inView) return;
-    let start = 0;
     const duration = 1600;
     const startTime = performance.now();
     const step = (now: number) => {

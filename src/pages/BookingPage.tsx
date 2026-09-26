@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Check, Loader2 } from 'lucide-react';
@@ -43,14 +43,7 @@ export const BookingPage: React.FC = () => {
     wasAuthOpen.current = authModalOpen;
   }, [authModalOpen, hydrated, user, navigate]);
 
-  // Determine starting step from route state
-  const initialStep = useMemo(() => {
-    if (state.doctor) return 3;
-    if (state.condition) return 2;
-    return 1;
-  }, []);
-
-  const [step, setStep] = useState<1 | 2 | 3 | 4>(initialStep as 1 | 2 | 3 | 4);
+  const [step, setStep] = useState<1 | 2 | 3 | 4>(state.doctor ? 3 : state.condition ? 2 : 1);
   const [condition, setCondition] = useState<Symptom | null>(state.condition || null);
   const [doctor, setDoctor] = useState<Doctor | null>(state.doctor || null);
   const [mode, setMode] = useState<ConsultationMode>(state.mode || 'home');

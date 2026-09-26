@@ -36,9 +36,9 @@ const tagColors = [
 ]
 
 export function CommunityPage() {
-  const { user } = useAuth()
+  // ponytail: bare call kept for the auth subscription side effect
+  useAuth()
   const navigate = useNavigate()
-  const queryClient = useQueryClient()
 
   const [category, setCategory] = useState<string>('all')
   const [sort, setSort] = useState<Sort>('new')

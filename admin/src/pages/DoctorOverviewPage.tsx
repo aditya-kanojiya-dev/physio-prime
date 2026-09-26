@@ -9,7 +9,6 @@ import {
   MessageCircle,
   MapPin,
   TrendingUp,
-  Users,
   Wallet,
 } from 'lucide-react'
 import { api } from '../lib/api'

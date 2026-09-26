@@ -2,14 +2,12 @@ import React, { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   AlertCircle,
-  Banknote,
   CheckCircle,
   Clock,
   CreditCard,
   Download,
   Loader2,
   Wallet,
-  X,
 } from 'lucide-react'
 import { api } from '../lib/api'
 import { formatFee, type PayoutSummary, type Payout } from '../lib/types'

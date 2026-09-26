@@ -1,8 +1,14 @@
 import React from 'react';
 import { Layers } from 'lucide-react';
 import { CategoriesGrid } from '../components/home/CategoriesGrid';
+import { usePageMeta } from '../lib/usePageMeta';
 
 export const CategoriesPage: React.FC = () => {
+  usePageMeta(
+    'Physiotherapy Specialties | PhysioPrime',
+    'Browse orthopedic, neurological, sports injury, pediatric, cardiac, geriatric and women\'s health physiotherapy. Find a certified specialist for your condition.',
+  );
+
   return (
     <div className="pt-28 pb-20 min-h-screen bg-white">
       {/* Hero */}

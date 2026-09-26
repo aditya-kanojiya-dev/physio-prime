@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Appointment, ConsultationMode, Doctor } from '../types';
+import { Appointment, ConsultationMode } from '../types';
 import { api } from '../lib/api';
 import { ApiAppointment, toAppointment } from '../lib/adapters';
 import { useAppointments } from '../hooks/queries';

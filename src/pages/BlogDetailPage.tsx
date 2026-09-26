@@ -4,6 +4,7 @@ import { ArrowLeft, Clock, Tag, BookOpen, RefreshCw } from 'lucide-react'
 import { api } from '../lib/api'
 import DOMPurify from 'isomorphic-dompurify'
 import { BlogPost } from '../types'
+import { usePageMeta } from '../lib/usePageMeta'
 
 export function BlogDetailPage() {
   const { slug } = useParams<{ slug: string }>()
@@ -13,6 +14,12 @@ export function BlogDetailPage() {
     queryFn: async () => api.get<{ post: BlogPost }>(`/blog/posts/${slug}`),
     enabled: !!slug,
   })
+
+  // ponytail: called before the early returns so it always runs
+  usePageMeta(
+    data?.post ? `${data.post.title} | PhysioPrime` : 'PhysioPrime Blog',
+    data?.post?.excerpt ?? 'Physiotherapy, rehab and pain-management guides from certified specialists.',
+  )
 
   if (isLoading) {
     return (

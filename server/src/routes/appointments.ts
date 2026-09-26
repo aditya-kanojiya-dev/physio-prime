@@ -301,11 +301,8 @@ async function bookTransaction(
   patientEmail: string,
 ): Promise<{ row: AppointmentView; order: { id: string; amountPaise: number } | null }> {
   for (let attempt = 0; attempt < 2; attempt++) {
-    const bookingId = randomBookingId();
-    // ponytail: online consultations free during testing — mark paid immediately,
-    // no Razorpay order. Remove `freeMode` to restore the prepay flow.
-    const freeMode = body.mode === 'online';
-    try {
+      const bookingId = randomBookingId();
+      try {
       // ponytail: transaction only holds the lock for DB work; the external
       // Razorpay HTTP call happens after commit to avoid long lock durations.
       const row = await db.transaction(async (tx) => {
@@ -329,7 +326,7 @@ async function bookTransaction(
             feePaise,
             address: body.address ?? {},
             paymentMode: body.paymentMode ?? 'prepay',
-            paymentStatus: freeMode ? 'paid' : 'pending',
+            paymentStatus: 'pending',
             patientName: body.patientName,
             patientPhone: body.patientPhone,
             patientEmail: body.patientEmail ?? patientEmail,
@@ -346,17 +343,17 @@ async function bookTransaction(
 
       // Razorpay order creation — outside the transaction so the DB lock is released.
       let order: { id: string; amountPaise: number } | null = null;
-      if (!freeMode && (body.paymentMode ?? 'prepay') === 'prepay') {
+      if ((body.paymentMode ?? 'prepay') === 'prepay') {
         try {
           order = await createOrder({ amountPaise: feePaise, receipt: bookingId });
         } catch (err) {
+          // Razorpay unconfigured: fall through to the 502 below, which drops the row.
           if (!(err instanceof Error) || !err.message.includes('not configured')) throw err;
-          // ponytail: razorpay not configured — trial booking proceeds unpaid
         }
       }
       if (order) {
         await db.update(appointments).set({ razorpayOrderId: order.id }).where(eq(appointments.id, row.id));
-      } else if (!freeMode && (body.paymentMode ?? 'prepay') === 'prepay' && !order) {
+      } else if ((body.paymentMode ?? 'prepay') === 'prepay') {
         // Order creation failed or unavailable — clean up the orphaned row
         await db.delete(appointments).where(eq(appointments.id, row.id));
         throw new BookingError(502, 'Payment gateway unavailable. Please try again.');

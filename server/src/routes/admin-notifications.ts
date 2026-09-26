@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { and, eq, desc, count } from 'drizzle-orm';
+  import { eq, desc, count } from 'drizzle-orm';
 import { db } from '../db/pool';
 import { adminNotifications } from '../db/schema';
 import { requireAuth, requireRole } from '../middleware/auth';

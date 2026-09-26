@@ -98,11 +98,12 @@ export const DoctorTrackingModal: React.FC<TrackingModalProps> = ({ appointment,
         setEtaMinutes(newEta);
         
         // Update distance
-        setDistanceKm(Number((remaining * 0.028).toFixed(1)));
+        const nextDistanceKm = Number((remaining * 0.028).toFixed(1));
+        setDistanceKm(nextDistanceKm);
         
         // Update speed with realistic variation
-        const newSpeed = Math.max(8, Math.min(25, 15 + (Math.random() - 0.5) * 10));
-        setSpeed(Math.round(newSpeed));
+        const newSpeed = Math.round(Math.max(8, Math.min(25, 15 + (Math.random() - 0.5) * 10)));
+        setSpeed(newSpeed);
         
         // Update waypoint
         const waypointProgress = next / 100;
@@ -116,12 +117,14 @@ export const DoctorTrackingModal: React.FC<TrackingModalProps> = ({ appointment,
         }
 
         // Status updates
+        // ponytail: read the values computed above, not the state vars - this effect only
+        // re-creates on waypoint change, so state would be a stale closure value here.
         if (next < 30) {
-          setStatusText(`🚀 Doctor is on the way via EV Scooter (${speed} km/h)`);
+          setStatusText(`🚀 Doctor is on the way via EV Scooter (${newSpeed} km/h)`);
         } else if (next < 60) {
-          setStatusText(`📍 Doctor is halfway there - ${Math.round(distanceKm)}km away`);
+          setStatusText(`📍 Doctor is halfway there - ${Math.round(nextDistanceKm)}km away`);
         } else if (next < 85) {
-          setStatusText(`⚡ Doctor is nearby - ${Math.round(distanceKm)}km away`);
+          setStatusText(`⚡ Doctor is nearby - ${Math.round(nextDistanceKm)}km away`);
         } else {
           setStatusText(`🏠 Doctor is almost at your address!`);
         }

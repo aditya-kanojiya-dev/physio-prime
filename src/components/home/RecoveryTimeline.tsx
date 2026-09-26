@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useBooking } from '../../context/BookingContext';
 import { Search, UserCheck, CalendarCheck, Home, Activity, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 

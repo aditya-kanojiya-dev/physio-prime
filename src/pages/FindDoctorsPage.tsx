@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+  import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { usePageMeta } from '../lib/usePageMeta';
 import { motion, AnimatePresence } from 'framer-motion';

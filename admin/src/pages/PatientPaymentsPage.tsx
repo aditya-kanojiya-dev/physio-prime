@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { CreditCard, Loader2, Search } from 'lucide-react'
+  import { Loader2, Search } from 'lucide-react'
 import { api } from '../lib/api'
 import { PaymentRecord, formatFee } from '../lib/types'
 import { AdminLayout } from '../components/admin/AdminLayout'

@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'
+  import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Image, RefreshCw, Trash2, Copy, Check, Folder } from 'lucide-react'
+  import { RefreshCw, Trash2, Copy, Check, Folder } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { AdminLayout } from '../../components/admin/AdminLayout'
 import { confirmDialog } from '../../components/admin/ConfirmDialog'

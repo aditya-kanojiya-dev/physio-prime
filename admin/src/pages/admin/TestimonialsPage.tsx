@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { RefreshCw, Star, Trash2, CheckCircle, XCircle, Eye, ChevronLeft, ChevronRight } from 'lucide-react'
+  import { RefreshCw, Star, Trash2, CheckCircle, XCircle, ChevronLeft, ChevronRight } from 'lucide-react'
 import { api } from '../../lib/api'
 import { AdminReview } from '../../lib/types'
 import { AdminLayout } from '../../components/admin/AdminLayout'

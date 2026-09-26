@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { AlertCircle, CheckCircle, Loader2, Mail, ShieldCheck } from 'lucide-react';
+import { AlertCircle, Loader2, Mail, ShieldCheck } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 export function VerifyEmailPage() {

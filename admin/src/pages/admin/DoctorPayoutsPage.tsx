@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { RefreshCw, DollarSign, CheckCircle, XCircle, Clock, CreditCard, Banknote, ChevronLeft, ChevronRight, Filter } from 'lucide-react'
+  import { RefreshCw, DollarSign, CheckCircle, XCircle, Clock, CreditCard, Banknote, ChevronLeft, ChevronRight } from 'lucide-react'
 import { api } from '../../lib/api'
 import { AdminLayout } from '../../components/admin/AdminLayout'
 import { confirmDialog } from '../../components/admin/ConfirmDialog'
