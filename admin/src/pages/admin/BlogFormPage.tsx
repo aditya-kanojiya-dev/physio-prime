@@ -16,12 +16,33 @@ import { BlogPost, BlogCategory, BlogTag } from '../../lib/types'
 import { AdminLayout } from '../../components/admin/AdminLayout'
 import { confirmDialog } from '../../components/admin/ConfirmDialog'
 import { TipTapEditor } from '../../components/admin/TipTapEditor'
+import { hasErrors, maxLen, slug as slugRule, type Errors } from '../../lib/validate'
+import { Field } from './CategoriesPage'
 
 function slugify(text: string) {
   return text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
 }
 
-export function BlogFormPage() {
+export interface BlogScope {
+  /** API prefix, e.g. `/admin/blog`. */
+  base: string
+  /** Post-list route to return to. */
+  listPath: string
+  /** Must match the `queryKey` prefix used by the list page. */
+  listKey: string
+  portal: 'admin' | 'doctor'
+  subtitle: string
+}
+
+const ADMIN_BLOG_SCOPE: BlogScope = {
+  base: '/admin/blog',
+  listPath: '/admin/blogs',
+  listKey: 'admin/blog/posts',
+  portal: 'admin',
+  subtitle: 'Create a new article for your blog.',
+}
+
+export function BlogFormPage({ scope = ADMIN_BLOG_SCOPE }: { scope?: BlogScope }) {
   const { id } = useParams<{ id: string }>()
   const isNew = id === 'new'
   const navigate = useNavigate()
@@ -37,22 +58,24 @@ export function BlogFormPage() {
   const [selectedTagIds, setSelectedTagIds] = useState<number[]>([])
   const [slugEdited, setSlugEdited] = useState(false)
   const [uploadingImage, setUploadingImage] = useState(false)
+  const [errors, setErrors] = useState<Errors<'title' | 'slug' | 'excerpt' | 'content'>>({})
+  const [uploadError, setUploadError] = useState<string | null>(null)
   const imageFileRef = useRef<HTMLInputElement>(null)
 
   const { data: existing, isLoading: loadingPost } = useQuery({
-    queryKey: ['admin/blog/post', id],
-    queryFn: async () => api.get<{ post: BlogPost }>(`/admin/blog/posts/${id}`),
+    queryKey: [scope.base, 'post', id],
+    queryFn: async () => api.get<{ post: BlogPost }>(`${scope.base}/posts/${id}`),
     enabled: !isNew && !!id,
   })
 
   const { data: categoriesData } = useQuery({
-    queryKey: ['admin/blog/categories'],
-    queryFn: async () => api.get<{ categories: BlogCategory[] }>('/admin/blog/categories'),
+    queryKey: [scope.base, 'categories'],
+    queryFn: async () => api.get<{ categories: BlogCategory[] }>(`${scope.base}/categories`),
   })
 
   const { data: tagsData } = useQuery({
-    queryKey: ['admin/blog/tags'],
-    queryFn: async () => api.get<{ tags: BlogTag[] }>('/admin/blog/tags'),
+    queryKey: [scope.base, 'tags'],
+    queryFn: async () => api.get<{ tags: BlogTag[] }>(`${scope.base}/tags`),
   })
 
   useEffect(() => {
@@ -76,27 +99,36 @@ export function BlogFormPage() {
 
   const saveMutation = useMutation({
     mutationFn: async (payload: Record<string, unknown>) => {
-      if (isNew) return api.post<{ post: BlogPost }>('/admin/blog/posts', payload)
-      return api.patch<{ post: BlogPost }>(`/admin/blog/posts/${id}`, payload)
+      if (isNew) return api.post<{ post: BlogPost }>(`${scope.base}/posts`, payload)
+      return api.patch<{ post: BlogPost }>(`${scope.base}/posts/${id}`, payload)
     },
     onSuccess: (res) => {
-      queryClient.invalidateQueries({ queryKey: ['admin/blog/posts'] })
-      navigate(`/admin/blogs/${res.post.id}`)
+      queryClient.invalidateQueries({ queryKey: [scope.listKey] })
+      navigate(`${scope.listPath}/${res.post.id}`)
     },
   })
 
   const deleteMutation = useMutation({
-    mutationFn: async () => api.delete(`/admin/blog/posts/${id}`),
+    mutationFn: async () => api.delete(`${scope.base}/posts/${id}`),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin/blog/posts'] })
-      navigate('/admin/blogs')
+      queryClient.invalidateQueries({ queryKey: [scope.listKey] })
+      navigate(scope.listPath)
     },
   })
 
   const handleSave = (asStatus?: 'draft' | 'published') => {
+    const plain = content.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim()
+    const next: Errors<'title' | 'slug' | 'excerpt' | 'content'> = {
+      title: title ? maxLen(title, 200, 'Title') : 'Title is required',
+      slug: slugRule(slug.trim()),
+      excerpt: excerpt ? maxLen(excerpt, 500, 'Excerpt') : undefined,
+      content: plain ? undefined : 'Content is required',
+    }
+    setErrors(next)
+    if (hasErrors(next)) return
     saveMutation.mutate({
-      title,
-      slug,
+      title: title.trim(),
+      slug: slug.trim(),
       excerpt: excerpt || null,
       content,
       featuredImage: featuredImage || null,
@@ -114,11 +146,12 @@ export function BlogFormPage() {
     const file = e.target.files?.[0]
     if (!file) return
     setUploadingImage(true)
+    setUploadError(null)
     try {
       const url = await uploadBlogImage(file)
       setFeaturedImage(url)
     } catch (err) {
-      alert(`Upload failed: ${(err as Error).message}`)
+      setUploadError(`Image upload failed: ${(err as Error).message}`)
     } finally {
       setUploadingImage(false)
       e.target.value = ''
@@ -129,11 +162,11 @@ export function BlogFormPage() {
   const tags = tagsData?.tags || []
 
   return (
-    <AdminLayout>
+    <AdminLayout portal={scope.portal}>
       <div className="space-y-6 max-w-4xl">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <button onClick={() => navigate('/admin/blogs')} className="p-2 rounded-xl text-slate-500 hover:bg-slate-100 transition-all">
+            <button onClick={() => navigate(scope.listPath)} className="p-2 rounded-xl text-slate-500 hover:bg-slate-100 transition-all">
               <ArrowLeft className="w-5 h-5" />
             </button>
             <div>
@@ -141,7 +174,7 @@ export function BlogFormPage() {
                 {isNew ? 'New Blog Post' : 'Edit Blog Post'}
               </h1>
               <p className="text-xs font-semibold text-slate-500 mt-0.5">
-                {isNew ? 'Create a new article for your blog.' : `Editing: ${existing?.post?.title || ''}`}
+                {isNew ? scope.subtitle : `Editing: ${existing?.post?.title || ''}`}
               </p>
             </div>
           </div>
@@ -186,42 +219,54 @@ export function BlogFormPage() {
         ) : (
           <div className="space-y-5">
             <div className="p-6 rounded-3xl bg-white border border-slate-200 space-y-5">
-              <div>
-                <label className="block text-xs font-bold text-slate-600 mb-1.5">Title</label>
+              <Field label="Title" error={errors.title}>
                 <input
                   type="text"
                   value={title}
-                  onChange={(e) => setTitle(e.target.value)}
+                  onChange={(e) => {
+                    setTitle(e.target.value)
+                    setErrors((p) => ({ ...p, title: undefined }))
+                  }}
                   placeholder="Enter post title..."
                   className="w-full px-4 py-2.5 rounded-xl bg-slate-100 border border-slate-200 text-sm focus:outline-none focus:border-teal-500 transition-colors"
                 />
-              </div>
+              </Field>
 
-              <div>
-                <label className="block text-xs font-bold text-slate-600 mb-1.5">Slug</label>
+              <Field label="Slug" error={errors.slug}>
                 <input
                   type="text"
                   value={slug}
-                  onChange={(e) => { setSlug(e.target.value); setSlugEdited(true) }}
+                  onChange={(e) => {
+                    setSlug(e.target.value)
+                    setSlugEdited(true)
+                    setErrors((p) => ({ ...p, slug: undefined }))
+                  }}
                   placeholder="post-url-slug"
                   className="w-full px-4 py-2.5 rounded-xl bg-slate-100 border border-slate-200 text-sm font-mono focus:outline-none focus:border-teal-500 transition-colors"
                 />
-              </div>
+              </Field>
 
-              <div>
-                <label className="block text-xs font-bold text-slate-600 mb-1.5">Excerpt</label>
+              <Field label="Excerpt" error={errors.excerpt}>
                 <textarea
                   value={excerpt}
-                  onChange={(e) => setExcerpt(e.target.value)}
+                  onChange={(e) => {
+                    setExcerpt(e.target.value)
+                    setErrors((p) => ({ ...p, excerpt: undefined }))
+                  }}
                   placeholder="Short summary for listings..."
                   rows={2}
                   className="w-full px-4 py-2.5 rounded-xl bg-slate-100 border border-slate-200 text-sm focus:outline-none focus:border-teal-500 transition-colors resize-none"
                 />
-              </div>
+              </Field>
 
               <div>
                 <label className="block text-xs font-bold text-slate-600 mb-1.5">Featured Image</label>
                 <input ref={imageFileRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+                {uploadError && (
+                  <div role="alert" className="mb-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2.5 text-xs font-semibold text-rose-700">
+                    {uploadError}
+                  </div>
+                )}
                 {featuredImage ? (
                   <div className="relative">
                     <img src={featuredImage} alt="Preview" className="h-40 w-full rounded-xl object-cover border border-slate-200" />
@@ -256,6 +301,9 @@ export function BlogFormPage() {
             <div className="p-6 rounded-3xl bg-white border border-slate-200">
               <label className="block text-xs font-bold text-slate-600 mb-3">Content</label>
               <TipTapEditor content={content} onChange={setContent} />
+              {errors.content && (
+                <p role="alert" className="mt-2 text-xs font-semibold text-rose-600">{errors.content}</p>
+              )}
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
@@ -290,7 +338,7 @@ export function BlogFormPage() {
                       {tag.name}
                     </button>
                   ))}
-                  {!tags.length && <p className="text-xs text-slate-400">No tags created yet.</p>}
+                  {!tags.length && <p className="text-xs text-slate-400">No tags available.</p>}
                 </div>
               </div>
             </div>

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { BadgePercent, Settings, RefreshCw, Save, Globe, Phone, Mail, MapPin, Loader2 } from 'lucide-react'
 import { api, ApiError } from '../../lib/api'
+import { intInRange } from '../../lib/validate'
 import { AdminDepartment } from '../../lib/types'
 import { AdminLayout } from '../../components/admin/AdminLayout'
 
@@ -203,9 +204,15 @@ export function SettingsPage() {
 
               <button
                 onClick={() => {
-                  const changes = (departments || [])
-                    .map((d) => ({ id: d.id, platformFeePercent: Number(deptFees[d.id]) }))
-                    .filter((d) => Number.isInteger(d.platformFeePercent) && d.platformFeePercent !== (departments || []).find((x) => x.id === d.id)?.platformFeePercent)
+                  // mirrors departmentFeeSchema: int 0..100 — report bad values instead of
+                  // silently dropping them or letting a negative reach the server
+                  const list = departments || []
+                  const rows = list.map((d) => ({ d, pct: deptFees[d.id] }))
+                  const bad = rows.find(({ pct }) => intInRange(pct, 0, 100, 'Commission'))
+                  if (bad) { setDeptFeeError(intInRange(bad.pct, 0, 100, 'Commission')!); return }
+                  const changes = rows
+                    .map(({ d, pct }) => ({ id: d.id, platformFeePercent: Number(pct) }))
+                    .filter((c) => c.platformFeePercent !== list.find((x) => x.id === c.id)?.platformFeePercent)
                   if (changes.length > 0) {
                     setDeptFeeError('')
                     saveDeptFees.mutate(changes)

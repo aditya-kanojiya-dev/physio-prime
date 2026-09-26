@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { cloneElement, isValidElement, useId, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { AlertCircle, Edit3, Layers, Loader2, Plus, Trash2, X } from 'lucide-react'
 import { api, ApiError } from '../../lib/api'
@@ -7,6 +7,7 @@ import { AdminLayout } from '../../components/admin/AdminLayout'
 import { confirmDialog } from '../../components/admin/ConfirmDialog'
 import { StatusPill } from './AppointmentsPage'
 import { ImageUpload } from '../../components/admin/ImageUpload'
+import { hasErrors, intInRange, maxLen, slug as slugRule, type Errors } from '../../lib/validate'
 
 const emptyForm = {
   title: '',
@@ -25,6 +26,7 @@ export function CategoriesPage() {
   const [editing, setEditing] = useState<AdminCategory | null>(null)
   const [form, setForm] = useState(emptyForm)
   const [error, setError] = useState<string | null>(null)
+  const [errors, setErrors] = useState<Errors<'title' | 'slug' | 'description' | 'color' | 'sortOrder'>>({})
 
   const { data, isLoading } = useQuery({
     queryKey: ['admin/categories'],
@@ -72,9 +74,18 @@ export function CategoriesPage() {
   const submit = (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
+    const next: Errors<'title' | 'slug' | 'description' | 'color' | 'sortOrder'> = {
+      title: form.title ? maxLen(form.title, 100, 'Title') : 'Title is required',
+      slug: slugRule(form.slug),
+      description: form.description ? maxLen(form.description, 1000, 'Description') : undefined,
+      color: maxLen(form.color, 50, 'Color'),
+      sortOrder: intInRange(String(form.sortOrder), 0, 100000, 'Sort order'),
+    }
+    setErrors(next)
+    if (hasErrors(next)) return
     save.mutate({
-      title: form.title,
-      slug: form.slug,
+      title: form.title.trim(),
+      slug: form.slug.trim(),
       description: form.description || null,
       image: form.image || null,
       color: form.color || null,
@@ -161,34 +172,59 @@ export function CategoriesPage() {
 
       {modalOpen && (
         <Modal title={editing ? 'Edit Category' : 'Add Category'} onClose={() => setModalOpen(false)}>
-          <form onSubmit={submit} className="space-y-4 text-xs">
+          <form onSubmit={submit} noValidate className="space-y-4 text-xs">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field label="Title *">
-                <input required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className={inputCls} />
-              </Field>
-              <Field label="Slug *">
+              <Field label="Title *" error={errors.title}>
                 <input
-                  required
+                  value={form.title}
+                  onChange={(e) => {
+                    setForm({ ...form, title: e.target.value })
+                    setErrors((p) => ({ ...p, title: undefined }))
+                  }}
+                  className={inputCls}
+                />
+              </Field>
+              <Field label="Slug *" error={errors.slug}>
+                <input
                   value={form.slug}
-                  onChange={(e) => setForm({ ...form, slug: e.target.value.toLowerCase().replace(/[^a-z0-9]+/g, '-') })}
+                  onChange={(e) => {
+                    setForm({ ...form, slug: e.target.value.toLowerCase().replace(/[^a-z0-9]+/g, '-') })
+                    setErrors((p) => ({ ...p, slug: undefined }))
+                  }}
                   className={inputCls}
                 />
               </Field>
             </div>
-            <Field label="Description">
-              <textarea rows={3} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className={`${inputCls} resize-none`} />
+            <Field label="Description" error={errors.description}>
+              <textarea
+                rows={3}
+                value={form.description}
+                onChange={(e) => {
+                  setForm({ ...form, description: e.target.value })
+                  setErrors((p) => ({ ...p, description: undefined }))
+                }}
+                className={`${inputCls} resize-none`}
+              />
             </Field>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <ImageUpload value={form.image} onChange={(url) => setForm({ ...form, image: url })} folder="categories" label="Category Image" />
-              <Field label="Color">
+              <Field label="Color" error={errors.color}>
                 <input type="color" value={form.color} onChange={(e) => setForm({ ...form, color: e.target.value })} className="w-full h-10 rounded-xl bg-white border border-slate-200" />
               </Field>
             </div>
             <Field label="Conditions (comma separated)">
               <input type="text" value={form.conditions} onChange={(e) => setForm({ ...form, conditions: e.target.value })} className={inputCls} placeholder="Knee Pain, Arthritis, ..." />
             </Field>
-            <Field label="Sort Order">
-              <input type="number" value={form.sortOrder} onChange={(e) => setForm({ ...form, sortOrder: Number(e.target.value) })} className={inputCls} />
+            <Field label="Sort Order" error={errors.sortOrder}>
+              <input
+                type="number"
+                value={form.sortOrder}
+                onChange={(e) => {
+                  setForm({ ...form, sortOrder: Number(e.target.value) })
+                  setErrors((p) => ({ ...p, sortOrder: undefined }))
+                }}
+                className={inputCls}
+              />
             </Field>
             <label className="flex items-center gap-2 cursor-pointer">
               <input type="checkbox" checked={form.active} onChange={(e) => setForm({ ...form, active: e.target.checked })} className="accent-teal-600 w-4 h-4" />
@@ -227,11 +263,33 @@ export function Modal({ title, onClose, children }: { title: string; onClose: ()
 export const inputCls =
   'w-full p-2.5 bg-white border border-slate-200 rounded-xl text-slate-900 font-bold focus:outline-none focus:border-teal-500 transition-colors'
 
-export function Field({ label, children }: { label: string; children: React.ReactNode }) {
+/**
+ * Label + control + inline error. The label is associated with the control and
+ * `aria-invalid` / `aria-describedby` are wired automatically; the red border
+ * comes from the global `[aria-invalid='true']` rule in index.css, so no
+ * per-form styling. Keep the shared form primitives here -- six admin pages
+ * already import them from this module.
+ */
+export function Field({ label, error, action, children }: { label: string; error?: string | null; action?: React.ReactNode; children: React.ReactNode }) {
+  const autoId = useId()
+  const child = isValidElement(children) ? (children as React.ReactElement<Record<string, unknown>>) : null
+  const id = (child?.props.id as string) || autoId
   return (
     <div className="space-y-1">
-      <label className="font-bold text-slate-600">{label}</label>
-      {children}
+      <label htmlFor={id} className="font-bold text-slate-600">{label}</label>
+      <div className="relative">
+        {child
+          ? cloneElement(child, {
+              id,
+              'aria-invalid': error ? true : undefined,
+              'aria-describedby': error ? `${id}-error` : undefined,
+            })
+          : children}
+        {action}
+      </div>
+      {error && (
+        <p id={`${id}-error`} role="alert" className="text-xs font-semibold text-rose-600">{error}</p>
+      )}
     </div>
   )
 }

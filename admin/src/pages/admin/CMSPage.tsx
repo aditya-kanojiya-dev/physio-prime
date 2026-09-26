@@ -7,6 +7,7 @@ import { AdminLayout } from '../../components/admin/AdminLayout'
 import { confirmDialog } from '../../components/admin/ConfirmDialog'
 import { Field, inputCls, Modal } from './CategoriesPage'
 import { StatusPill } from './AppointmentsPage'
+import { hasErrors, intInRange, type Errors } from '../../lib/validate'
 
 const PAGES = ['home', 'about', 'footer'] as const
 
@@ -17,6 +18,7 @@ export function CMSPage() {
   const [sortOrder, setSortOrder] = useState(0)
   const [active, setActive] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [errors, setErrors] = useState<Errors<'data' | 'sortOrder'>>({})
 
   const { data, isLoading } = useQuery({
     queryKey: ['admin/cms'],
@@ -127,15 +129,29 @@ export function CMSPage() {
           <form
             onSubmit={(e) => {
               e.preventDefault()
+              let data: unknown
+              try {
+                data = JSON.parse(dataText)
+              } catch {
+                setErrors({ data: 'Invalid JSON' })
+                return
+              }
+              const next: Errors<'data' | 'sortOrder'> = {
+                data: data && typeof data === 'object' && !Array.isArray(data) ? undefined : 'Must be a JSON object',
+                sortOrder: intInRange(String(sortOrder), 0, 100000, 'Sort order'),
+              }
+              setErrors(next)
+              if (hasErrors(next)) return
               save.mutate(editing)
             }}
+            noValidate
             className="space-y-4 text-xs"
           >
-            <Field label="Section Data (JSON)">
-              <textarea rows={10} value={dataText} onChange={(e) => setDataText(e.target.value)} className={`${inputCls} resize-none font-mono`} />
+            <Field label="Section Data (JSON)" error={errors.data}>
+              <textarea rows={10} value={dataText} onChange={(e) => { setDataText(e.target.value); setErrors((p) => ({ ...p, data: undefined })) }} className={`${inputCls} resize-none font-mono`} />
             </Field>
-            <Field label="Sort Order">
-              <input type="number" value={sortOrder} onChange={(e) => setSortOrder(Number(e.target.value))} className={inputCls} />
+            <Field label="Sort Order" error={errors.sortOrder}>
+              <input type="number" value={sortOrder} onChange={(e) => { setSortOrder(Number(e.target.value)); setErrors((p) => ({ ...p, sortOrder: undefined })) }} className={inputCls} />
             </Field>
             <label className="flex items-center gap-2 cursor-pointer">
               <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} className="accent-teal-600 w-4 h-4" />

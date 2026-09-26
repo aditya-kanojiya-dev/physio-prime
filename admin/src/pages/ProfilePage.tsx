@@ -9,6 +9,8 @@ import { ChangePasswordModal } from '../components/admin/ChangePasswordModal'
 import { ImageUpload } from '../components/admin/ImageUpload'
 import { DEPARTMENTS, DESIGNATIONS, EXPERIENCE_YEARS } from '../lib/options'
 import { useAuth } from '../lib/auth'
+import { Field } from './admin/CategoriesPage'
+import { hasErrors, maxLen, minLen, type Errors } from '../lib/validate'
 
 const inputCls = 'w-full p-2.5 bg-white border border-slate-200 rounded-xl text-slate-900 font-bold focus:outline-none focus:border-teal-500 transition-colors'
 const labelCls = 'font-bold text-slate-600'
@@ -25,6 +27,7 @@ export function ProfilePage() {
   const [tab, setTab] = useState<Tab>('personal')
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [errors, setErrors] = useState<Errors<'name' | 'phone' | 'bio'>>({})
   const [showPasswordModal, setShowPasswordModal] = useState(false)
   const [deletionRequested, setDeletionRequested] = useState(false)
 
@@ -66,6 +69,32 @@ export function ProfilePage() {
     setTreatments((doctor.treatments || []).join(', '))
     setDeletionRequested(!!doctor.deletionRequestedAt)
     setHydrated(true)
+  }
+
+  // mirrors profilePatchSchema: name 2-150, phone <=20, bio <=5000, list items <=100/50
+  function validate() {
+    const next: Errors<'name' | 'phone' | 'bio'> = {
+      name: minLen(name, 2, 'Name') ?? maxLen(name, 150, 'Name'),
+      phone: phone ? maxLen(phone, 20, 'Phone') : undefined,
+      bio: bio ? maxLen(bio, 5000, 'Bio') : undefined,
+    }
+    setErrors(next)
+    if (hasErrors(next)) return false
+    const longItem = [
+      ...splitList(expertise).map((v) => [v, 100, 'Expertise item'] as const),
+      ...splitList(treatments).map((v) => [v, 100, 'Treatment item'] as const),
+      ...splitList(languages).map((v) => [v, 50, 'Language'] as const),
+    ].find(([v, max]) => v.length > max)
+    if (longItem) {
+      setError(`${longItem[2]} is too long (max ${longItem[1]} characters)`)
+      return false
+    }
+    return true
+  }
+
+  const handleSave = () => {
+    setError(null)
+    if (validate()) save.mutate()
   }
 
   const save = useMutation({
@@ -166,15 +195,13 @@ export function ProfilePage() {
                 <p className="text-xs text-slate-500">Your basic personal details.</p>
               </div>
             </div>
-            <div>
-              <label className={labelCls}>Full Name</label>
+            <Field label="Full Name" error={errors.name}>
               <input value={name} onChange={(e) => setName(e.target.value)} className={inputCls} />
-            </div>
+            </Field>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className={labelCls}>Phone</label>
-                <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+91 ..." className={inputCls} />
-              </div>
+                <Field label="Phone" error={errors.phone}>
+                  <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+91 ..." className={inputCls} />
+                </Field>
               <div>
                 <label className={labelCls}>Gender</label>
                 <select value={gender} onChange={(e) => setGender(e.target.value)} className={inputCls}>
@@ -186,17 +213,16 @@ export function ProfilePage() {
               </div>
             </div>
             <ImageUpload value={photo} onChange={setPhoto} folder="doctors" label="Photo" />
-            <div>
-              <label className={labelCls}>Bio</label>
-              <textarea value={bio} onChange={(e) => setBio(e.target.value)} rows={4} className={`${inputCls} resize-none`} />
-            </div>
+              <Field label="Bio" error={errors.bio}>
+                <textarea value={bio} onChange={(e) => setBio(e.target.value)} rows={4} className={`${inputCls} resize-none`} />
+              </Field>
             <div>
               <label className={labelCls}>Address</label>
               <textarea value={address} onChange={(e) => setAddress(e.target.value)} rows={2} className={`${inputCls} resize-none`} />
             </div>
 
             <div className="flex justify-end pt-2">
-              <button onClick={() => save.mutate()} disabled={save.isPending} className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-teal-600 to-blue-600 hover:from-teal-500 hover:to-blue-500 text-white text-sm font-bold shadow-lg shadow-teal-600/20 transition-all disabled:opacity-50">
+              <button onClick={handleSave} disabled={save.isPending} className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-teal-600 to-blue-600 hover:from-teal-500 hover:to-blue-500 text-white text-sm font-bold shadow-lg shadow-teal-600/20 transition-all disabled:opacity-50">
                 {save.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                 Save Changes
               </button>
@@ -257,7 +283,7 @@ export function ProfilePage() {
             </div>
 
             <div className="flex justify-end pt-2">
-              <button onClick={() => save.mutate()} disabled={save.isPending} className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-teal-600 to-blue-600 hover:from-teal-500 hover:to-blue-500 text-white text-sm font-bold shadow-lg shadow-teal-600/20 transition-all disabled:opacity-50">
+              <button onClick={handleSave} disabled={save.isPending} className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-teal-600 to-blue-600 hover:from-teal-500 hover:to-blue-500 text-white text-sm font-bold shadow-lg shadow-teal-600/20 transition-all disabled:opacity-50">
                 {save.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                 Save Changes
               </button>

@@ -5,8 +5,9 @@ import { useBooking } from '../context/BookingContext';
 import { useSlots } from '../hooks/queries';
 import { slotLabel, hasPendingOnlinePayment } from '../lib/adapters';
 import { openRazorpayCheckout } from '../lib/razorpayCheckout';
+import { required } from '../lib/validate';
 import { Appointment } from '../types';
-import { Calendar, Video, Home, MapPin, RotateCcw, XCircle, Sparkles, Loader2, User, Mail, Phone, Ruler, Weight, Users, CreditCard, Timer } from 'lucide-react';
+import { AlertCircle, Calendar, Video, Home, MapPin, RotateCcw, XCircle, Sparkles, Loader2, User, Mail, Phone, Ruler, Weight, Users, CreditCard, Timer } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { DoctorTrackingModal } from '../components/tracking/DoctorTrackingModal';
 import { VideoConsultModal } from '../components/video/VideoConsultModal';
@@ -44,9 +45,17 @@ function PendingCountdown({ apt, onExpire }: { apt: Appointment; onExpire: () =>
   );
 }
 
+function ErrorBanner({ message }: { message: string }) {
+  return (
+    <div role="alert" className="flex items-start gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-3">
+      <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-600" />
+      <p className="text-xs font-semibold text-red-700">{message}</p>
+    </div>
+  );
+}
+
 export const AppointmentsPage: React.FC = () => {
-  const { appointments, rescheduleAppointment, cancelAppointment } = useBooking();
-  const navigate = useNavigate();
+  const { appointments, rescheduleAppointment, cancelAppointment } = useBooking();  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<'upcoming' | 'pending' | 'completed' | 'cancelled'>('upcoming');
   const [trackingApt, setTrackingApt] = useState<Appointment | null>(null);
@@ -69,6 +78,9 @@ export const AppointmentsPage: React.FC = () => {
   // View patient modal state
   const [viewPatientApt, setViewPatientApt] = useState<Appointment | null>(null);
 
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [cancelError, setCancelError] = useState<string | null>(null);
+
   const filteredAppointments = appointments.filter(a =>
     activeTab === 'upcoming'
       ? a.status === 'upcoming' && !hasPendingOnlinePayment(a)
@@ -78,24 +90,27 @@ export const AppointmentsPage: React.FC = () => {
   );
 
   const handleConfirmReschedule = async () => {
-    if (rescheduleApt && newDate && newTime) {
-      try {
-        await rescheduleAppointment(rescheduleApt.id, newDate, newTime);
-        setRescheduleApt(null);
-      } catch {
-        alert('Could not reschedule. Please try another slot.');
-      }
+    if (!rescheduleApt || !newDate || !newTime) return;
+    setActionError(null);
+    try {
+      await rescheduleAppointment(rescheduleApt.id, newDate, newTime);
+      setRescheduleApt(null);
+    } catch {
+      setActionError('Could not reschedule. Please try another slot.');
     }
   };
 
   const handleConfirmCancel = async () => {
-    if (cancelApt) {
-      try {
-        await cancelAppointment(cancelApt.id, cancelReason);
-        setCancelApt(null);
-      } catch {
-        alert('Could not cancel the appointment. Please try again.');
-      }
+    if (!cancelApt) return;
+    const reasonError = required(cancelReason, 'A cancellation reason');
+    setCancelError(reasonError);
+    if (reasonError) return;
+    setActionError(null);
+    try {
+      await cancelAppointment(cancelApt.id, cancelReason);
+      setCancelApt(null);
+    } catch {
+      setActionError('Could not cancel the appointment. Please try again.');
     }
   };
 
@@ -105,10 +120,11 @@ export const AppointmentsPage: React.FC = () => {
 
   const handlePay = async (apt: Appointment) => {
     if (!apt.razorpayOrderId || !import.meta.env.VITE_RAZORPAY_KEY_ID) {
-      alert('Payment gateway is not configured.');
+      setActionError('Payment gateway is not configured.');
       return;
     }
     setPayingId(apt.id);
+    setActionError(null);
     try {
       await openRazorpayCheckout({
         appointmentId: apt.id,
@@ -119,7 +135,7 @@ export const AppointmentsPage: React.FC = () => {
         onPaid: refetchAppointments,
       });
     } catch {
-      alert('Could not open the payment window. Please try again.');
+      setActionError('Could not open the payment window. Please try again.');
     } finally {
       setPayingId(null);
     }
@@ -148,6 +164,8 @@ export const AppointmentsPage: React.FC = () => {
             <span>Book New Appointment</span>
           </button>
         </div>
+
+        {actionError && <ErrorBanner message={actionError} />}
 
         {/* Tab Filters Bar */}
         <div className="flex items-center justify-between p-2 rounded-2xl glass-panel border border-slate-200 shadow-md">
@@ -348,7 +366,7 @@ export const AppointmentsPage: React.FC = () => {
                     </p>
                     <div className="flex flex-wrap items-center gap-2 justify-end">
                       <button
-                        onClick={() => setCancelApt(apt)}
+                        onClick={() => { setActionError(null); setCancelError(null); setCancelApt(apt); }}
                         className="px-4 py-2 rounded-xl font-bold text-xs text-rose-600 bg-rose-50 hover:bg-rose-100 transition-colors flex items-center gap-1.5"
                       >
                         <XCircle className="w-3.5 h-3.5" />
@@ -411,7 +429,7 @@ export const AppointmentsPage: React.FC = () => {
 
                     <button
                       onClick={() => {
-                        setRescheduleApt(apt);
+                        setActionError(null); setRescheduleApt(apt);
                         setNewDate(apt.date);
                         setNewTime('');
                       }}
@@ -422,7 +440,7 @@ export const AppointmentsPage: React.FC = () => {
                     </button>
 
                     <button
-                      onClick={() => setCancelApt(apt)}
+                      onClick={() => { setActionError(null); setCancelError(null); setCancelApt(apt); }}
                       className="px-4 py-2.5 rounded-xl font-bold text-xs text-rose-600 bg-rose-50 hover:bg-rose-100 transition-colors flex items-center gap-1.5"
                     >
                       <XCircle className="w-3.5 h-3.5" />
@@ -469,7 +487,9 @@ export const AppointmentsPage: React.FC = () => {
             <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="bg-white p-6 rounded-3xl border border-slate-200 shadow-2xl max-w-md w-full space-y-4">
               <h3 className="text-lg font-bold text-slate-900">Reschedule Appointment</h3>
               <p className="text-xs text-slate-500">Select new date and time for {rescheduleApt.doctorName}:</p>
-              
+
+              {actionError && <ErrorBanner message={actionError} />}
+
               <div className="space-y-2">
                 <label className="text-xs font-bold text-slate-700">New Date</label>
                 <input
@@ -531,15 +551,26 @@ export const AppointmentsPage: React.FC = () => {
             <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="bg-white p-6 rounded-3xl border border-slate-200 shadow-2xl max-w-md w-full space-y-4">
               <h3 className="text-lg font-bold text-rose-600">Cancel Appointment</h3>
               <p className="text-xs text-slate-500">Are you sure you want to cancel appointment with {cancelApt.doctorName}?</p>
-              
+
+              {actionError && <ErrorBanner message={actionError} />}
+
               <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-700">Cancellation Reason</label>
+                <label htmlFor="cancel-reason" className="text-xs font-bold text-slate-700">Cancellation Reason</label>
                 <input
+                  id="cancel-reason"
                   type="text"
                   value={cancelReason}
-                  onChange={e => setCancelReason(e.target.value)}
+                  onChange={e => {
+                    setCancelReason(e.target.value);
+                    if (cancelError) setCancelError(null);
+                  }}
+                  aria-invalid={cancelError ? true : undefined}
+                  aria-describedby={cancelError ? 'cancel-reason-error' : undefined}
                   className="w-full p-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-900"
                 />
+                {cancelError && (
+                  <p id="cancel-reason-error" role="alert" className="text-xs font-semibold text-red-600">{cancelError}</p>
+                )}
               </div>
 
               <div className="pt-2 flex items-center justify-end gap-2">

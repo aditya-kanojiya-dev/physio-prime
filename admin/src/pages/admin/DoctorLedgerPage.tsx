@@ -21,6 +21,8 @@ import { DoctorLedger, ServiceArea, formatFee, formatDate } from '../../lib/type
 import { AdminLayout } from '../../components/admin/AdminLayout'
 import { CITIES, DEPARTMENTS, DESIGNATIONS, EXPERIENCE_YEARS, SPECIALTIES } from '../../lib/options'
 import { ChipMultiSelect } from '../../components/ChipMultiSelect'
+import { Field } from './CategoriesPage'
+import { hasErrors, maxLen, numInRange, required, type Errors } from '../../lib/validate'
 
 const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 const inputCls = 'w-full p-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:border-teal-500 transition-colors'
@@ -81,15 +83,6 @@ function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
   )
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="space-y-1">
-      <label className="font-bold text-slate-600 text-[11px]">{label}</label>
-      {children}
-    </div>
-  )
-}
-
 export function DoctorLedgerPage() {
   const { id } = useParams<{ id: string }>()
   const qc = useQueryClient()
@@ -108,6 +101,7 @@ export function DoctorLedgerPage() {
 
   const [editingSection, setEditingSection] = useState<string | null>(null)
   const [error2, setError2] = useState<string | null>(null)
+  const [errors, setErrors] = useState<Errors<'name' | 'phone' | 'designation' | 'department' | 'bio' | 'fees'>>({})
 
   // Profile form state
   const [profileForm, setProfileForm] = useState<Record<string, unknown>>({})
@@ -121,6 +115,7 @@ export function DoctorLedgerPage() {
     onSuccess: () => {
       setEditingSection(null)
       setError2(null)
+    setErrors({})
       qc.invalidateQueries({ queryKey: ['admin/doctor-ledger', id] })
       qc.invalidateQueries({ queryKey: ['admin/doctors'] })
     },
@@ -164,6 +159,7 @@ export function DoctorLedgerPage() {
     })
     setEditingSection('profile')
     setError2(null)
+    setErrors({})
   }
 
   function startEditFees() {
@@ -173,15 +169,31 @@ export function DoctorLedgerPage() {
     })
     setEditingSection('fees')
     setError2(null)
+    setErrors({})
   }
 
   function startEditLocation() {
     setLocForm({ area: String(doctor.location?.area || ''), city: String(doctor.location?.city || '') })
     setEditingSection('location')
     setError2(null)
+    setErrors({})
+  }
+
+  // mirrors doctorCreateSchema.partial() — the server is the authority
+  function validateProfile() {
+    const next: Errors<'name' | 'phone' | 'designation' | 'department' | 'bio'> = {
+      name: required(String(profileForm.name), 'Name') ?? maxLen(String(profileForm.name), 100, 'Name'),
+      phone: profileForm.phone ? maxLen(String(profileForm.phone), 20, 'Phone') : undefined,
+      designation: profileForm.designation ? maxLen(String(profileForm.designation), 100, 'Designation') : undefined,
+      department: profileForm.department ? maxLen(String(profileForm.department), 100, 'Department') : undefined,
+      bio: profileForm.bio ? maxLen(String(profileForm.bio), 5000, 'Bio') : undefined,
+    }
+    setErrors(next)
+    return !hasErrors(next)
   }
 
   function saveProfile() {
+    if (!validateProfile()) return
     saveMutation.mutate({
       name: profileForm.name, title: profileForm.title, specialty: profileForm.specialty,
       gender: profileForm.gender, phone: profileForm.phone || null,
@@ -196,6 +208,13 @@ export function DoctorLedgerPage() {
   }
 
   function saveFees() {
+    const next: Errors<'fees'> = {
+      fees:
+        numInRange(String(Math.round(feesForm.home)), 0, 100000, 'Home fee') ??
+        numInRange(String(Math.round(feesForm.online)), 0, 100000, 'Online fee'),
+    }
+    setErrors(next)
+    if (hasErrors(next)) return
     saveMutation.mutate({
       fees: { home: Math.round(feesForm.home), online: Math.round(feesForm.online) },
     })
@@ -252,7 +271,7 @@ export function DoctorLedgerPage() {
             {editingSection === 'profile' ? (
               <div className="space-y-3">
                 <div className="grid grid-cols-2 gap-3">
-                  <Field label="Name *"><input required value={String(profileForm.name)} onChange={(e) => setProfileForm({ ...profileForm, name: e.target.value })} className={inputCls} /></Field>
+                  <Field label="Name *" error={errors.name}><input required value={String(profileForm.name)} onChange={(e) => setProfileForm({ ...profileForm, name: e.target.value })} className={inputCls} /></Field>
                   <Field label="Title"><select value={String(profileForm.title)} onChange={(e) => setProfileForm({ ...profileForm, title: e.target.value })} className={selectCls}><option value="">—</option>{DESIGNATIONS.map((t) => <option key={t} value={t}>{t}</option>)}</select></Field>
                 </div>
                 <Field label="Specialty *"><ChipMultiSelect value={String(profileForm.specialty || '')} onChange={(v) => setProfileForm({ ...profileForm, specialty: v })} options={SPECIALTIES} /></Field>
@@ -266,14 +285,14 @@ export function DoctorLedgerPage() {
                   <Field label="Patients Treated"><input type="number" value={Number(profileForm.patientsTreated)} onChange={(e) => setProfileForm({ ...profileForm, patientsTreated: Number(e.target.value) })} className={inputCls} /></Field>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
-                  <Field label="Phone"><input value={String(profileForm.phone)} onChange={(e) => setProfileForm({ ...profileForm, phone: e.target.value })} className={inputCls} /></Field>
+                  <Field label="Phone" error={errors.phone}><input value={String(profileForm.phone)} onChange={(e) => setProfileForm({ ...profileForm, phone: e.target.value })} className={inputCls} /></Field>
                   <Field label="Languages (comma-sep)"><input value={String(profileForm.languages)} onChange={(e) => setProfileForm({ ...profileForm, languages: e.target.value })} className={inputCls} /></Field>
                 </div>
                 <div className="grid grid-cols-3 gap-3">
-                  <Field label="Designation"><select value={String(profileForm.designation)} onChange={(e) => setProfileForm({ ...profileForm, designation: e.target.value })} className={selectCls}><option value="">—</option>{DESIGNATIONS.map((t) => <option key={t} value={t}>{t}</option>)}</select></Field>
-                  <Field label="Department"><select value={String(profileForm.department)} onChange={(e) => setProfileForm({ ...profileForm, department: e.target.value })} className={selectCls}><option value="">—</option>{DEPARTMENTS.map((t) => <option key={t} value={t}>{t}</option>)}</select></Field>
+                  <Field label="Designation" error={errors.designation}><select value={String(profileForm.designation)} onChange={(e) => setProfileForm({ ...profileForm, designation: e.target.value })} className={selectCls}><option value="">—</option>{DESIGNATIONS.map((t) => <option key={t} value={t}>{t}</option>)}</select></Field>
+                  <Field label="Department" error={errors.department}><select value={String(profileForm.department)} onChange={(e) => setProfileForm({ ...profileForm, department: e.target.value })} className={selectCls}><option value="">—</option>{DEPARTMENTS.map((t) => <option key={t} value={t}>{t}</option>)}</select></Field>
                 </div>
-                <Field label="Bio"><textarea value={String(profileForm.bio)} onChange={(e) => setProfileForm({ ...profileForm, bio: e.target.value })} rows={3} className={`${inputCls} resize-none`} /></Field>
+                <Field label="Bio" error={errors.bio}><textarea value={String(profileForm.bio)} onChange={(e) => setProfileForm({ ...profileForm, bio: e.target.value })} rows={3} className={`${inputCls} resize-none`} /></Field>
                 <div className="flex gap-6 pt-1">
                   <label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={Boolean(profileForm.verified)} onChange={(e) => setProfileForm({ ...profileForm, verified: e.target.checked })} className="accent-teal-600 w-4 h-4" /><span className="font-bold text-slate-600 text-xs">Verified</span></label>
                   <label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={Boolean(profileForm.featured)} onChange={(e) => setProfileForm({ ...profileForm, featured: e.target.checked })} className="accent-amber-500 w-4 h-4" /><span className="font-bold text-slate-600 text-xs">Prime Physiotherapist</span></label>
@@ -308,7 +327,7 @@ export function DoctorLedgerPage() {
             {editingSection === 'fees' ? (
               <div className="space-y-3">
                 <div className="grid grid-cols-2 gap-3">
-                  <Field label="Home Fee (₹)"><input type="number" value={feesForm.home} onChange={(e) => setFeesForm({ ...feesForm, home: Number(e.target.value) })} className={inputCls} /></Field>
+                  <Field label="Home Fee (₹)" error={errors.fees}><input type="number" value={feesForm.home} onChange={(e) => setFeesForm({ ...feesForm, home: Number(e.target.value) })} className={inputCls} /></Field>
                   <Field label="Online Fee (₹)"><input type="number" value={feesForm.online} onChange={(e) => setFeesForm({ ...feesForm, online: Number(e.target.value) })} className={inputCls} /></Field>
                 </div>
               </div>

@@ -5,6 +5,8 @@ import { api } from '../../lib/api'
 import { AdminLayout } from '../../components/admin/AdminLayout'
 import { confirmDialog } from '../../components/admin/ConfirmDialog'
 import { StatusPill } from './AppointmentsPage'
+import { hasErrors, maxLen, required, type Errors } from '../../lib/validate'
+import { Field } from './CategoriesPage'
 
 interface AdminPayout {
   id: number
@@ -33,6 +35,7 @@ export function DoctorPayoutsPage() {
   const [page, setPage] = useState(1)
   const [statusFilter, setStatusFilter] = useState<(typeof STATUS_FILTERS)[number]>('all')
   const [processingId, setProcessingId] = useState<number | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
 
   const { data: summary } = useQuery({
     queryKey: ['admin/payouts/summary'],
@@ -55,11 +58,11 @@ export function DoctorPayoutsPage() {
       queryClient.invalidateQueries({ queryKey: ['admin/payouts'] })
       queryClient.invalidateQueries({ queryKey: ['admin/payouts/summary'] })
       setProcessingId(null)
+      setActionError(null)
     },
     onError: (err) => {
       const msg = err instanceof Error ? err.message : 'Request failed'
-      if (processingId) setProcessingId(null)
-      alert(`Could not update payout: ${msg}`)
+      setActionError(`Could not update payout: ${msg}`)
     },
   })
 
@@ -215,14 +218,25 @@ export function DoctorPayoutsPage() {
           </div>
         )}
 
+        {actionError && (
+          <div role="alert" className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs font-semibold text-rose-700">
+            {actionError}
+          </div>
+        )}
+
         {/* Complete Payout Modal */}
         {processingId && (
           <CompletePayoutModal
             payoutId={processingId}
+            error={actionError}
             onComplete={(transactionId, notes) => {
+              setActionError(null)
               updateMutation.mutate({ id: processingId, status: 'completed', transactionId, notes: notes || null })
             }}
-            onClose={() => setProcessingId(null)}
+            onClose={() => {
+              setProcessingId(null)
+              setActionError(null)
+            }}
           />
         )}
 
@@ -264,10 +278,21 @@ function SummaryCard({ icon, label, value, color }: { icon: React.ReactNode; lab
   )
 }
 
-function CompletePayoutModal({ payoutId, onComplete, onClose }: { payoutId: number; onComplete: (txId: string, notes: string) => void; onClose: () => void }) {
+function CompletePayoutModal({ payoutId, error, onComplete, onClose }: { payoutId: number; error: string | null; onComplete: (txId: string, notes: string) => void; onClose: () => void }) {
   const [transactionId, setTransactionId] = useState('')
   const [notes, setNotes] = useState('')
+  const [errors, setErrors] = useState<Errors<'transactionId' | 'notes'>>({})
   const txId = transactionId.trim()
+
+  const submit = () => {
+    const next: Errors<'transactionId' | 'notes'> = {
+      transactionId: required(txId, 'Transaction ID'),
+      notes: notes.trim() ? maxLen(notes, 500, 'Notes') : undefined,
+    }
+    setErrors(next)
+    if (hasErrors(next)) return
+    onComplete(txId, notes)
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -275,17 +300,36 @@ function CompletePayoutModal({ payoutId, onComplete, onClose }: { payoutId: numb
       <div className="relative w-full max-w-md mx-4 p-6 rounded-3xl bg-white border border-slate-200 shadow-2xl space-y-4">
         <h3 className="text-lg font-extrabold text-slate-900">Complete Payout</h3>
         <p className="text-xs text-slate-500">Mark payout #{payoutId} as completed with the UPI ref / bank ref from the transfer.</p>
-        <div>
-          <label className="block text-xs font-bold text-slate-600 mb-1.5">Transaction ID (required)</label>
-          <input value={transactionId} onChange={(e) => setTransactionId(e.target.value)} placeholder="UPI ref / bank ref" className="w-full px-4 py-2.5 rounded-xl bg-slate-100 border border-slate-200 text-sm focus:outline-none focus:border-teal-500" />
-        </div>
-        <div>
-          <label className="block text-xs font-bold text-slate-600 mb-1.5">Notes (optional)</label>
-          <input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Any internal notes" className="w-full px-4 py-2.5 rounded-xl bg-slate-100 border border-slate-200 text-sm focus:outline-none focus:border-teal-500" />
-        </div>
+        {error && (
+          <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2.5 text-xs font-semibold text-rose-700">
+            {error}
+          </div>
+        )}
+        <Field label="Transaction ID (required)" error={errors.transactionId}>
+          <input
+            value={transactionId}
+            onChange={(e) => {
+              setTransactionId(e.target.value)
+              setErrors((p) => ({ ...p, transactionId: undefined }))
+            }}
+            placeholder="UPI ref / bank ref"
+            className="w-full px-4 py-2.5 rounded-xl bg-slate-100 border border-slate-200 text-sm focus:outline-none focus:border-teal-500"
+          />
+        </Field>
+        <Field label="Notes (optional)" error={errors.notes}>
+          <input
+            value={notes}
+            onChange={(e) => {
+              setNotes(e.target.value)
+              setErrors((p) => ({ ...p, notes: undefined }))
+            }}
+            placeholder="Any internal notes"
+            className="w-full px-4 py-2.5 rounded-xl bg-slate-100 border border-slate-200 text-sm focus:outline-none focus:border-teal-500"
+          />
+        </Field>
         <div className="flex justify-end gap-2">
           <button onClick={onClose} className="px-4 py-2 rounded-xl text-slate-600 text-xs font-bold hover:bg-slate-100 transition-all">Cancel</button>
-          <button onClick={() => onComplete(txId, notes)} disabled={!txId} className="px-4 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-teal-500 text-white text-xs font-bold shadow-md transition-all disabled:opacity-50">
+          <button onClick={submit} className="px-4 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-teal-500 text-white text-xs font-bold shadow-md transition-all">
             Confirm Complete
           </button>
         </div>

@@ -14,6 +14,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../lib/auth'
 import { getStoredUser } from '../lib/api'
+import { email as emailField, hasErrors, minLen, required, type Errors } from '../lib/validate'
 
 const BENEFITS = [
   {
@@ -45,7 +46,7 @@ export function LoginPage() {
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [fieldError, setFieldError] = useState<string | null>(null)
+  const [errors, setErrors] = useState<Errors<'name' | 'email' | 'password'>>({})
   const [busy, setBusy] = useState(false)
 
   if (hydrated && user) return <Navigate to={user.role === 'admin' ? '/admin/dashboard' : '/appointments'} replace />
@@ -53,18 +54,25 @@ export function LoginPage() {
   function switchMode(next: 'login' | 'signup') {
     setMode(next)
     setError(null)
-    setFieldError(null)
+    setErrors({})
     setPassword('')
   }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
-    setFieldError(null)
-    if (mode === 'signup' && password.length < 8) {
-      setFieldError('Password must be at least 8 characters.')
-      return
+    const next: Errors<'name' | 'email' | 'password'> = {
+      name: mode === 'signup' ? required(name, 'Full name') : undefined,
+      email: emailField(email),
+      password:
+        mode === 'signup'
+          ? password
+            ? minLen(password, 8, 'Password')
+            : 'Password is required'
+          : required(password, 'Password'),
     }
+    setErrors(next)
+    if (hasErrors(next)) return
     setBusy(true)
     try {
       if (mode === 'login') await login(email.trim(), password)
@@ -158,56 +166,70 @@ export function LoginPage() {
             ))}
           </div>
 
-          <form key={mode} onSubmit={submit} className="animate-auth-enter space-y-4">
+          <form key={mode} onSubmit={submit} noValidate className="animate-auth-enter space-y-4">
             {mode === 'signup' && (
               <div className="space-y-1">
-                <label className="ml-1 text-xs font-semibold text-slate-600">Full name</label>
+                <label htmlFor="admin-name" className="ml-1 text-xs font-semibold text-slate-600">Full name</label>
                 <div className="relative">
                   <UserRound className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                   <input
+                    id="admin-name"
                     type="text"
                     placeholder="Dr. Jane Doe"
                     value={name}
-                    onChange={(e) => setName(e.target.value)}
+                    onChange={(e) => {
+                      setName(e.target.value)
+                      setErrors((p) => ({ ...p, name: undefined }))
+                    }}
                     className={inputClass}
-                    required
                     autoComplete="name"
+                    aria-invalid={errors.name ? true : undefined}
+                    aria-describedby={errors.name ? 'admin-name-error' : undefined}
                   />
                 </div>
+                {errors.name && <p id="admin-name-error" role="alert" className="ml-1 mt-1 text-xs font-medium text-red-600">{errors.name}</p>}
               </div>
             )}
 
             <div className="space-y-1">
-              <label className="ml-1 text-xs font-semibold text-slate-600">Email address</label>
+              <label htmlFor="admin-email" className="ml-1 text-xs font-semibold text-slate-600">Email address</label>
               <div className="relative">
                 <Mail className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                 <input
+                  id="admin-email"
                   type="email"
                   placeholder="you@clinic.com"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e) => {
+                    setEmail(e.target.value)
+                    setErrors((p) => ({ ...p, email: undefined }))
+                  }}
                   className={inputClass}
-                  required
                   autoComplete="email"
+                  aria-invalid={errors.email ? true : undefined}
+                  aria-describedby={errors.email ? 'admin-email-error' : undefined}
                 />
               </div>
+              {errors.email && <p id="admin-email-error" role="alert" className="ml-1 mt-1 text-xs font-medium text-red-600">{errors.email}</p>}
             </div>
 
             <div className="space-y-1">
-              <label className="ml-1 text-xs font-semibold text-slate-600">Password</label>
+              <label htmlFor="admin-password" className="ml-1 text-xs font-semibold text-slate-600">Password</label>
               <div className="relative">
                 <Lock className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                 <input
+                  id="admin-password"
                   type={showPassword ? 'text' : 'password'}
                   placeholder={mode === 'signup' ? 'At least 8 characters' : 'Your password'}
                   value={password}
                   onChange={(e) => {
                     setPassword(e.target.value)
-                    if (fieldError) setFieldError(null)
+                    setErrors((p) => ({ ...p, password: undefined }))
                   }}
                   className={`${inputClass} pr-11`}
-                  required
                   autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
+                  aria-invalid={errors.password ? true : undefined}
+                  aria-describedby={errors.password ? 'admin-password-error' : undefined}
                 />
                 <button
                   type="button"
@@ -218,11 +240,11 @@ export function LoginPage() {
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>
-              {fieldError && <p className="ml-1 mt-1 text-xs font-medium text-red-600">{fieldError}</p>}
+              {errors.password && <p id="admin-password-error" role="alert" className="ml-1 mt-1 text-xs font-medium text-red-600">{errors.password}</p>}
             </div>
 
             {error && (
-              <div className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 text-xs font-medium text-red-700">
+              <div role="alert" className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 text-xs font-medium text-red-700">
                 <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
                 {error}
               </div>

@@ -8,6 +8,7 @@ import { confirmDialog } from '../../components/admin/ConfirmDialog'
 import { StatusPill } from './AppointmentsPage'
 import { Field, Modal, inputCls } from './CategoriesPage'
 import { CITIES } from '../../lib/options'
+import { hasErrors, intInRange, maxLen, type Errors } from '../../lib/validate'
 
 const emptyAreaForm = { name: '', city: 'Nagpur', active: true, sortOrder: 0 }
 
@@ -22,6 +23,7 @@ export function LocationsPage() {
   const [selectedArea, setSelectedArea] = useState<ServiceArea | null>(null)
   const [addDoctorId, setAddDoctorId] = useState<number>(0)
   const [error, setError] = useState<string | null>(null)
+  const [errors, setErrors] = useState<Errors<'name' | 'city' | 'sortOrder'>>({})
 
   const { data: areas, isLoading: areasLoading } = useQuery({
     queryKey: ['admin/service-areas'],
@@ -47,6 +49,19 @@ export function LocationsPage() {
     onSuccess: () => { setAreaModalOpen(false); invalidateAreas() },
     onError: (err) => setError(err instanceof ApiError ? err.message : 'Save failed'),
   })
+
+  const submitArea = (e: React.FormEvent) => {
+    e.preventDefault()
+    setError(null)
+    const next: Errors<'name' | 'city' | 'sortOrder'> = {
+      name: areaForm.name ? maxLen(areaForm.name, 100, 'Name') : 'Name is required',
+      city: areaForm.city ? maxLen(areaForm.city, 100, 'City') : undefined,
+      sortOrder: intInRange(String(areaForm.sortOrder), 0, 100000, 'Sort order'),
+    }
+    setErrors(next)
+    if (hasErrors(next)) return
+    saveArea.mutate({ name: areaForm.name.trim(), city: areaForm.city || null, active: areaForm.active, sortOrder: Number(areaForm.sortOrder) })
+  }
 
   const removeArea = useMutation({
     mutationFn: (id: number) => api.delete(`/admin/service-areas/${id}`),
@@ -208,21 +223,27 @@ export function LocationsPage() {
       {areaModalOpen && (
         <Modal title={editingArea ? 'Edit Service Area' : 'Add Service Area'} onClose={() => setAreaModalOpen(false)}>
           <form
-            onSubmit={(e) => { e.preventDefault(); setError(null); saveArea.mutate({ name: areaForm.name, city: areaForm.city || null, active: areaForm.active, sortOrder: Number(areaForm.sortOrder) }) }}
+            onSubmit={submitArea}
+            noValidate
             className="space-y-4 text-xs"
           >
-            <Field label="Name *">
-              <input required value={areaForm.name} onChange={(e) => setAreaForm({ ...areaForm, name: e.target.value })} className={inputCls} />
+            <Field label="Name *" error={errors.name}>
+              <input value={areaForm.name} onChange={(e) => { setAreaForm({ ...areaForm, name: e.target.value }); setErrors((p) => ({ ...p, name: undefined })) }} className={inputCls} />
             </Field>
             <div className="grid grid-cols-2 gap-4">
-              <Field label="City">
-                <select value={areaForm.city} onChange={(e) => setAreaForm({ ...areaForm, city: e.target.value })} className={inputCls}>
+              <Field label="City" error={errors.city}>
+                <select value={areaForm.city} onChange={(e) => { setAreaForm({ ...areaForm, city: e.target.value }); setErrors((p) => ({ ...p, city: undefined })) }} className={inputCls}>
                   <option value="">—</option>
                   {CITIES.map((c) => <option key={c} value={c}>{c}</option>)}
                 </select>
               </Field>
-              <Field label="Sort Order">
-                <input type="number" value={areaForm.sortOrder} onChange={(e) => setAreaForm({ ...areaForm, sortOrder: Number(e.target.value) })} className={inputCls} />
+              <Field label="Sort Order" error={errors.sortOrder}>
+                <input
+                  type="number"
+                  value={areaForm.sortOrder}
+                  onChange={(e) => { setAreaForm({ ...areaForm, sortOrder: Number(e.target.value) }); setErrors((p) => ({ ...p, sortOrder: undefined })) }}
+                  className={inputCls}
+                />
               </Field>
             </div>
             <label className="flex items-center gap-2 cursor-pointer">

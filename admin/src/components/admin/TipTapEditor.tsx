@@ -34,6 +34,7 @@ export function TipTapEditor({ content, onChange, placeholder = 'Start writing..
   const [linkUrl, setLinkUrl] = useState('')
   const [showLinkInput, setShowLinkInput] = useState(false)
   const [uploading, setUploading] = useState(false)
+  const [uploadError, setUploadError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const editor = useEditor({
@@ -59,11 +60,12 @@ export function TipTapEditor({ content, onChange, placeholder = 'Start writing..
     const file = e.target.files?.[0]
     if (!file || !editor) return
     setUploading(true)
+    setUploadError(null)
     try {
       const url = await uploadBlogImage(file)
       editor.chain().focus().setImage({ src: url }).run()
     } catch (err) {
-      alert(`Upload failed: ${(err as Error).message}`)
+      setUploadError(`Image upload failed: ${(err as Error).message}`)
     } finally {
       setUploading(false)
       e.target.value = ''
@@ -142,6 +144,12 @@ export function TipTapEditor({ content, onChange, placeholder = 'Start writing..
           <ImageIcon className={`w-4 h-4 ${uploading ? 'animate-pulse' : ''}`} />
         </button>
       </div>
+
+      {uploadError && (
+        <div role="alert" className="border-b border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700">
+          {uploadError}
+        </div>
+      )}
 
       {showLinkInput && (
         <div className="flex items-center gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2">

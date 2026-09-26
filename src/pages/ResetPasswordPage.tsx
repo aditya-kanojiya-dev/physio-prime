@@ -2,6 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { AlertCircle, Eye, EyeOff, Loader2, Lock, CheckCircle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { hasErrors, matches, minLen, type Errors } from '../lib/validate';
+import { Field } from '../components/ui/Field';
+
+type PasswordErrors = Errors<'password' | 'confirm'>;
 
 const inputClass =
   'w-full pl-10 pr-11 py-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 placeholder-slate-400 outline-none transition-all shadow-sm focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20';
@@ -15,6 +19,7 @@ export function ResetPasswordPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [errors, setErrors] = useState<PasswordErrors>({});
   const [done, setDone] = useState(false);
 
   useEffect(() => {
@@ -51,14 +56,14 @@ export function ResetPasswordPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    if (password.length < 8) {
-      setError('Password must be at least 8 characters.');
-      return;
-    }
-    if (password !== confirm) {
-      setError('Passwords do not match.');
-      return;
-    }
+    const next: PasswordErrors = {
+      password: password ? minLen(password, 8, 'Password') : 'Password is required',
+      confirm: !confirm
+        ? 'Confirm your new password'
+        : matches(password, confirm),
+    };
+    setErrors(next);
+    if (hasErrors(next)) return;
     setSubmitting(true);
     try {
       const { error: updateError } = await supabase.auth.updateUser({ password });
@@ -112,20 +117,14 @@ export function ResetPasswordPage() {
           )}
 
           {!checking && !linkError && !done && (
-            <form onSubmit={handleSubmit} className="mt-6 space-y-4">
-              <div className="space-y-1">
-                <label className="ml-1 text-xs font-bold text-slate-700">New password</label>
-                <div className="relative">
-                  <Lock className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className={inputClass}
-                    autoComplete="new-password"
-                    minLength={8}
-                    required
-                  />
+            <form onSubmit={handleSubmit} noValidate className="mt-6 space-y-4">
+              <Field
+                id="new-password"
+                label="New password"
+                error={errors.password}
+                hint="At least 8 characters"
+                icon={<Lock className="h-4 w-4" />}
+                action={
                   <button
                     type="button"
                     onClick={() => setShowPassword((s) => !s)}
@@ -134,23 +133,31 @@ export function ResetPasswordPage() {
                   >
                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
-                </div>
-              </div>
-              <div className="space-y-1">
-                <label className="ml-1 text-xs font-bold text-slate-700">Confirm password</label>
-                <div className="relative">
-                  <Lock className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    value={confirm}
-                    onChange={(e) => setConfirm(e.target.value)}
-                    className={inputClass}
-                    autoComplete="new-password"
-                    minLength={8}
-                    required
-                  />
-                </div>
-              </div>
+                }
+              >
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    setErrors((p) => ({ ...p, password: undefined }));
+                  }}
+                  className={inputClass}
+                  autoComplete="new-password"
+                />
+              </Field>
+              <Field id="confirm-password" label="Confirm password" error={errors.confirm} icon={<Lock className="h-4 w-4" />}>
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={confirm}
+                  onChange={(e) => {
+                    setConfirm(e.target.value);
+                    setErrors((p) => ({ ...p, confirm: undefined }));
+                  }}
+                  className={inputClass}
+                  autoComplete="new-password"
+                />
+              </Field>
               {error && (
                 <div className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 text-xs font-semibold text-red-700">
                   <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />

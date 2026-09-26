@@ -1,6 +1,24 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { supabase } from '../lib/supabase';
+import { email, file, hasErrors, phone10, required, type Errors } from '../lib/validate';
+
+type CareerErrors = Errors<
+  | 'fullName'
+  | 'email'
+  | 'phone'
+  | 'position'
+  | 'specialization'
+  | 'qualification'
+  | 'experience'
+  | 'resume'
+  | 'supportingDocType'
+  | 'supportingDoc'
+  | 'photo'
+  | 'doctorCertificate'
+  | 'joiningDate'
+  | 'consent'
+>;
 import { 
   Briefcase, 
   Mail, 
@@ -65,7 +83,8 @@ export const Career: React.FC = () => {
   const [supportingFileName, setSupportingFileName] = useState('');
   const [photoFileName, setPhotoFileName] = useState('');
   const [certificateFileName, setCertificateFileName] = useState('');
-  const [error, setError] = useState('');
+  const [errors, setErrors] = useState<CareerErrors>({});
+  const [submitError, setSubmitError] = useState('');
 
   const resetForm = () => {
     setFormData({
@@ -76,7 +95,7 @@ export const Career: React.FC = () => {
       photo: null, doctorCertificate: null,
     });
     setFileName(''); setSupportingFileName(''); setPhotoFileName(''); setCertificateFileName('');
-    setIsSubmitted(false); setError('');
+    setIsSubmitted(false); setErrors({}); setSubmitError('');
   };
 
   const positions = [
@@ -137,7 +156,11 @@ export const Career: React.FC = () => {
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
+    clearError(name as keyof CareerErrors);
   };
+
+  const clearError = (key: keyof CareerErrors) =>
+    setErrors(prev => (prev[key] ? { ...prev, [key]: undefined } : prev));
 
   const handleSpecializationChange = (spec: string) => {
     setFormData(prev => {
@@ -146,6 +169,7 @@ export const Career: React.FC = () => {
         : [...prev.specialization, spec];
       return { ...prev, specialization: updated };
     });
+    clearError('specialization');
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -153,6 +177,7 @@ export const Career: React.FC = () => {
     if (file) {
       setFormData(prev => ({ ...prev, resume: file }));
       setFileName(file.name);
+      clearError('resume');
     }
   };
 
@@ -161,6 +186,7 @@ export const Career: React.FC = () => {
     if (file) {
       setFormData(prev => ({ ...prev, supportingDoc: file }));
       setSupportingFileName(file.name);
+      clearError('supportingDoc');
     }
   };
 
@@ -169,6 +195,7 @@ export const Career: React.FC = () => {
     if (file) {
       setFormData(prev => ({ ...prev, photo: file }));
       setPhotoFileName(file.name);
+      clearError('photo');
     }
   };
 
@@ -177,6 +204,7 @@ export const Career: React.FC = () => {
     if (file) {
       setFormData(prev => ({ ...prev, doctorCertificate: file }));
       setCertificateFileName(file.name);
+      clearError('doctorCertificate');
     }
   };
 
@@ -190,47 +218,38 @@ export const Career: React.FC = () => {
     return data.publicUrl;
   };
 
-  // ponytail: wired to POST /api/v1/careers — resume upload deferred (needs storage infra)
+  // wired to POST /api/v1/careers
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
+    setSubmitError('');
+
+    const f = formData;
+    const next: CareerErrors = {
+      fullName: required(f.fullName, 'Full name'),
+      email: email(f.email),
+      phone: phone10(f.phone),
+      position: required(f.position, 'Position'),
+      specialization: f.specialization.length ? undefined : 'Select at least one specialization',
+      qualification: required(f.qualification, 'Qualification'),
+      experience: required(f.experience, 'Years of experience'),
+      resume: file(f.resume, { label: 'Resume', types: ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'], maxMb: 10 }),
+      supportingDocType: required(f.supportingDocType, 'Document type'),
+      supportingDoc: file(f.supportingDoc, { label: 'Supporting document', types: ['application/pdf', 'image/jpeg', 'image/png'], maxMb: 10 }),
+      photo: file(f.photo, { label: 'Photo', types: ['image/jpeg', 'image/png', 'image/webp'], maxMb: 10 }),
+      doctorCertificate: file(f.doctorCertificate, { label: 'Doctor certificate', types: ['application/pdf', 'image/jpeg', 'image/png'], maxMb: 10 }),
+      joiningDate: required(f.joiningDate, 'Joining preference'),
+      consent: f.consent ? undefined : 'Consent is required',
+    };
+    setErrors(next);
+    if (hasErrors(next)) return;
+
     setIsLoading(true);
-
-    if (formData.phone && !/^\d{10}$/.test(formData.phone.replace(/\D/g, ''))) {
-      setIsLoading(false);
-      setError('Phone number must be a valid 10-digit number.');
-      return;
-    }
-
-    if (!formData.supportingDocType) {
-      setIsLoading(false);
-      setError('Please select the type of your supporting document.');
-      return;
-    }
-
-    if (!formData.supportingDoc) {
-      setIsLoading(false);
-      setError('Please upload a supporting document (Aadhaar, PAN, passport, etc.) for verification.');
-      return;
-    }
-
-    if (!formData.photo) {
-      setIsLoading(false);
-      setError('Please upload your photo.');
-      return;
-    }
-
-    if (!formData.doctorCertificate) {
-      setIsLoading(false);
-      setError('Please upload your doctor certificate.');
-      return;
-    }
-
     try {
-      const [supportingDocUrl, photoUrl, doctorCertificateUrl] = await Promise.all([
-        uploadFile(formData.supportingDoc),
-        uploadFile(formData.photo),
-        uploadFile(formData.doctorCertificate),
+      const [resumeUrl, supportingDocUrl, photoUrl, doctorCertificateUrl] = await Promise.all([
+        uploadFile(formData.resume!),
+        uploadFile(formData.supportingDoc!),
+        uploadFile(formData.photo!),
+        uploadFile(formData.doctorCertificate!),
       ]);
 
       const res = await fetch('/api/v1/careers', {
@@ -249,6 +268,7 @@ export const Career: React.FC = () => {
           coverLetter: formData.coverLetter,
           joiningDate: formData.joiningDate,
           consent: formData.consent,
+          resumeUrl,
           supportingDocType: formData.supportingDocType,
           supportingDocUrl,
           photoUrl,
@@ -263,7 +283,7 @@ export const Career: React.FC = () => {
 
       setIsSubmitted(true);
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Something went wrong');
+      setSubmitError(err instanceof Error ? err.message : 'Something went wrong');
     } finally {
       setIsLoading(false);
     }
@@ -299,51 +319,64 @@ export const Career: React.FC = () => {
           className="bg-white rounded-3xl border border-slate-200 shadow-xl overflow-hidden"
         >
           {!isSubmitted && (
-            <form onSubmit={handleSubmit} className="p-6 sm:p-8 space-y-6">
+            <form onSubmit={handleSubmit} noValidate className="p-6 sm:p-8 space-y-6">
               
               {/* Full Name */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                  <Users className="w-3.5 h-3.5 text-blue-500" />
-                  Full Name <span className="text-rose-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  name="fullName"
-                  value={formData.fullName}
-                  onChange={handleInputChange}
-                  placeholder="Enter your complete name"
-                  required
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 focus:bg-white transition-all"
-                />
-                <p className="text-[10px] text-slate-400">Candidate's complete name.</p>
-              </div>
+                <div className="space-y-1.5">
+                  <label htmlFor="career-fullName" className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                    <Users className="w-3.5 h-3.5 text-blue-500" />
+                    Full Name <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    id="career-fullName"
+                    type="text"
+                    name="fullName"
+                    value={formData.fullName}
+                    onChange={handleInputChange}
+                    placeholder="Enter your complete name"
+                    aria-invalid={errors.fullName ? true : undefined}
+                    aria-describedby={errors.fullName ? 'career-fullName-error' : undefined}
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 focus:bg-white transition-all"
+                  />
+                  {errors.fullName ? (
+                    <p id="career-fullName-error" role="alert" className="text-xs font-semibold text-red-600">{errors.fullName}</p>
+                  ) : (
+                    <p className="text-[10px] text-slate-400">Candidate's complete name.</p>
+                  )}
+                </div>
 
               {/* Email & Phone Grid */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                  <label htmlFor="career-email" className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
                     <Mail className="w-3.5 h-3.5 text-blue-500" />
                     Email Address <span className="text-rose-500">*</span>
                   </label>
                   <input
+                    id="career-email"
                     type="email"
                     name="email"
                     value={formData.email}
                     onChange={handleInputChange}
                     placeholder="Enter your email"
-                    required
+                    aria-invalid={errors.email ? true : undefined}
+                    aria-describedby={errors.email ? 'career-email-error' : undefined}
                     className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 focus:bg-white transition-all"
                   />
-                  <p className="text-[10px] text-slate-400">For interview and application communication.</p>
+                  {errors.email ? (
+                    <p id="career-email-error" role="alert" className="text-xs font-semibold text-red-600">{errors.email}</p>
+                  ) : (
+                    <p className="text-[10px] text-slate-400">For interview and application communication.</p>
+                  )}
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                  <label htmlFor="career-phone" className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
                     <Phone className="w-3.5 h-3.5 text-blue-500" />
                     Phone / WhatsApp <span className="text-rose-500">*</span>
                   </label>
                   <input
+                    id="career-phone"
                     type="tel"
                     inputMode="numeric"
                     name="phone"
@@ -351,32 +384,42 @@ export const Career: React.FC = () => {
                     value={formData.phone}
                     onChange={handleInputChange}
                     placeholder="Enter 10-digit phone number"
-                    required
+                    aria-invalid={errors.phone ? true : undefined}
+                    aria-describedby={errors.phone ? 'career-phone-error' : undefined}
                     className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 focus:bg-white transition-all"
                   />
-                  <p className="text-[10px] text-slate-400">Primary contact number.</p>
+                  {errors.phone ? (
+                    <p id="career-phone-error" role="alert" className="text-xs font-semibold text-red-600">{errors.phone}</p>
+                  ) : (
+                    <p className="text-[10px] text-slate-400">Primary contact number.</p>
+                  )}
                 </div>
               </div>
 
               {/* Position Applying For */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                  <Briefcase className="w-3.5 h-3.5 text-blue-500" />
-                  Position Applying For <span className="text-rose-500">*</span>
-                </label>
-                <select
-                  name="position"
-                  value={formData.position}
-                  onChange={handleInputChange}
-                  required
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 focus:outline-none focus:border-blue-600 focus:bg-white transition-all"
-                >
-                  <option value="">Select position</option>
-                  {positions.map(pos => (
-                    <option key={pos} value={pos}>{pos}</option>
-                  ))}
-                </select>
-              </div>
+                <div className="space-y-1.5">
+                  <label htmlFor="career-position" className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                    <Briefcase className="w-3.5 h-3.5 text-blue-500" />
+                    Position Applying For <span className="text-rose-500">*</span>
+                  </label>
+                  <select
+                    id="career-position"
+                    name="position"
+                    value={formData.position}
+                    onChange={handleInputChange}
+                    aria-invalid={errors.position ? true : undefined}
+                    aria-describedby={errors.position ? 'career-position-error' : undefined}
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 focus:outline-none focus:border-blue-600 focus:bg-white transition-all"
+                  >
+                    <option value="">Select position</option>
+                    {positions.map(pos => (
+                      <option key={pos} value={pos}>{pos}</option>
+                    ))}
+                  </select>
+                  {errors.position && (
+                    <p id="career-position-error" role="alert" className="text-xs font-semibold text-red-600">{errors.position}</p>
+                  )}
+                </div>
 
               {/* Area of Specialization */}
               <div className="space-y-2">
@@ -400,21 +443,27 @@ export const Career: React.FC = () => {
                     </button>
                   ))}
                 </div>
-                <p className="text-[10px] text-slate-400">Select all that apply.</p>
+                {errors.specialization ? (
+                  <p role="alert" className="text-xs font-semibold text-red-600">{errors.specialization}</p>
+                ) : (
+                  <p className="text-[10px] text-slate-400">Select all that apply.</p>
+                )}
               </div>
 
               {/* Qualification & Experience Grid */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                  <label htmlFor="career-qualification" className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
                     <GraduationCap className="w-3.5 h-3.5 text-blue-500" />
                     Highest Qualification <span className="text-rose-500">*</span>
                   </label>
                   <select
+                    id="career-qualification"
                     name="qualification"
                     value={formData.qualification}
                     onChange={handleInputChange}
-                    required
+                    aria-invalid={errors.qualification ? true : undefined}
+                    aria-describedby={errors.qualification ? 'career-qualification-error' : undefined}
                     className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 focus:outline-none focus:border-blue-600 focus:bg-white transition-all"
                   >
                     <option value="">Select qualification</option>
@@ -422,18 +471,23 @@ export const Career: React.FC = () => {
                       <option key={q} value={q}>{q}</option>
                     ))}
                   </select>
+                  {errors.qualification && (
+                    <p id="career-qualification-error" role="alert" className="text-xs font-semibold text-red-600">{errors.qualification}</p>
+                  )}
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                  <label htmlFor="career-experience" className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
                     <Calendar className="w-3.5 h-3.5 text-blue-500" />
                     Years of Experience <span className="text-rose-500">*</span>
                   </label>
                   <select
+                    id="career-experience"
                     name="experience"
                     value={formData.experience}
                     onChange={handleInputChange}
-                    required
+                    aria-invalid={errors.experience ? true : undefined}
+                    aria-describedby={errors.experience ? 'career-experience-error' : undefined}
                     className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 focus:outline-none focus:border-blue-600 focus:bg-white transition-all"
                   >
                     <option value="">Select experience</option>
@@ -441,6 +495,9 @@ export const Career: React.FC = () => {
                       <option key={exp} value={exp}>{exp}</option>
                     ))}
                   </select>
+                  {errors.experience && (
+                    <p id="career-experience-error" role="alert" className="text-xs font-semibold text-red-600">{errors.experience}</p>
+                  )}
                 </div>
               </div>
 
@@ -478,28 +535,33 @@ export const Career: React.FC = () => {
               </div>
 
               {/* Resume Upload */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                  <Upload className="w-3.5 h-3.5 text-blue-500" />
-                  Resume / CV Upload <span className="text-rose-500">*</span>
-                </label>
-                <div className="relative">
-                  <input
-                    type="file"
-                    accept=".pdf,.doc,.docx"
-                    onChange={handleFileChange}
-                    required
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                  />
-                  <div className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 flex items-center justify-between">
-                    <span className="text-slate-500">
-                      {fileName || 'Choose file (PDF/DOC/DOCX)'}
-                    </span>
-                    <span className="text-blue-600 font-bold text-xs">Browse</span>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                    <Upload className="w-3.5 h-3.5 text-blue-500" />
+                    Resume / CV Upload <span className="text-rose-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="file"
+                      accept=".pdf,.doc,.docx"
+                      onChange={handleFileChange}
+                      aria-invalid={errors.resume ? true : undefined}
+                      aria-describedby={errors.resume ? 'career-resume-error' : undefined}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    />
+                    <div className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 flex items-center justify-between">
+                      <span className="text-slate-500">
+                        {fileName || 'Choose file (PDF/DOC/DOCX)'}
+                      </span>
+                      <span className="text-blue-600 font-bold text-xs">Browse</span>
+                    </div>
                   </div>
+                  {errors.resume ? (
+                    <p id="career-resume-error" role="alert" className="text-xs font-semibold text-red-600">{errors.resume}</p>
+                  ) : (
+                    <p className="text-[10px] text-slate-400">Upload your resume in PDF, DOC, or DOCX format.</p>
+                  )}
                 </div>
-                <p className="text-[10px] text-slate-400">Upload your resume in PDF, DOC, or DOCX format.</p>
-              </div>
 
               {/* Supporting Document (for verification) */}
               <div className="space-y-1.5">
@@ -507,35 +569,45 @@ export const Career: React.FC = () => {
                   <FileText className="w-3.5 h-3.5 text-blue-500" />
                   Supporting Document <span className="text-rose-500">*</span>
                 </label>
-                <select
-                  name="supportingDocType"
-                  value={formData.supportingDocType}
-                  onChange={handleInputChange}
-                  required
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 focus:outline-none focus:border-blue-600 focus:bg-white transition-all"
-                >
-                  <option value="">Select document type</option>
-                  {documentTypes.map(doc => (
-                    <option key={doc} value={doc}>{doc}</option>
-                  ))}
-                </select>
-                <div className="relative">
-                  <input
-                    type="file"
-                    accept=".pdf,.jpg,.jpeg,.png"
-                    onChange={handleSupportingDocChange}
-                    required
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                  />
-                  <div className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 flex items-center justify-between">
-                    <span className="text-slate-500">
-                      {supportingFileName || 'Choose file (PDF/JPG/PNG)'}
-                    </span>
-                    <span className="text-blue-600 font-bold text-xs">Browse</span>
+                  <select
+                    id="career-supportingDocType"
+                    name="supportingDocType"
+                    value={formData.supportingDocType}
+                    onChange={handleInputChange}
+                    aria-invalid={errors.supportingDocType ? true : undefined}
+                    aria-describedby={errors.supportingDocType ? 'career-supportingDocType-error' : undefined}
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 focus:outline-none focus:border-blue-600 focus:bg-white transition-all"
+                  >
+                    <option value="">Select document type</option>
+                    {documentTypes.map(doc => (
+                      <option key={doc} value={doc}>{doc}</option>
+                    ))}
+                  </select>
+                  {errors.supportingDocType && (
+                    <p id="career-supportingDocType-error" role="alert" className="text-xs font-semibold text-red-600">{errors.supportingDocType}</p>
+                  )}
+                  <div className="relative">
+                    <input
+                      type="file"
+                      accept=".pdf,.jpg,.jpeg,.png"
+                      onChange={handleSupportingDocChange}
+                      aria-invalid={errors.supportingDoc ? true : undefined}
+                      aria-describedby={errors.supportingDoc ? 'career-supportingDoc-error' : undefined}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    />
+                    <div className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 flex items-center justify-between">
+                      <span className="text-slate-500">
+                        {supportingFileName || 'Choose file (PDF/JPG/PNG)'}
+                      </span>
+                      <span className="text-blue-600 font-bold text-xs">Browse</span>
+                    </div>
                   </div>
+                  {errors.supportingDoc ? (
+                    <p id="career-supportingDoc-error" role="alert" className="text-xs font-semibold text-red-600">{errors.supportingDoc}</p>
+                  ) : (
+                    <p className="text-[10px] text-slate-400">Upload a clear copy for identity verification (Aadhaar, PAN, passport, voter ID, driving license).</p>
+                  )}
                 </div>
-                <p className="text-[10px] text-slate-400">Upload a clear copy for identity verification (Aadhaar, PAN, passport, voter ID, driving license).</p>
-              </div>
 
               {/* Photo Upload */}
               <div className="space-y-1.5">
@@ -544,22 +616,27 @@ export const Career: React.FC = () => {
                   Photo Upload <span className="text-rose-500">*</span>
                 </label>
                 <div className="relative">
-                  <input
-                    type="file"
-                    accept=".jpg,.jpeg,.png,.webp"
-                    onChange={handlePhotoChange}
-                    required
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                  />
-                  <div className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 flex items-center justify-between">
-                    <span className="text-slate-500">
-                      {photoFileName || 'Choose photo (JPG/PNG)'}
-                    </span>
-                    <span className="text-blue-600 font-bold text-xs">Browse</span>
+                    <input
+                      type="file"
+                      accept=".jpg,.jpeg,.png,.webp"
+                      onChange={handlePhotoChange}
+                      aria-invalid={errors.photo ? true : undefined}
+                      aria-describedby={errors.photo ? 'career-photo-error' : undefined}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    />
+                    <div className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 flex items-center justify-between">
+                      <span className="text-slate-500">
+                        {photoFileName || 'Choose photo (JPG/PNG)'}
+                      </span>
+                      <span className="text-blue-600 font-bold text-xs">Browse</span>
+                    </div>
                   </div>
+                  {errors.photo ? (
+                    <p id="career-photo-error" role="alert" className="text-xs font-semibold text-red-600">{errors.photo}</p>
+                  ) : (
+                    <p className="text-[10px] text-slate-400">Upload a recent professional photo.</p>
+                  )}
                 </div>
-                <p className="text-[10px] text-slate-400">Upload a recent professional photo.</p>
-              </div>
 
               {/* Doctor Certificate Upload */}
               <div className="space-y-1.5">
@@ -568,22 +645,27 @@ export const Career: React.FC = () => {
                   Doctor Certificate <span className="text-rose-500">*</span>
                 </label>
                 <div className="relative">
-                  <input
-                    type="file"
-                    accept=".pdf,.jpg,.jpeg,.png"
-                    onChange={handleCertificateChange}
-                    required
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                  />
-                  <div className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 flex items-center justify-between">
-                    <span className="text-slate-500">
-                      {certificateFileName || 'Choose certificate (PDF/JPG/PNG)'}
-                    </span>
-                    <span className="text-blue-600 font-bold text-xs">Browse</span>
+                    <input
+                      type="file"
+                      accept=".pdf,.jpg,.jpeg,.png"
+                      onChange={handleCertificateChange}
+                      aria-invalid={errors.doctorCertificate ? true : undefined}
+                      aria-describedby={errors.doctorCertificate ? 'career-doctorCertificate-error' : undefined}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    />
+                    <div className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 flex items-center justify-between">
+                      <span className="text-slate-500">
+                        {certificateFileName || 'Choose certificate (PDF/JPG/PNG)'}
+                      </span>
+                      <span className="text-blue-600 font-bold text-xs">Browse</span>
+                    </div>
                   </div>
+                  {errors.doctorCertificate ? (
+                    <p id="career-doctorCertificate-error" role="alert" className="text-xs font-semibold text-red-600">{errors.doctorCertificate}</p>
+                  ) : (
+                    <p className="text-[10px] text-slate-400">Upload your physiotherapy degree / registration certificate.</p>
+                  )}
                 </div>
-                <p className="text-[10px] text-slate-400">Upload your physiotherapy degree / registration certificate.</p>
-              </div>
 
               {/* Cover Letter */}
               <div className="space-y-1.5">
@@ -604,15 +686,17 @@ export const Career: React.FC = () => {
               {/* Joining Date & Consent */}
               <div className="space-y-4">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                  <label htmlFor="career-joiningDate" className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
                     <Calendar className="w-3.5 h-3.5 text-blue-500" />
                     Preferred Joining Date <span className="text-rose-500">*</span>
                   </label>
                   <select
+                    id="career-joiningDate"
                     name="joiningDate"
                     value={formData.joiningDate}
                     onChange={handleInputChange}
-                    required
+                    aria-invalid={errors.joiningDate ? true : undefined}
+                    aria-describedby={errors.joiningDate ? 'career-joiningDate-error' : undefined}
                     className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 focus:outline-none focus:border-blue-600 focus:bg-white transition-all"
                   >
                     <option value="">Select joining preference</option>
@@ -620,6 +704,9 @@ export const Career: React.FC = () => {
                       <option key={opt} value={opt}>{opt}</option>
                     ))}
                   </select>
+                  {errors.joiningDate && (
+                    <p id="career-joiningDate-error" role="alert" className="text-xs font-semibold text-red-600">{errors.joiningDate}</p>
+                  )}
                 </div>
 
                 {/* Consent Checkbox */}
@@ -628,26 +715,33 @@ export const Career: React.FC = () => {
                     type="checkbox"
                     id="consent"
                     checked={formData.consent}
-                    onChange={(e) => setFormData(prev => ({ ...prev, consent: e.target.checked }))}
-                    required
+                    onChange={(e) => {
+                      setFormData(prev => ({ ...prev, consent: e.target.checked }));
+                      clearError('consent');
+                    }}
+                    aria-invalid={errors.consent ? true : undefined}
+                    aria-describedby={errors.consent ? 'consent-error' : undefined}
                     className="mt-1 w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500"
                   />
                   <label htmlFor="consent" className="text-xs text-slate-600 leading-relaxed">
                     I confirm that the information provided is accurate and I consent to PhysioPrime 
                     contacting me regarding my application. <span className="text-rose-500">*</span>
+                    {errors.consent && (
+                      <span id="consent-error" role="alert" className="block mt-1 font-bold text-red-600">{errors.consent}</span>
+                    )}
                   </label>
                 </div>
               </div>
 
               {/* Submit Button */}
-              {error && (
-                <div className="text-xs font-bold text-red-600 bg-red-50 border border-red-200 rounded-xl px-3 py-2.5">
-                  {error}
+              {submitError && (
+                <div role="alert" className="text-xs font-bold text-red-600 bg-red-50 border border-red-200 rounded-xl px-3 py-2.5">
+                  {submitError}
                 </div>
               )}
               <button
                 type="submit"
-                disabled={isLoading || !formData.consent}
+                disabled={isLoading}
                 className="w-full btn-gradient text-white py-3.5 rounded-2xl font-extrabold text-sm shadow-lg shadow-blue-500/25 flex items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-70 disabled:hover:scale-100"
               >
                 {isLoading ? (

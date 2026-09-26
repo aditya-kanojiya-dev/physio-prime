@@ -9,6 +9,15 @@ import { ApiError } from '../../lib/api';
 import { openRazorpayCheckout } from '../../lib/razorpayCheckout';
 import { fadeUp } from '../../lib/motion';
 import {
+  email as checkEmail,
+  hasErrors,
+  intInRange,
+  numInRange,
+  phone10,
+  required,
+  type Errors,
+} from '../../lib/validate';
+import {
   ArrowLeft,
   CheckCircle2,
   Loader2,
@@ -31,6 +40,10 @@ interface ConfirmStepProps {
 }
 
 const RELATIONS = ['Father', 'Mother', 'Spouse', 'Child', 'Grandparent', 'Sibling', 'Friend', 'Other'];
+
+type BookingErrors = Errors<
+  'name' | 'email' | 'phone' | 'gender' | 'age' | 'weight' | 'height' | 'relation' | 'address' | 'agreed'
+>;
 
 const MODE_LABELS: Record<ConsultationMode, string> = {
   home: 'Home Visit',
@@ -100,30 +113,20 @@ export const ConfirmStep: React.FC<ConfirmStepProps> = ({
 
   const fee = doctor.fees[mode];
 
-  const errors = useMemo(() => {
-    const e: Record<string, string> = {};
-    if (!patientName.trim()) e.name = 'Full name is required';
-    if (!patientEmail.trim()) e.email = 'Email is required';
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(patientEmail.trim())) e.email = 'Enter a valid email address';
-    if (!patientPhone.trim()) e.phone = 'Phone number is required';
-    else if (!/^\d{10}$/.test(patientPhone.replace(/\D/g, ''))) e.phone = 'Enter a valid 10-digit phone number';
+  const errors = useMemo<BookingErrors>(() => {
+    const e: BookingErrors = {};
+    e.name = required(patientName, 'Full name');
+    e.email = checkEmail(patientEmail);
+    e.phone = phone10(patientPhone);
     if (!patientGender) e.gender = 'Select a gender';
-    if (!patientAge.trim()) e.age = 'Age is required';
-    else {
-      const ageInt = parseInt(patientAge);
-      if (ageInt < 1 || ageInt > 100) e.age = 'Age must be between 1 and 100';
-    }
-    if (patientWeight.trim()) {
-      const w = Number(patientWeight);
-      if (!(w > 0 && w <= 500)) e.weight = 'Weight must be between 1 and 500 kg';
-    }
-    if (patientHeight.trim()) {
-      const h = Number(patientHeight);
-      if (!(h > 0 && h <= 250)) e.height = 'Height must be between 1 and 250 cm';
-    }
+    e.age = intInRange(patientAge, 1, 100, 'Age');
+    if (patientWeight.trim()) e.weight = numInRange(patientWeight, 1, 500, 'Weight');
+    if (patientHeight.trim()) e.height = numInRange(patientHeight, 1, 250, 'Height');
     if (forOther && !relation) e.relation = 'Select who this appointment is for';
+    if (mode === 'home') e.address = required(address, 'Home visit address');
+    if (!agreed) e.agreed = 'Please accept the terms to continue';
     return e;
-  }, [patientName, patientEmail, patientPhone, patientGender, patientAge, patientWeight, patientHeight, forOther, relation]);
+  }, [patientName, patientEmail, patientPhone, patientGender, patientAge, patientWeight, patientHeight, forOther, relation, address, mode, agreed]);
 
   function prefillSelf() {
     if (!user) return;
@@ -160,12 +163,12 @@ export const ConfirmStep: React.FC<ConfirmStepProps> = ({
     return () => clearTimeout(t);
   }, [heldFor]);
 
-  const canSubmit = useMemo(() => {
-    if (!user) return false;
-    if (Object.keys(errors).length > 0) return false;
-    if (!agreed) return false;
-    return true;
-  }, [user, errors, agreed]);
+  // The button stays enabled when the form is invalid: disabling it would also
+  // stop `attempted` from ever flipping, so the inline errors would never show.
+  // handlePay validates and bails.
+  const canSubmit = Boolean(user);
+
+  const invalidCount = useMemo(() => Object.values(errors).filter(Boolean).length, [errors]);
 
   const openCheckout = async (appointment: CreatedAppointment['appointment'], razorpayOrder: CreatedAppointment['razorpayOrder']) => {
     if (!import.meta.env.VITE_RAZORPAY_KEY_ID || !razorpayOrder) {
@@ -196,6 +199,7 @@ export const ConfirmStep: React.FC<ConfirmStepProps> = ({
 
   const handlePay = async () => {
     setAttempted(true);
+    if (hasErrors(errors)) return;
     setProcessing(true);
     setPaymentError(null);
     setHeldFor(null);
@@ -565,7 +569,7 @@ export const ConfirmStep: React.FC<ConfirmStepProps> = ({
 
             {mode === 'home' && (
               <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-700">Home Visit Address</label>
+                <label className="text-xs font-bold text-slate-700">Home Visit Address *</label>
                 <div className="relative">
                   <MapPin className="absolute left-4 top-3 w-4 h-4 text-slate-400" />
                   <textarea
@@ -573,9 +577,12 @@ export const ConfirmStep: React.FC<ConfirmStepProps> = ({
                     value={address}
                     onChange={e => setAddress(e.target.value)}
                     placeholder="Enter home address for the therapist visit"
-                    className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 shadow-sm"
+                    className={`w-full pl-10 pr-4 py-3 bg-white border ${attempted && errors.address ? 'border-red-400 border-2' : 'border-slate-200'} rounded-xl text-sm font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 shadow-sm`}
                   />
                 </div>
+                {attempted && errors.address && (
+                  <p role="alert" className="text-[11px] font-semibold text-red-600">{errors.address}</p>
+                )}
               </div>
             )}
           </div>
@@ -716,6 +723,13 @@ export const ConfirmStep: React.FC<ConfirmStepProps> = ({
                 <span>Confirm & Book (Pay at Visit)</span>
               )}
             </button>
+            {attempted && invalidCount > 0 && (
+              <p role="alert" className="text-center text-xs font-semibold text-red-600">
+                {invalidCount === 1
+                  ? '1 field needs fixing above.'
+                  : `${invalidCount} fields need fixing above.`}
+              </p>
+            )}
           </div>
         </motion.div>
       </div>

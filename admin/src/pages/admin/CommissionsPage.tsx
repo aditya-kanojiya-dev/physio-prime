@@ -5,6 +5,7 @@ import { api, ApiError } from '../../lib/api'
 import { AdminDoctor, DoctorCategoryCommission } from '../../lib/types'
 import { AdminLayout } from '../../components/admin/AdminLayout'
 import { confirmDialog } from '../../components/admin/ConfirmDialog'
+import { intInRange, numInRange } from '../../lib/validate'
   import { Modal, inputCls } from './CategoriesPage'
 
 const FALLBACK = 30
@@ -212,14 +213,22 @@ function CommissionRow({
   const [pct, setPct] = useState(commission.platformFeePercent === null ? '' : String(commission.platformFeePercent))
   const [fee, setFee] = useState(commission.consultationFeePaise === null ? '' : String(commission.consultationFeePaise / 100))
   const [dirty, setDirty] = useState(false)
+  const [err, setErr] = useState('')
 
+  // mirrors categoryCommissionSchema: int 0..100 percent, int >= 0 paise
   const handleSave = () => {
+    setErr('')
+    const pctErr = pct === '' ? null : intInRange(pct, 0, 100, 'Commission')
+    const feePaise = fee === '' ? 0 : Math.round(Number(fee) * 100)
+    const feeErr =
+      fee === '' ? null : Number.isFinite(feePaise) ? numInRange(String(feePaise), 0, Number.MAX_SAFE_INTEGER, 'Fee') : 'Enter a valid fee'
+    if (pctErr || feeErr) { setErr(pctErr ?? feeErr!); return }
     save.mutate({
       doctorId,
       categoryId: commission.categoryId,
       body: {
         platformFeePercent: pct === '' ? null : Number(pct),
-        consultationFeePaise: fee === '' ? null : Math.round(Number(fee) * 100),
+        consultationFeePaise: fee === '' ? null : feePaise,
       },
     })
     setDirty(false)
@@ -271,6 +280,7 @@ function CommissionRow({
           <Trash2 className="w-3.5 h-3.5" />
         </button>
       </div>
+      {err && <p role="alert" className="text-[10px] font-bold text-rose-600">{err}</p>}
     </li>
   )
 }

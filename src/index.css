@@ -207,3 +207,10 @@
     animation: none !important;
   }
 }
+
+/* Inline form validation. Field sets aria-invalid on the control, so every form
+   gets the same red border without repeating classes per input. */
+[aria-invalid='true'] {
+  border-color: #fca5a5 !important;
+  box-shadow: 0 0 0 3px rgba(248, 113, 113, 0.15);
+}

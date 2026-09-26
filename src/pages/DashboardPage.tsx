@@ -5,6 +5,13 @@ import { useAuth } from '../context/AuthContext';
 import { useBooking } from '../context/BookingContext';
 import { hasPendingOnlinePayment } from '../lib/adapters';
 import { supabase } from '../lib/supabase';
+import { Field } from '../components/ui/Field';
+import { hasErrors, matches, minLen, numInRange, phone10, required, type Errors } from '../lib/validate';
+
+const fieldCls =
+  'w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 placeholder-slate-400 outline-none transition-all shadow-sm focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20';
+
+type ProfileErrors = Errors<'name' | 'phone' | 'weight' | 'height'>;
 
 export const DashboardPage: React.FC = () => {
   const { user, hydrated } = useAuth();
@@ -116,6 +123,7 @@ function ProfileTab() {
   const [address, setAddress] = useState(addressText(user?.address));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [errors, setErrors] = useState<ProfileErrors>({});
   const [saved, setSaved] = useState(false);
 
   if (!user) return null;
@@ -129,6 +137,7 @@ function ProfileTab() {
     setHeight(user.height || '');
     setAddress(addressText(user.address));
     setError(null);
+    setErrors({});
     setSaved(false);
     setEditing(true);
   };
@@ -137,29 +146,17 @@ function ProfileTab() {
     e.preventDefault();
     setError(null);
     setSaved(false);
-    if (!name.trim()) {
-      setError('Name cannot be empty.');
-      return;
-    }
+
+    const next: ProfileErrors = {
+      name: required(name, 'Name'),
+      phone: phone.trim() ? phone10(phone) : undefined,
+      weight: weight.trim() ? numInRange(weight, 1, 500, 'Weight') : undefined,
+      height: height.trim() ? numInRange(height, 1, 250, 'Height') : undefined,
+    };
+    setErrors(next);
+    if (hasErrors(next)) return;
+
     const phoneDigits = (phone || '').replace(/\D/g, '');
-    if (phone.trim() && phoneDigits.length !== 10) {
-      setError('Phone number must be a valid 10-digit number.');
-      return;
-    }
-    if (weight.trim()) {
-      const w = Number(weight);
-      if (!(w > 0 && w <= 500)) {
-        setError('Weight must be between 1 and 500 kg.');
-        return;
-      }
-    }
-    if (height.trim()) {
-      const h = Number(height);
-      if (!(h > 0 && h <= 250)) {
-        setError('Height must be between 1 and 250 cm.');
-        return;
-      }
-    }
     setLoading(true);
     try {
       await updateProfile({
@@ -195,43 +192,48 @@ function ProfileTab() {
       </div>
 
       {editing ? (
-        <form onSubmit={handleSave} className="space-y-4 max-w-lg">
-          <div className="space-y-1">
-            <label className="ml-1 text-xs font-bold text-slate-700">Full Name</label>
+        <form onSubmit={handleSave} noValidate className="space-y-4 max-w-lg">
+          <Field id="profile-name" label="Full Name" error={errors.name}>
             <input
               type="text"
               value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 placeholder-slate-400 outline-none transition-all shadow-sm focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20"
-              required
+              onChange={(e) => {
+                setName(e.target.value);
+                setErrors((p) => ({ ...p, name: undefined }));
+              }}
+              className={fieldCls}
             />
-          </div>
+          </Field>
 
-          <div className="space-y-1">
-            <label className="ml-1 text-xs font-bold text-slate-700">Email Address</label>
+          <Field
+            id="profile-email"
+            label="Email Address"
+            hint="Email cannot be changed here."
+            labelClass="ml-1 text-xs font-bold text-slate-700"
+          >
             <input
               type="email"
               value={user.email || ''}
               className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-400 outline-none cursor-not-allowed"
               disabled
             />
-            <p className="ml-1 text-[11px] text-slate-400">Email cannot be changed here.</p>
-          </div>
+          </Field>
 
-          <div className="space-y-1">
-            <label className="ml-1 text-xs font-bold text-slate-700">Phone Number</label>
+          <Field id="profile-phone" label="Phone Number" error={errors.phone}>
             <input
               type="tel"
               value={phone}
-              onChange={(e) => setPhone(e.target.value)}
+              onChange={(e) => {
+                setPhone(e.target.value);
+                setErrors((p) => ({ ...p, phone: undefined }));
+              }}
               placeholder="+91 98765 43210"
-              className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 placeholder-slate-400 outline-none transition-all shadow-sm focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20"
+              className={fieldCls}
             />
-          </div>
+          </Field>
 
           <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <label className="ml-1 text-xs font-bold text-slate-700">Gender</label>
+            <Field id="profile-gender" label="Gender">
               <select
                 value={gender}
                 onChange={(e) => setGender(e.target.value)}
@@ -242,66 +244,62 @@ function ProfileTab() {
                 <option value="female">Female</option>
                 <option value="other">Other</option>
               </select>
-            </div>
+            </Field>
 
-            <div className="space-y-1">
-              <label className="ml-1 text-xs font-bold text-slate-700">Date of Birth</label>
+            <Field id="profile-dob" label="Date of Birth">
               <input
                 type="date"
                 value={dob}
                 onChange={(e) => setDob(e.target.value)}
                 className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 focus:outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 shadow-sm"
               />
-            </div>
+            </Field>
 
-            <div className="space-y-1">
-              <label className="ml-1 text-xs font-bold text-slate-700">Weight (kg)</label>
+            <Field id="profile-weight" label="Weight (kg)" error={errors.weight}>
               <input
                 type="number"
                 min="1"
                 max="500"
                 step="0.1"
                 value={weight}
-                onChange={(e) => setWeight(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === '-' || e.key === 'e' || e.key === 'E') e.preventDefault();
+                onChange={(e) => {
+                  setWeight(e.target.value);
+                  setErrors((p) => ({ ...p, weight: undefined }));
                 }}
                 placeholder="e.g. 65"
-                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 shadow-sm"
+                className={fieldCls}
               />
-            </div>
+            </Field>
 
-            <div className="space-y-1">
-              <label className="ml-1 text-xs font-bold text-slate-700">Height (cm)</label>
+            <Field id="profile-height" label="Height (cm)" error={errors.height}>
               <input
                 type="number"
                 min="1"
                 max="250"
                 step="0.1"
                 value={height}
-                onChange={(e) => setHeight(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === '-' || e.key === 'e' || e.key === 'E') e.preventDefault();
+                onChange={(e) => {
+                  setHeight(e.target.value);
+                  setErrors((p) => ({ ...p, height: undefined }));
                 }}
                 placeholder="e.g. 168"
-                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 shadow-sm"
+                className={fieldCls}
               />
-            </div>
+            </Field>
           </div>
 
-          <div className="space-y-1">
-            <label className="ml-1 text-xs font-bold text-slate-700">Address</label>
+          <Field id="profile-address" label="Address">
             <textarea
               rows={2}
               value={address}
               onChange={(e) => setAddress(e.target.value)}
               placeholder="Enter your address"
-              className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 placeholder-slate-400 outline-none transition-all shadow-sm focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20"
+              className={fieldCls}
             />
-          </div>
+          </Field>
 
           {error && (
-            <div className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 text-xs font-semibold text-red-700">
+            <div role="alert" className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 text-xs font-semibold text-red-700">
               <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
               {error}
             </div>
@@ -424,6 +422,7 @@ function PrivacyTab() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [errors, setErrors] = useState<Errors<'currentPassword' | 'newPassword' | 'confirmPassword'>>({});
   const [saved, setSaved] = useState(false);
 
   if (!user?.email) return null;
@@ -432,14 +431,19 @@ function PrivacyTab() {
     e.preventDefault();
     setError(null);
     setSaved(false);
-    if (newPassword.length < 8) {
-      setError('New password must be at least 8 characters.');
-      return;
-    }
-    if (newPassword !== confirmPassword) {
-      setError('New passwords do not match.');
-      return;
-    }
+
+    const next: Errors<'currentPassword' | 'newPassword' | 'confirmPassword'> = {
+      currentPassword: required(currentPassword, 'Current password'),
+      newPassword: newPassword
+        ? minLen(newPassword, 8, 'New password')
+        : 'New password is required',
+      confirmPassword: !confirmPassword
+        ? 'Confirm your new password'
+        : matches(newPassword, confirmPassword),
+    };
+    setErrors(next);
+    if (hasErrors(next)) return;
+
     setLoading(true);
     try {
       const { error: signInError } = await supabase.auth.signInWithPassword({
@@ -467,28 +471,53 @@ function PrivacyTab() {
         <p className="mt-1 text-slate-500">Your health data is encrypted according to HIPAA and ISO-27001 medical standards.</p>
       </div>
 
-      <form onSubmit={handleChangePassword} className="space-y-4">
+      <form onSubmit={handleChangePassword} noValidate className="space-y-4">
         <h4 className="flex items-center gap-2 font-bold text-slate-900">
           <KeyRound className="w-4 h-4" /> Change Account Password
         </h4>
 
-        <div className="space-y-1">
-          <label className="ml-1 text-xs font-bold text-slate-700">Current Password</label>
-          <PasswordInput value={currentPassword} onChange={setCurrentPassword} show={showPassword} setShow={setShowPassword} autoComplete="current-password" />
-        </div>
+        <Field id="current-password" label="Current Password" error={errors.currentPassword}>
+          <PasswordInput
+            value={currentPassword}
+            onChange={(v) => {
+              setCurrentPassword(v);
+              setErrors((p) => ({ ...p, currentPassword: undefined }));
+            }}
+            show={showPassword}
+            setShow={setShowPassword}
+            autoComplete="current-password"
+          />
+        </Field>
 
-        <div className="space-y-1">
-          <label className="ml-1 text-xs font-bold text-slate-700">New Password</label>
-          <PasswordInput value={newPassword} onChange={setNewPassword} show={showPassword} setShow={setShowPassword} autoComplete="new-password" placeholder="At least 8 characters" />
-        </div>
+        <Field id="new-password" label="New Password" error={errors.newPassword}>
+          <PasswordInput
+            value={newPassword}
+            onChange={(v) => {
+              setNewPassword(v);
+              setErrors((p) => ({ ...p, newPassword: undefined }));
+            }}
+            show={showPassword}
+            setShow={setShowPassword}
+            autoComplete="new-password"
+            placeholder="At least 8 characters"
+          />
+        </Field>
 
-        <div className="space-y-1">
-          <label className="ml-1 text-xs font-bold text-slate-700">Confirm New Password</label>
-          <PasswordInput value={confirmPassword} onChange={setConfirmPassword} show={showPassword} setShow={setShowPassword} autoComplete="new-password" />
-        </div>
+        <Field id="confirm-new-password" label="Confirm New Password" error={errors.confirmPassword}>
+          <PasswordInput
+            value={confirmPassword}
+            onChange={(v) => {
+              setConfirmPassword(v);
+              setErrors((p) => ({ ...p, confirmPassword: undefined }));
+            }}
+            show={showPassword}
+            setShow={setShowPassword}
+            autoComplete="new-password"
+          />
+        </Field>
 
         {error && (
-          <div className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 text-xs font-semibold text-red-700">
+          <div role="alert" className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 text-xs font-semibold text-red-700">
             <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
             {error}
           </div>
@@ -521,6 +550,7 @@ function PasswordInput({
   setShow,
   autoComplete,
   placeholder,
+  ...rest
 }: {
   value: string;
   onChange: (v: string) => void;
@@ -528,18 +558,18 @@ function PasswordInput({
   setShow: (v: boolean) => void;
   autoComplete: string;
   placeholder?: string;
-}) {
+} & Record<string, unknown>) {
   const inputClass =
     'w-full px-4 py-3 pr-11 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 placeholder-slate-400 outline-none transition-all shadow-sm focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20';
   return (
     <div className="relative">
       <input
+        {...rest}
         type={show ? 'text' : 'password'}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         className={inputClass}
         placeholder={placeholder}
-        required
         autoComplete={autoComplete}
       />
       <button

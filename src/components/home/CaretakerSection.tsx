@@ -1,7 +1,15 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { FilterSelect } from '../ui/FilterSelect';
+import { Field } from '../ui/Field';
+import { hasErrors, phone10, required, type Errors } from '../../lib/validate';
 import { HeartHandshake, Phone, Mail, MapPin, Send, CheckCircle2, Loader2 } from 'lucide-react';
+
+const inputCls =
+  'w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:border-teal-400 focus:ring-2 focus:ring-teal-100 outline-none transition-all';
+const labelCls = 'block text-sm font-semibold text-slate-700 mb-1.5';
+
+type CaretakerErrors = Errors<'name' | 'phone' | 'message'>;
 
 export const CaretakerSection: React.FC = () => {
   const [name, setName] = useState('');
@@ -9,6 +17,7 @@ export const CaretakerSection: React.FC = () => {
   const [serviceType, setServiceType] = useState('Caretaker');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [errors, setErrors] = useState<CaretakerErrors>({});
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
@@ -16,14 +25,12 @@ export const CaretakerSection: React.FC = () => {
     e.preventDefault();
     setError('');
 
-    if (!name.trim()) {
-      setError('Please enter your name.');
-      return;
-    }
-    if (!/^\d{10}$/.test(phone.replace(/\D/g, ''))) {
-      setError('Please enter a valid 10-digit phone number.');
-      return;
-    }
+    const next: CaretakerErrors = {
+      name: required(name, 'Your name'),
+      phone: phone10(phone),
+    };
+    setErrors(next);
+    if (hasErrors(next)) return;
 
     setLoading(true);
     try {
@@ -110,28 +117,28 @@ export const CaretakerSection: React.FC = () => {
                 <p className="text-slate-600">Thank you! Our care team will call you back shortly.</p>
               </div>
             ) : (
-              <form onSubmit={handleSubmit} className="space-y-5">
+              <form onSubmit={handleSubmit} noValidate className="space-y-5">
                 <h3 className="text-lg font-extrabold text-slate-900">Get a Call Back</h3>
 
-                <div>
-                  <label htmlFor="caretaker-name" className="block text-sm font-semibold text-slate-700 mb-1.5">
-                    Your Name
-                  </label>
+                <Field id="caretaker-name" labelClass={labelCls} label="Your Name" error={errors.name}>
                   <input
-                    id="caretaker-name"
                     type="text"
                     value={name}
-                    onChange={(e) => setName(e.target.value)}
+                    onChange={(e) => {
+                      setName(e.target.value);
+                      setErrors((p) => ({ ...p, name: undefined }));
+                    }}
                     placeholder="e.g. Rahul Sharma"
-                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:border-teal-400 focus:ring-2 focus:ring-teal-100 outline-none transition-all"
+                    className={inputCls}
                   />
-                </div>
+                </Field>
 
                 <div>
-                  <label htmlFor="caretaker-service" className="block text-sm font-semibold text-slate-700 mb-1.5">
+                  <label htmlFor="caretaker-service" className={labelCls}>
                     Service You Need
                   </label>
                   <FilterSelect
+                    id="caretaker-service"
                     value={serviceType}
                     onChange={setServiceType}
                     placeholder="Select a service"
@@ -145,35 +152,37 @@ export const CaretakerSection: React.FC = () => {
                   />
                 </div>
 
-                <div>
-                  <label htmlFor="caretaker-phone" className="block text-sm font-semibold text-slate-700 mb-1.5">
-                    Phone Number
-                  </label>
+                <Field id="caretaker-phone" labelClass={labelCls} label="Phone Number" error={errors.phone}>
                   <input
-                    id="caretaker-phone"
                     type="tel"
+                    inputMode="numeric"
+                    maxLength={14}
                     value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
+                    onChange={(e) => {
+                      setPhone(e.target.value);
+                      setErrors((p) => ({ ...p, phone: undefined }));
+                    }}
                     placeholder="10-digit mobile number"
-                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:border-teal-400 focus:ring-2 focus:ring-teal-100 outline-none transition-all"
+                    className={inputCls}
                   />
-                </div>
+                </Field>
 
-                <div>
-                  <label htmlFor="caretaker-message" className="block text-sm font-semibold text-slate-700 mb-1.5">
-                    Message <span className="text-slate-400 font-normal">(optional)</span>
-                  </label>
+                <Field
+                  id="caretaker-message"
+                  labelClass={labelCls}
+                  label="Message (optional)"
+                  error={errors.message}
+                >
                   <textarea
-                    id="caretaker-message"
                     value={message}
                     onChange={(e) => setMessage(e.target.value)}
                     placeholder="Tell us briefly about the care you need"
                     rows={3}
-                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:border-teal-400 focus:ring-2 focus:ring-teal-100 outline-none transition-all resize-none"
+                    className={`${inputCls} resize-none`}
                   />
-                </div>
+                </Field>
 
-                {error && <p className="text-sm text-red-600 font-medium">{error}</p>}
+                {error && <p role="alert" className="text-sm text-red-600 font-medium">{error}</p>}
 
                 <button
                   type="submit"

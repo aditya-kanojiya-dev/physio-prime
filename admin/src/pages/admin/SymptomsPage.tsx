@@ -8,6 +8,7 @@ import { confirmDialog } from '../../components/admin/ConfirmDialog'
 import { StatusPill } from './AppointmentsPage'
 import { Field, Modal, inputCls } from './CategoriesPage'
 import { ImageUpload } from '../../components/admin/ImageUpload'
+import { hasErrors, intInRange, maxLen, slug as slugRule, type Errors } from '../../lib/validate'
 
 const emptyForm = {
   title: '',
@@ -26,6 +27,7 @@ export function SymptomsPage() {
   const [editing, setEditing] = useState<AdminSymptom | null>(null)
   const [form, setForm] = useState(emptyForm)
   const [error, setError] = useState<string | null>(null)
+  const [errors, setErrors] = useState<Errors<'title' | 'slug' | 'description' | 'iconName' | 'recoveryEstimate' | 'sortOrder'>>({})
 
   const { data, isLoading } = useQuery({
     queryKey: ['admin/symptoms'],
@@ -73,9 +75,19 @@ export function SymptomsPage() {
   const submit = (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
+    const next: Errors<'title' | 'slug' | 'description' | 'iconName' | 'recoveryEstimate' | 'sortOrder'> = {
+      title: form.title ? maxLen(form.title, 100, 'Title') : 'Title is required',
+      slug: slugRule(form.slug),
+      description: form.description ? maxLen(form.description, 1000, 'Description') : undefined,
+      iconName: form.iconName ? maxLen(form.iconName, 100, 'Icon name') : undefined,
+      recoveryEstimate: form.recoveryEstimate ? maxLen(form.recoveryEstimate, 200, 'Recovery estimate') : undefined,
+      sortOrder: intInRange(String(form.sortOrder), 0, 100000, 'Sort order'),
+    }
+    setErrors(next)
+    if (hasErrors(next)) return
     save.mutate({
-      title: form.title,
-      slug: form.slug,
+      title: form.title.trim(),
+      slug: form.slug.trim(),
       iconName: form.iconName || null,
       description: form.description || null,
       recoveryEstimate: form.recoveryEstimate || null,
@@ -169,35 +181,78 @@ export function SymptomsPage() {
 
       {modalOpen && (
         <Modal title={editing ? 'Edit Symptom' : 'Add Symptom'} onClose={() => setModalOpen(false)}>
-          <form onSubmit={submit} className="space-y-4 text-xs">
+          <form onSubmit={submit} noValidate className="space-y-4 text-xs">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field label="Title *">
-                <input required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className={inputCls} />
-              </Field>
-              <Field label="Slug *">
+              <Field label="Title *" error={errors.title}>
                 <input
-                  required
+                  value={form.title}
+                  onChange={(e) => {
+                    setForm({ ...form, title: e.target.value })
+                    setErrors((p) => ({ ...p, title: undefined }))
+                  }}
+                  className={inputCls}
+                />
+              </Field>
+              <Field label="Slug *" error={errors.slug}>
+                <input
                   value={form.slug}
-                  onChange={(e) => setForm({ ...form, slug: e.target.value.toLowerCase().replace(/[^a-z0-9]+/g, '-') })}
+                  onChange={(e) => {
+                    setForm({ ...form, slug: e.target.value.toLowerCase().replace(/[^a-z0-9]+/g, '-') })
+                    setErrors((p) => ({ ...p, slug: undefined }))
+                  }}
                   className={inputCls}
                 />
               </Field>
             </div>
-            <Field label="Description">
-              <textarea rows={3} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className={`${inputCls} resize-none`} />
+            <Field label="Description" error={errors.description}>
+              <textarea
+                rows={3}
+                value={form.description}
+                onChange={(e) => {
+                  setForm({ ...form, description: e.target.value })
+                  setErrors((p) => ({ ...p, description: undefined }))
+                }}
+                className={`${inputCls} resize-none`}
+              />
             </Field>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field label="Icon Name">
-                <input type="text" value={form.iconName} onChange={(e) => setForm({ ...form, iconName: e.target.value })} className={inputCls} placeholder="lucide icon name (e.g. Bone)" />
+              <Field label="Icon Name" error={errors.iconName}>
+                <input
+                  type="text"
+                  value={form.iconName}
+                  onChange={(e) => {
+                    setForm({ ...form, iconName: e.target.value })
+                    setErrors((p) => ({ ...p, iconName: undefined }))
+                  }}
+                  className={inputCls}
+                  placeholder="lucide icon name (e.g. Bone)"
+                />
               </Field>
-              <Field label="Recovery Estimate">
-                <input type="text" value={form.recoveryEstimate} onChange={(e) => setForm({ ...form, recoveryEstimate: e.target.value })} className={inputCls} placeholder="e.g. 2–4 weeks" />
+              <Field label="Recovery Estimate" error={errors.recoveryEstimate}>
+                <input
+                  type="text"
+                  value={form.recoveryEstimate}
+                  onChange={(e) => {
+                    setForm({ ...form, recoveryEstimate: e.target.value })
+                    setErrors((p) => ({ ...p, recoveryEstimate: undefined }))
+                  }}
+                  className={inputCls}
+                  placeholder="e.g. 2–4 weeks"
+                />
               </Field>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <ImageUpload value={form.image} onChange={(url) => setForm({ ...form, image: url })} folder="symptoms" label="Symptom Image" />
-              <Field label="Sort Order">
-                <input type="number" value={form.sortOrder} onChange={(e) => setForm({ ...form, sortOrder: Number(e.target.value) })} className={inputCls} />
+              <Field label="Sort Order" error={errors.sortOrder}>
+                <input
+                  type="number"
+                  value={form.sortOrder}
+                  onChange={(e) => {
+                    setForm({ ...form, sortOrder: Number(e.target.value) })
+                    setErrors((p) => ({ ...p, sortOrder: undefined }))
+                  }}
+                  className={inputCls}
+                />
               </Field>
             </div>
             <label className="flex items-center gap-2 cursor-pointer">

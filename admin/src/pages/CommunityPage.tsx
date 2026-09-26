@@ -370,8 +370,9 @@ function NewPostModal({
   })
 
   const addTags = (raw: string) => {
-    const parts = raw.split(',').map((t) => t.trim()).filter(Boolean)
-    setTags((prev) => [...new Set([...prev, ...parts])])
+    // server caps tags at 10 entries of 50 chars; clamp on entry like the existing dedupe
+    const parts = raw.split(',').map((t) => t.trim()).filter((t) => t && t.length <= 50)
+    setTags((prev) => [...new Set([...prev, ...parts])].slice(0, 10))
     setTagInput('')
   }
 
@@ -389,6 +390,7 @@ function NewPostModal({
           <input
             type="text"
             value={title}
+            maxLength={300}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="Title"
             className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold text-slate-900 focus:outline-none focus:border-teal-500"

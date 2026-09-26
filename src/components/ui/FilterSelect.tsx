@@ -13,9 +13,10 @@ interface FilterSelectProps {
   placeholder: string;
   options: FilterSelectOption[];
   searchable?: boolean;
+  id?: string;
 }
 
-export const FilterSelect: React.FC<FilterSelectProps> = ({ value, onChange, placeholder, options, searchable = true }) => {
+export const FilterSelect: React.FC<FilterSelectProps> = ({ value, onChange, placeholder, options, searchable = true, id }) => {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const ref = useRef<HTMLDivElement>(null);
@@ -48,6 +49,9 @@ export const FilterSelect: React.FC<FilterSelectProps> = ({ value, onChange, pla
     <div ref={ref} className="relative">
       <button
         type="button"
+        id={id}
+        aria-label={id ? undefined : placeholder}
+        aria-haspopup="listbox"
         onClick={() => setOpen(o => !o)}
         aria-expanded={open}
         className={`w-full flex items-center justify-between gap-2 bg-white border rounded-xl px-3 py-2.5 text-sm text-left transition-all ${

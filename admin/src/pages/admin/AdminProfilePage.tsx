@@ -1,7 +1,9 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { User, RefreshCw, Save, Lock, Mail, Phone, Shield } from 'lucide-react'
-import { api } from '../../lib/api'
+import { User, RefreshCw, Save, Lock, Mail, Shield } from 'lucide-react'
+import { api, ApiError } from '../../lib/api'
+import { Field } from './CategoriesPage'
+import { hasErrors, maxLen, required, type Errors } from '../../lib/validate'
 import { AdminProfile } from '../../lib/types'
 import { AdminLayout } from '../../components/admin/AdminLayout'
 import { ChangePasswordModal } from '../../components/admin/ChangePasswordModal'
@@ -12,6 +14,8 @@ export function AdminProfilePage() {
   const [phone, setPhone] = useState('')
   const [showPasswordModal, setShowPasswordModal] = useState(false)
   const [message, setMessage] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [errors, setErrors] = useState<Errors<'name' | 'phone'>>({})
 
   const { data, isLoading } = useQuery({
     queryKey: ['admin/profile'],
@@ -33,10 +37,22 @@ export function AdminProfilePage() {
     mutationFn: async () => api.patch<{ user: AdminProfile }>('/admin/profile', { name, phone: phone || null }),
     onSuccess: (res) => {
       queryClient.setQueryData(['admin/profile'], res.user)
+      setError(null)
       setMessage('Profile updated successfully')
       setTimeout(() => setMessage(''), 3000)
     },
+    onError: (err) => setError(err instanceof ApiError ? err.message : 'Save failed'),
   })
+
+  // mirrors the server's { name: 1..100, phone: <=20 }
+  const handleSave = () => {
+    const next: Errors<'name' | 'phone'> = {
+      name: required(name, 'Name') ?? maxLen(name, 100, 'Name'),
+      phone: phone ? maxLen(phone, 20, 'Phone') : undefined,
+    }
+    setErrors(next)
+    if (!hasErrors(next)) saveMutation.mutate()
+  }
 
   return (
     <AdminLayout>
@@ -48,6 +64,9 @@ export function AdminProfilePage() {
 
         {message && (
           <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-sm text-emerald-700 font-bold">{message}</div>
+        )}
+        {error && (
+          <div role="alert" className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-sm text-rose-700 font-bold">{error}</div>
         )}
 
         {isLoading ? (
@@ -68,15 +87,14 @@ export function AdminProfilePage() {
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-slate-600 mb-1.5">Full Name</label>
+              <Field label="Full Name" error={errors.name}>
                 <input
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   className="w-full px-4 py-2.5 rounded-xl bg-slate-100 border border-slate-200 text-sm focus:outline-none focus:border-teal-500 transition-colors"
                 />
-              </div>
+              </Field>
 
               <div>
                 <label className="block text-xs font-bold text-slate-600 mb-1.5">
@@ -91,10 +109,7 @@ export function AdminProfilePage() {
                 <p className="text-[10px] text-slate-400 mt-1">Email cannot be changed here.</p>
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-slate-600 mb-1.5">
-                  <span className="flex items-center gap-1.5"><Phone className="w-3.5 h-3.5" /> Phone</span>
-                </label>
+              <Field label="Phone" error={errors.phone}>
                 <input
                   type="tel"
                   value={phone}
@@ -102,7 +117,7 @@ export function AdminProfilePage() {
                   placeholder="+91 ..."
                   className="w-full px-4 py-2.5 rounded-xl bg-slate-100 border border-slate-200 text-sm focus:outline-none focus:border-teal-500 transition-colors"
                 />
-              </div>
+              </Field>
 
               <div className="flex items-center gap-2 pt-2">
                 <Shield className="w-4 h-4 text-slate-400" />
@@ -110,7 +125,7 @@ export function AdminProfilePage() {
               </div>
 
               <button
-                onClick={() => saveMutation.mutate()}
+                onClick={handleSave}
                 disabled={saveMutation.isPending}
                 className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-teal-500 text-white text-sm font-bold shadow-md shadow-blue-500/20 hover:shadow-lg transition-all disabled:opacity-50"
               >

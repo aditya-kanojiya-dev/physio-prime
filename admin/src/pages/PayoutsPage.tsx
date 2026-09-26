@@ -58,10 +58,12 @@ export function PayoutsPage() {
 
   const handleRequest = () => {
     setError(null)
-    const rupees = parseFloat(amount)
-    if (!rupees || rupees <= 0) { setError('Enter a valid amount'); return }
-    if (rupees * 100 > (s.availableBalancePaise ?? 0)) { setError('Amount exceeds available balance'); return }
-    requestMutation.mutate({ amountPaise: Math.round(rupees * 100), paymentMethod: method })
+    // mirrors the server's z.number().int().positive(): reject anything that
+    // rounds to a non-positive or non-integer paise amount before spending a round trip
+    const paise = Math.round(Number(amount.trim()) * 100)
+    if (!Number.isInteger(paise) || paise <= 0) { setError('Enter a valid amount'); return }
+    if (paise > (s.availableBalancePaise ?? 0)) { setError('Amount exceeds available balance'); return }
+    requestMutation.mutate({ amountPaise: paise, paymentMethod: method })
   }
 
   return (

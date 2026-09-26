@@ -23,9 +23,13 @@ import { api, ApiError } from '../../lib/api'
 import { AdminApplication, AdminClient, AdminDoctor, ServiceArea } from '../../lib/types'
 import { AdminLayout } from '../../components/admin/AdminLayout'
 import { confirmDialog } from '../../components/admin/ConfirmDialog'
+import { Field, inputCls } from './CategoriesPage'
 import { ImageUpload } from '../../components/admin/ImageUpload'
 import { ChipMultiSelect } from '../../components/ChipMultiSelect'
 import { CITIES, DEPARTMENTS, DESIGNATIONS, EXPERIENCE_YEARS, HOME_RADIUS_KM, SPECIALTIES, STATES } from '../../lib/options'
+import { email as emailField, hasErrors, intInRange, maxLen, numInRange, type Errors } from '../../lib/validate'
+
+type DoctorFormErrors = Errors<'name' | 'email' | 'specialty' | 'title' | 'phone' | 'designation' | 'department' | 'feesHome' | 'feesOnline' | 'patientsTreated' | 'bio'>
 
 const emptyForm = {
   name: '',
@@ -69,6 +73,7 @@ export function DoctorsPage() {
   const [modalOpen, setModalOpen] = useState(false)
   const [form, setForm] = useState(emptyForm)
   const [error, setError] = useState<string | null>(null)
+  const [errors, setErrors] = useState<DoctorFormErrors>({})
   const [appError, setAppError] = useState<string | null>(null)
   const [clientsDoctor, setClientsDoctor] = useState<AdminDoctor | null>(null)
   const [viewApp, setViewApp] = useState<AdminApplication | null>(null)
@@ -138,9 +143,30 @@ export function DoctorsPage() {
     onError: (err) => setError(err instanceof ApiError ? err.message : 'Save failed'),
   })
 
+  // ponytail: clears a field's error on edit so a stale message never lingers
+  const edit = (patch: Partial<typeof form>, field?: keyof DoctorFormErrors) => {
+    setForm({ ...form, ...patch })
+    if (field) setErrors((p) => ({ ...p, [field]: undefined }))
+  }
+
   const submit = (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
+    const next: DoctorFormErrors = {
+      name: form.name ? maxLen(form.name, 100, 'Doctor name') : 'Doctor name is required',
+      email: emailField(form.email),
+      specialty: form.specialty.length ? maxLen(form.specialty, 200, 'Specialty') : 'Specialty is required',
+      title: form.title ? maxLen(form.title, 200, 'Title') : undefined,
+      phone: form.phone ? maxLen(form.phone, 20, 'Phone') : undefined,
+      designation: form.designation ? maxLen(form.designation, 100, 'Designation') : undefined,
+      department: form.department ? maxLen(form.department, 100, 'Department') : undefined,
+      feesHome: numInRange(String(form.feesHome), 0, 100000, 'Home fee'),
+      feesOnline: numInRange(String(form.feesOnline), 0, 100000, 'Online fee'),
+      patientsTreated: intInRange(String(form.patientsTreated), 0, 10000000, 'Patients treated'),
+      bio: form.bio ? maxLen(form.bio, 5000, 'Bio') : undefined,
+    }
+    setErrors(next)
+    if (hasErrors(next)) return
     saveDoctor.mutate({
       name: form.name,
       email: form.email,
@@ -622,23 +648,23 @@ export function DoctorsPage() {
               </button>
             </div>
 
-            <form onSubmit={submit} className="space-y-4 text-xs">
+            <form onSubmit={submit} noValidate className="space-y-4 text-xs">
               {/* Basic Info */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <Field label="Doctor Name *">
-                  <input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={inputCls} placeholder="Dr. John Doe" />
+                <Field label="Doctor Name *" error={errors.name}>
+                  <input required value={form.name} onChange={(e) => edit({ name: e.target.value }, 'name')} className={inputCls} placeholder="Dr. John Doe" />
                 </Field>
-                <Field label="Email *">
-                  <input required type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className={inputCls} placeholder="doctor@example.com" />
+                <Field label="Email *" error={errors.email}>
+                  <input required type="email" value={form.email} onChange={(e) => edit({ email: e.target.value }, 'email')} className={inputCls} placeholder="doctor@example.com" />
                 </Field>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <Field label="Specialty *">
-                  <ChipMultiSelect value={form.specialty} onChange={(v) => setForm({ ...form, specialty: v })} options={SPECIALTIES} />
+                <Field label="Specialty *" error={errors.specialty}>
+                  <ChipMultiSelect value={form.specialty} onChange={(v) => edit({ specialty: v }, 'specialty')} options={SPECIALTIES} />
                 </Field>
-                <Field label="Title">
-                  <select value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className={inputCls}>
+                <Field label="Title" error={errors.title}>
+                  <select value={form.title} onChange={(e) => edit({ title: e.target.value }, 'title')} className={inputCls}>
                     <option value="">—</option>
                     {DESIGNATIONS.map((t) => <option key={t} value={t}>{t}</option>)}
                   </select>
@@ -652,20 +678,20 @@ export function DoctorsPage() {
                     <option value="male">Male</option>
                   </select>
                 </Field>
-                <Field label="Phone">
-                  <input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className={inputCls} placeholder="+91 98765 43210" />
+                <Field label="Phone" error={errors.phone}>
+                  <input value={form.phone} onChange={(e) => edit({ phone: e.target.value }, 'phone')} className={inputCls} placeholder="+91 98765 43210" />
                 </Field>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <Field label="Designation">
-                  <select value={form.designation} onChange={(e) => setForm({ ...form, designation: e.target.value })} className={inputCls}>
+                <Field label="Designation" error={errors.designation}>
+                  <select value={form.designation} onChange={(e) => edit({ designation: e.target.value }, 'designation')} className={inputCls}>
                     <option value="">—</option>
                     {DESIGNATIONS.map((t) => <option key={t} value={t}>{t}</option>)}
                   </select>
                 </Field>
-                <Field label="Department">
-                  <select value={form.department} onChange={(e) => setForm({ ...form, department: e.target.value })} className={inputCls}>
+                <Field label="Department" error={errors.department}>
+                  <select value={form.department} onChange={(e) => edit({ department: e.target.value }, 'department')} className={inputCls}>
                     <option value="">—</option>
                     {DEPARTMENTS.map((t) => <option key={t} value={t}>{t}</option>)}
                   </select>
@@ -682,11 +708,11 @@ export function DoctorsPage() {
 
               {/* Fees */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <Field label="Home Fee (₹) *">
-                  <input type="number" required value={form.feesHome} onChange={(e) => setForm({ ...form, feesHome: Number(e.target.value) })} className={inputCls} />
+                <Field label="Home Fee (₹) *" error={errors.feesHome}>
+                  <input type="number" required value={form.feesHome} onChange={(e) => edit({ feesHome: Number(e.target.value) }, 'feesHome')} className={inputCls} />
                 </Field>
-                <Field label="Online Fee (₹) *">
-                  <input type="number" required value={form.feesOnline} onChange={(e) => setForm({ ...form, feesOnline: Number(e.target.value) })} className={inputCls} />
+                <Field label="Online Fee (₹) *" error={errors.feesOnline}>
+                  <input type="number" required value={form.feesOnline} onChange={(e) => edit({ feesOnline: Number(e.target.value) }, 'feesOnline')} className={inputCls} />
                 </Field>
                 <Field label="Platform Fee (%)">
                   <input type="number" value={form.platformFeePercent} onChange={(e) => setForm({ ...form, platformFeePercent: e.target.value })} className={inputCls} min={0} max={100} placeholder="Auto (department)" />
@@ -696,8 +722,8 @@ export function DoctorsPage() {
               {/* Photo & Stats */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <ImageUpload value={form.photo} onChange={(url) => setForm({ ...form, photo: url })} folder="doctors" label="Doctor Photo" />
-                <Field label="Patients Treated">
-                  <input type="number" value={form.patientsTreated} onChange={(e) => setForm({ ...form, patientsTreated: Number(e.target.value) })} className={inputCls} />
+                <Field label="Patients Treated" error={errors.patientsTreated}>
+                  <input type="number" value={form.patientsTreated} onChange={(e) => edit({ patientsTreated: Number(e.target.value) }, 'patientsTreated')} className={inputCls} />
                 </Field>
                 <Field label="Next Available">
                   <input type="date" value={form.nextAvailable} onChange={(e) => setForm({ ...form, nextAvailable: e.target.value })} className={inputCls} />
@@ -762,8 +788,8 @@ export function DoctorsPage() {
               </div>
 
               {/* Bio */}
-              <Field label="Bio">
-                <textarea value={form.bio} onChange={(e) => setForm({ ...form, bio: e.target.value })} rows={3} className={`${inputCls} resize-none`} placeholder="Brief description of the doctor's expertise..." />
+              <Field label="Bio" error={errors.bio}>
+                <textarea value={form.bio} onChange={(e) => edit({ bio: e.target.value }, 'bio')} rows={3} className={`${inputCls} resize-none`} placeholder="Brief description of the doctor's expertise..." />
               </Field>
 
               {/* Settings */}
@@ -817,18 +843,6 @@ export function DoctorsPage() {
         </div>
       )}
     </AdminLayout>
-  )
-}
-
-const inputCls =
-  'w-full p-2.5 bg-white border border-slate-200 rounded-xl text-slate-900 font-bold focus:outline-none focus:border-teal-500 transition-colors'
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="space-y-1">
-      <label className="font-bold text-slate-600">{label}</label>
-      {children}
-    </div>
   )
 }
 

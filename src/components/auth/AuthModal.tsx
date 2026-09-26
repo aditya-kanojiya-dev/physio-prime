@@ -3,11 +3,15 @@ import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { AlertCircle, Eye, EyeOff, Loader2, Lock, Mail, MailCheck, ShieldCheck, User, X } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { ApiError } from '../../lib/api';
+import { email as checkEmail, hasErrors, minLen, required, type Errors } from '../../lib/validate';
+import { Field } from '../ui/Field';
 
 interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
+
+type AuthErrors = Errors<'name' | 'email' | 'password'>;
 
 const inputClass =
   'w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 placeholder-slate-400 outline-none transition-all shadow-sm focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20';
@@ -25,7 +29,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
   const [confirmationSent, setConfirmationSent] = useState(false);
   const [resetSent, setResetSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [fieldError, setFieldError] = useState<string | null>(null);
+  const [errors, setErrors] = useState<AuthErrors>({});
 
   const fade = reduce
     ? { initial: { opacity: 0 }, animate: { opacity: 1 }, exit: { opacity: 0 } }
@@ -40,16 +44,35 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
     setIsLogin(next);
     setForgot(false);
     setError(null);
-    setFieldError(null);
+    setErrors({});
     setConfirmationSent(false);
     setResetSent(false);
     setPassword('');
   };
 
+  const clearErr = (key: keyof AuthErrors) =>
+    setErrors((prev) => (prev[key] ? { ...prev, [key]: undefined } : prev));
+
+  const validate = (): AuthErrors => {
+    const next: AuthErrors = {};
+    if (!isLogin && !forgot) next.name = required(name, 'Full name');
+    next.email = checkEmail(email);
+    if (!forgot) {
+      if (isLogin) {
+        if (!password) next.password = 'Password is required';
+      } else {
+        next.password = minLen(password, 8, 'Password');
+      }
+    }
+    return next;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    setFieldError(null);
+    const next = validate();
+    setErrors(next);
+    if (hasErrors(next)) return;
     if (forgot) {
       setLoading(true);
       try {
@@ -60,10 +83,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
       } finally {
         setLoading(false);
       }
-      return;
-    }
-    if (!isLogin && password.length < 8) {
-      setFieldError('Password must be at least 8 characters.');
       return;
     }
     setLoading(true);
@@ -164,77 +183,75 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
               </div>
               )}
 
-              <form key={forgot ? 'forgot' : String(isLogin)} onSubmit={handleSubmit} className="animate-auth-enter space-y-4">
+              <form key={forgot ? 'forgot' : String(isLogin)} onSubmit={handleSubmit} noValidate className="animate-auth-enter space-y-4">
                 {!isLogin && !forgot && (
-                  <div className="space-y-1">
-                    <label className="ml-1 text-xs font-bold text-slate-700">Full name</label>
-                    <div className="relative">
-                      <User className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                      <input
-                        type="text"
-                        placeholder="John Doe"
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        className={inputClass}
-                        required
-                        autoComplete="name"
-                      />
-                    </div>
-                  </div>
+                  <Field id="auth-name" label="Full name" error={errors.name} icon={<User className="h-4 w-4" />}>
+                    <input
+                      type="text"
+                      placeholder="John Doe"
+                      value={name}
+                      onChange={(e) => {
+                        setName(e.target.value);
+                        clearErr('name');
+                      }}
+                      className={inputClass}
+                      autoComplete="name"
+                    />
+                  </Field>
                 )}
 
-                <div className="space-y-1">
-                  <label className="ml-1 text-xs font-bold text-slate-700">Email address</label>
-                  <div className="relative">
-                    <Mail className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                    <input
-                      type="email"
-                      placeholder="you@example.com"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      className={inputClass}
-                      required
-                      autoComplete="email"
-                    />
-                  </div>
-                </div>
+                <Field id="auth-email" label="Email address" error={errors.email} icon={<Mail className="h-4 w-4" />}>
+                  <input
+                    type="email"
+                    placeholder="you@example.com"
+                    value={email}
+                    onChange={(e) => {
+                      setEmail(e.target.value);
+                      clearErr('email');
+                    }}
+                    className={inputClass}
+                    autoComplete="email"
+                  />
+                </Field>
 
                 {!forgot && (
-                <div className="space-y-1">
-                  <label className="ml-1 text-xs font-bold text-slate-700">Password</label>
-                  <div className="relative">
-                    <Lock className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <div>
+                  <Field
+                    id="auth-password"
+                    label="Password"
+                    error={errors.password}
+                    icon={<Lock className="h-4 w-4" />}
+                    action={
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword((s) => !s)}
+                        aria-label={showPassword ? 'Hide password' : 'Show password'}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1 text-slate-400 transition-colors hover:text-slate-600"
+                      >
+                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    }
+                  >
                     <input
                       type={showPassword ? 'text' : 'password'}
                       placeholder={isLogin ? 'Your password' : 'At least 8 characters'}
                       value={password}
                       onChange={(e) => {
                         setPassword(e.target.value);
-                        if (fieldError) setFieldError(null);
+                        clearErr('password');
                       }}
                       className={`${inputClass} pr-11`}
-                      required
-                      minLength={isLogin ? undefined : 8}
                       autoComplete={isLogin ? 'current-password' : 'new-password'}
                     />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword((s) => !s)}
-                      aria-label={showPassword ? 'Hide password' : 'Show password'}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1 text-slate-400 transition-colors hover:text-slate-600"
-                    >
-                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </button>
-                  </div>
-                  {fieldError && <p className="ml-1 mt-1 text-xs font-semibold text-red-600">{fieldError}</p>}
+                  </Field>
                   {isLogin && (
-                    <div className="text-right">
+                    <div className="mt-1 text-right">
                       <button
                         type="button"
                         onClick={() => {
                           setForgot(true);
                           setError(null);
-                          setFieldError(null);
+                          setErrors({});
                           setResetSent(false);
                         }}
                         className="text-xs font-bold text-teal-700 hover:text-teal-800"
