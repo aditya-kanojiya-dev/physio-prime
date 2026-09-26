@@ -6,7 +6,7 @@ import { db } from '../db/pool';
 import { appointments, departments, doctors, doctorSchedules, patientProfiles, prescriptions, sessionOtps, users } from '../db/schema';
 import { randomBookingId } from './appointments';
 import { requireAuth, requireRole } from '../middleware/auth';
-import { isValidDate, isPast, getNextFreeSlot, getAvailableWindows } from '../lib/slots';
+import { isValidDate, isPast, isJoinableNow, getNextFreeSlot, getAvailableWindows } from '../lib/slots';
 import { requireDoctor, noProfile } from '../lib/doctor';
 import { computeCommission, resolvePlatformFeePercent } from '../lib/commission';
 import { recordCashEntry, recordPaymentTransaction } from '../lib/payments';
@@ -203,7 +203,9 @@ doctorRouter.get('/appointments', async (req, res, next) => {
       .from(appointments)
       .where(and(...filters))
       .orderBy(asc(appointments.date), asc(appointments.timeSlot));
-    res.json({ appointments: rows.map((row) => ({ ...row, id: row.bookingId })) });
+    res.json({
+      appointments: rows.map((row) => ({ ...row, id: row.bookingId, videoJoinable: isJoinableNow(row) })),
+    });
   } catch (err) {
     next(err);
   }
@@ -866,6 +868,17 @@ doctorRouter.get('/appointments/:id/video-token', async (req, res, next) => {
     }
     if (row.status !== 'upcoming') {
       res.status(400).json({ error: { message: 'Only upcoming appointments can join a video call' } });
+      return;
+    }
+    // Same window as the patient, so the room is never held open by one side
+    // joining hours early. The list response carries videoJoinable so the portal
+    // can disable its button rather than surfacing this as an error.
+    if (!isJoinableNow(row)) {
+      res.status(400).json({
+        error: {
+          message: `The video room for this appointment opens 15 minutes before the ${row.timeSlot} slot on ${row.date} and closes when it ends`,
+        },
+      });
       return;
     }
     const session = signJaasJwt({

@@ -15,6 +15,13 @@ vi.mock('../src/lib/razorpay', () => ({
   verifyWebhookSignature: vi.fn(),
 }));
 
+// The join-window guard runs *after* jaasConfigured(), so the suite needs JaaS to
+// look configured. The private key is never used: an out-of-window request is
+// rejected before signJaasJwt() is reached.
+process.env.JAAS_APP_ID ??= 'ci-test-app';
+process.env.JAAS_API_KEY_ID ??= 'ci-test-key';
+process.env.JAAS_PRIVATE_KEY ??= 'ci-test-private-key';
+
 const api = request(createApp());
 
 const DOCTOR_SLUG = 'doc-tarannum-sayyed';
@@ -143,6 +150,8 @@ describe('GET /api/v1/doctor/appointments', () => {
     expect(ours[0].id).toBe(ours[0].bookingId);
     // No stored room URL. The doctor joins via /doctor/appointments/:id/video-token.
     expect(ours[0].videoCallLink).toBeUndefined();
+    // So the portal can disable its Join button instead of erroring on click.
+    expect(ours[0].videoJoinable).toBe(false);
   });
 
   it('filters by status and date', async () => {
@@ -507,6 +516,27 @@ describe('PATCH /api/v1/doctor/appointments/:id/reschedule', () => {
     const apt = await insertAppointment(other.id);
 
     const res = await reschedule(apt.bookingId, { date: futureWeekday(1), windowStart: '08:00', windowEnd: '09:00' });
+    expect(res.status).toBe(404);
+  });
+});
+
+describe('GET /api/v1/doctor/appointments/:id/video-token', () => {
+  it('refuses a join outside the 15 minute window, same as the patient', async () => {
+    const [doc] = await db.select().from(doctors).where(eq(doctors.slug, DOCTOR_SLUG));
+    const appt = await insertAppointment(doc.id);
+
+    const res = await api
+      .get(`/api/v1/doctor/appointments/${appt.bookingId}/video-token`)
+      .set('Authorization', `Bearer ${await doctorToken()}`);
+
+    expect(res.status).toBe(400);
+    expect(res.body.error.message).toMatch(/opens 15 minutes before/);
+  });
+
+  it('refuses a non-existent appointment', async () => {
+    const res = await api
+      .get('/api/v1/doctor/appointments/APT-000000/video-token')
+      .set('Authorization', `Bearer ${await doctorToken()}`);
     expect(res.status).toBe(404);
   });
 });
