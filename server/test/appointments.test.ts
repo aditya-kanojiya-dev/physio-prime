@@ -88,8 +88,10 @@ describe('POST /api/v1/appointments', () => {
     expect(res.body.appointment.bookingId ?? res.body.appointment.id).toMatch(/^APT-\d{6}$/);
     expect(res.body.appointment.razorpayOrderId).toBe('order_default');
     expect(res.body.appointment.doctor.id).toBe(DOCTOR);
+    // The patient join flow uses the video-token endpoint; this is the link
+    // stored on the row, which jaasMeetingUrl() builds from JAAS_APP_ID.
     expect(res.body.appointment.videoCallLink).toBe(
-      `https://meet.physioprime.in/${res.body.appointment.id}`,
+      `https://8x8.vc/ci-test-app/${res.body.appointment.id}`,
     );
     expect(res.body.razorpayOrder).toEqual({ id: 'order_default', amountPaise: feePaise });
     expect(res.body.appointment.patientName).toBe('Test Patient');
