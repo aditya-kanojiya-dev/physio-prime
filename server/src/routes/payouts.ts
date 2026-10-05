@@ -2,10 +2,10 @@ import { Router } from 'express';
 import { and, eq, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '../db/pool';
-import { appointments, departments, doctorPayouts, doctors } from '../db/schema';
+import { appointments, departments, doctorCategoryCommissions, doctorPayouts, doctors } from '../db/schema';
 import { requireAuth, requireRole } from '../middleware/auth';
 import { requireDoctor, noProfile } from '../lib/doctor';
-import { sumEarnedSql, resolvePlatformFeePercentSql } from '../lib/commission';
+import { sumEarnedSql, rateForModeSql } from '../lib/commission';
 import { notifyAdmin } from '../lib/notifications';
 
 export const doctorPayoutsRouter = Router();
@@ -16,11 +16,26 @@ doctorPayoutsRouter.use(requireAuth, requireRole('doctor'));
 export async function getEarnedNet(doctorId: number) {
   const [earned] = await db
     .select({
-      total: sql<number>`${sumEarnedSql(sql`${appointments.paymentStatus} = 'paid' and ${appointments.status} = 'completed'`, appointments.feePaise, resolvePlatformFeePercentSql(doctors.platformFeePercent, departments.platformFeePercent))}`,
+      total: sql<number>`${sumEarnedSql(sql`${appointments.paymentStatus} = 'paid' and ${appointments.status} = 'completed'`, appointments.feePaise, rateForModeSql(appointments.mode, { category: doctorCategoryCommissions, doctor: doctors, department: departments }))}`,
     })
     .from(appointments)
     .innerJoin(doctors, eq(doctors.id, appointments.doctorId))
     .leftJoin(departments, eq(departments.name, doctors.department))
+    .leftJoin(doctorCategoryCommissions, and(eq(doctorCategoryCommissions.doctorId, doctors.id), eq(doctorCategoryCommissions.categoryId, appointments.categoryId)))
+    .where(eq(appointments.doctorId, doctorId));
+  return Number(earned?.total ?? 0);
+}
+
+// Same money rule as getEarnedNet, limited to appointments dated inside the period.
+export async function getEarnedNetForPeriod(doctorId: number, periodStart: string, periodEnd: string) {
+  const [earned] = await db
+    .select({
+      total: sql<number>`${sumEarnedSql(sql`${appointments.paymentStatus} = 'paid' and ${appointments.status} = 'completed' and ${appointments.date} between ${periodStart}::date and ${periodEnd}::date`, appointments.feePaise, rateForModeSql(appointments.mode, { category: doctorCategoryCommissions, doctor: doctors, department: departments }))}`,
+    })
+    .from(appointments)
+    .innerJoin(doctors, eq(doctors.id, appointments.doctorId))
+    .leftJoin(departments, eq(departments.name, doctors.department))
+    .leftJoin(doctorCategoryCommissions, and(eq(doctorCategoryCommissions.doctorId, doctors.id), eq(doctorCategoryCommissions.categoryId, appointments.categoryId)))
     .where(eq(appointments.doctorId, doctorId));
   return Number(earned?.total ?? 0);
 }

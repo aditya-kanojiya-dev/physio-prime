@@ -42,6 +42,7 @@ export const doctorApplications = pgTable('doctor_applications', {
   position: text('position'),
   specializations: text('specializations').array().notNull().default([]),
   qualification: text('qualification'),
+  collegeName: text('college_name'),
   experience: text('experience'),
   currentOrganization: text('current_organization'),
   certifications: text('certifications'),
@@ -92,8 +93,14 @@ export const doctors = pgTable('doctors', {
   department: text('department'),
   address: jsonb('address').notNull().default({}),
   // NULL platformFeePercent = inherit from the doctor's department default.
+  // Per-mode columns win over the shared one when set, so home visits and
+  // online consultations can carry different platform cuts.
   platformFeePercent: integer('platform_fee_percent'),
+  platformFeeHomePercent: integer('platform_fee_home_percent'),
+  platformFeeOnlinePercent: integer('platform_fee_online_percent'),
   categoryId: integer('category_id').references(() => categories.id, { onDelete: 'set null' }),
+  // Where the admin sends this doctor's money: { upiId, bank: { holder, accountNumber, ifsc } }
+  payoutDetails: jsonb('payout_details').notNull().default({}),
   deletionRequestedAt: timestamp('deletion_requested_at', { withTimezone: true }),
 });
 
@@ -116,6 +123,11 @@ export const appointments = pgTable('appointments', {
   bookingId: text('booking_id').notNull().unique(),
   patientId: integer('patient_id').notNull().references(() => users.id),
   doctorId: integer('doctor_id').notNull().references(() => doctors.id),
+  // The category page the patient booked through. This is what selects the
+  // commission rate (joined on doctor_category_commissions), so it must be
+  // captured at booking time. NULL = booked without category context, which
+  // falls back to the doctor/department chain.
+  categoryId: integer('category_id').references(() => categories.id),
   mode: text('mode').notNull(),
   date: date('date').notNull(),
   timeSlot: text('time_slot').notNull(),
@@ -269,16 +281,22 @@ export const doctorLocations = pgTable('doctor_locations', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
-// Per-doctor, per-category commission + consultation fee. NULL fee percent
-// inherits the department default; NULL consult fee inherits the doctor's fee.
+// Per-doctor, per-category commission + consultation fee. Resolved on
+// appointments.category_id (the page the patient booked through), NOT the
+// doctor's primary category, so every category a doctor serves can carry its
+// own rate. Category rates are per-mode only — a home and a video rate, no
+// shared one. A NULL rate inherits the doctor level. NULL consult fee inherits
+// the doctor's fee.
 export const doctorCategoryCommissions = pgTable(
   'doctor_category_commissions',
   {
     id: serial('id').primaryKey(),
     doctorId: integer('doctor_id').notNull().references(() => doctors.id, { onDelete: 'cascade' }),
     categoryId: integer('category_id').notNull().references(() => categories.id, { onDelete: 'cascade' }),
-    platformFeePercent: integer('platform_fee_percent'),
-    consultationFeePaise: integer('consultation_fee_paise'),
+    platformFeeHomePercent: integer('platform_fee_home_percent'),
+    platformFeeOnlinePercent: integer('platform_fee_online_percent'),
+    consultationFeeHomePaise: integer('consultation_fee_home_paise'),
+    consultationFeeOnlinePaise: integer('consultation_fee_online_paise'),
   },
   (t) => [unique().on(t.doctorId, t.categoryId)],
 );
@@ -303,6 +321,9 @@ export const doctorPayouts = pgTable('doctor_payouts', {
   paymentMethod: text('payment_method'),
   transactionId: text('transaction_id'),
   notes: text('notes'),
+  // Set when the admin pays a period. Doctor-requested payouts leave these null.
+  periodStart: date('period_start'),
+  periodEnd: date('period_end'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   processedAt: timestamp('processed_at', { withTimezone: true }),
 });

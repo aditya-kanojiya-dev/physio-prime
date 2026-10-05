@@ -1,7 +1,7 @@
 import { Router, type NextFunction } from 'express';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { db } from '../db/pool';
-import { appointments, departments, doctors, paymentWebhooks } from '../db/schema';
+import { appointments, departments, doctorCategoryCommissions, doctors, paymentWebhooks } from '../db/schema';
 import { computeCommission, resolvePlatformFeePercent } from '../lib/commission';
 import { recordPaymentTransaction, type Tx } from '../lib/payments';
 import { verifyWebhookSignature } from '../lib/razorpay';
@@ -34,17 +34,23 @@ async function recordCaptured(
       doctorId: appointments.doctorId,
       patientId: appointments.patientId,
       feePaise: appointments.feePaise,
+      mode: appointments.mode,
       paymentStatus: appointments.paymentStatus,
       platformFeePercent: doctors.platformFeePercent,
+      platformFeeHomePercent: doctors.platformFeeHomePercent,
+      platformFeeOnlinePercent: doctors.platformFeeOnlinePercent,
+      categoryPlatformFeeHomePercent: doctorCategoryCommissions.platformFeeHomePercent,
+      categoryPlatformFeeOnlinePercent: doctorCategoryCommissions.platformFeeOnlinePercent,
       departmentPlatformFeePercent: departments.platformFeePercent,
     })
     .from(appointments)
     .innerJoin(doctors, eq(doctors.id, appointments.doctorId))
     .leftJoin(departments, eq(departments.name, doctors.department))
+    .leftJoin(doctorCategoryCommissions, and(eq(doctorCategoryCommissions.doctorId, doctors.id), eq(doctorCategoryCommissions.categoryId, appointments.categoryId)))
     .where(where)
     .for('update', { of: [appointments] });
   if (!row || row.paymentStatus === 'paid') return null;
-  const c = computeCommission(row.feePaise, resolvePlatformFeePercent(row.platformFeePercent, row.departmentPlatformFeePercent));
+  const c = computeCommission(row.feePaise, resolvePlatformFeePercent({ categoryHome: row.categoryPlatformFeeHomePercent, categoryOnline: row.categoryPlatformFeeOnlinePercent, home: row.platformFeeHomePercent, online: row.platformFeeOnlinePercent, shared: row.platformFeePercent, department: row.departmentPlatformFeePercent }, row.mode));
   await tx
     .update(appointments)
     .set({

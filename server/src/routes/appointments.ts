@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { and, desc, eq, inArray, isNotNull, lt, ne } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '../db/pool';
-import { appointments, doctors, doctorSchedules, users } from '../db/schema';
+import { appointments, categories, doctors, doctorSchedules, users } from '../db/schema';
 import { requireAuth, requireRole } from '../middleware/auth';
 import { availableFromSchedules, dayOfWeek, EXPIRED_REASON, isJoinableNow, isPast, isStaleUnpaid, isValidDate, PAYMENT_GRACE_MS } from '../lib/slots';
 import { createOrder, verifySignature } from '../lib/razorpay';
@@ -28,6 +28,10 @@ const dateField = z.string().refine(isValidDate, 'date must be YYYY-MM-DD');
 
 const bookSchema = z.object({
   doctorSlug: z.string().min(1),
+  // Category page the patient booked through. Selects the commission rate, so it
+  // is recorded on the appointment. Optional: bookings with no category context
+  // resolve through the doctor/department chain instead.
+  categoryId: z.coerce.number().int().positive().optional(),
   mode: z.enum(['home', 'online']),
   date: dateField,
   slot: z.string().regex(/^\d{2}:\d{2}-\d{2}:\d{2}$/, 'slot must be HH:MM-HH:MM'),
@@ -294,6 +298,7 @@ async function availableStarts(tx: Tx, doctorId: number, date: string): Promise<
 async function bookTransaction(
   doctor: typeof doctors.$inferSelect,
   feePaise: number,
+  categoryId: number | null,
   body: z.infer<typeof bookSchema>,
   userId: number,
   patientEmail: string,
@@ -316,6 +321,7 @@ async function bookTransaction(
             bookingId,
             patientId: userId,
             doctorId: doctor.id,
+            categoryId,
             mode: body.mode,
             date: body.date,
             timeSlot: body.slot,
@@ -420,6 +426,20 @@ appointmentsRouter.post('/', async (req, res, next) => {
       res.status(404).json({ error: { message: 'Doctor not found' } });
       return;
     }
+    // Trust boundary: the client picks this id, and it decides the commission
+    // split, so verify it is a real, bookable category rather than storing junk.
+    let categoryId: number | null = null;
+    if (body.categoryId != null) {
+      const [category] = await db
+        .select({ id: categories.id })
+        .from(categories)
+        .where(and(eq(categories.id, body.categoryId), eq(categories.active, true)));
+      if (!category) {
+        res.status(400).json({ error: { message: 'That category is not available' } });
+        return;
+      }
+      categoryId = category.id;
+    }
     const fees = (doctor.fees ?? {}) as Record<string, number>;
     const feeRupees = fees[body.mode];
     if (feeRupees == null) {
@@ -428,7 +448,7 @@ appointmentsRouter.post('/', async (req, res, next) => {
     }
     const feePaise = Math.round(feeRupees * 100);
 
-    const booked = await bookTransaction(doctor, feePaise, body, req.user!.id, req.user!.email);
+    const booked = await bookTransaction(doctor, feePaise, categoryId, body, req.user!.id, req.user!.email);
     res.status(201).json({
       appointment: serializeAppointment({
         ...booked.row,

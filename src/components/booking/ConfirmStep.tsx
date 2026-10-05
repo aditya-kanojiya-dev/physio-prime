@@ -42,7 +42,7 @@ interface ConfirmStepProps {
 const RELATIONS = ['Father', 'Mother', 'Spouse', 'Child', 'Grandparent', 'Sibling', 'Friend', 'Other'];
 
 type BookingErrors = Errors<
-  'name' | 'email' | 'phone' | 'gender' | 'age' | 'weight' | 'height' | 'relation' | 'address' | 'agreed'
+  'name' | 'email' | 'phone' | 'gender' | 'age' | 'weight' | 'height' | 'relation' | 'address' | 'city' | 'area' | 'agreed'
 >;
 
 const MODE_LABELS: Record<ConsultationMode, string> = {
@@ -91,6 +91,9 @@ export const ConfirmStep: React.FC<ConfirmStepProps> = ({
   const [patientWeight, setPatientWeight] = useState('');
   const [patientHeight, setPatientHeight] = useState('');
   const [address, setAddress] = useState('');
+  const [city, setCity] = useState('');
+  const [area, setArea] = useState('');
+  const [detecting, setDetecting] = useState(false);
   const [problemDescription, setProblemDescription] = useState('');
   const [agreed, setAgreed] = useState(false);
   const [paymentMode, setPaymentMode] = useState<'prepay' | 'postpay'>('prepay');
@@ -123,10 +126,14 @@ export const ConfirmStep: React.FC<ConfirmStepProps> = ({
     if (patientWeight.trim()) e.weight = numInRange(patientWeight, 1, 500, 'Weight');
     if (patientHeight.trim()) e.height = numInRange(patientHeight, 1, 250, 'Height');
     if (forOther && !relation) e.relation = 'Select who this appointment is for';
-    if (mode === 'home') e.address = required(address, 'Home visit address');
+    if (mode === 'home') {
+      e.address = required(address, 'Home visit address');
+      if (!city.trim()) e.city = 'City required';
+      if (!area.trim()) e.area = 'Area required';
+    }
     if (!agreed) e.agreed = 'Please accept the terms to continue';
     return e;
-  }, [patientName, patientEmail, patientPhone, patientGender, patientAge, patientWeight, patientHeight, forOther, relation, address, mode, agreed]);
+  }, [patientName, patientEmail, patientPhone, patientGender, patientAge, patientWeight, patientHeight, forOther, relation, address, city, area, mode, agreed]);
 
   function prefillSelf() {
     if (!user) return;
@@ -137,7 +144,13 @@ export const ConfirmStep: React.FC<ConfirmStepProps> = ({
     setPatientAge(ageFromDob(user.dob));
     setPatientWeight(user.weight || '');
     setPatientHeight(user.height || '');
-    setAddress(addressFromUser(user.address));
+    const addr = addressFromUser(user.address);
+    setAddress(addr);
+    if (typeof user.address === 'object' && user.address) {
+      const ua = user.address as Record<string, unknown>;
+      if (typeof ua.city === 'string') setCity(ua.city);
+      if (typeof ua.area === 'string') setArea(ua.area);
+    }
   }
 
   useEffect(() => {
@@ -197,6 +210,38 @@ export const ConfirmStep: React.FC<ConfirmStepProps> = ({
     });
   };
 
+  const detectLocation = async () => {
+    if (!navigator.geolocation) {
+      setPaymentError('Geolocation not supported in this browser.');
+      return;
+    }
+    setDetecting(true);
+    setPaymentError(null);
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        try {
+          const { latitude, longitude } = pos.coords;
+          const res = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=16&addressdetails=1`,
+            { headers: { 'Accept': 'application/json', 'User-Agent': 'physio-prime/1.0' } }
+          );
+          const data = await res.json();
+          const addr = data.address || {};
+          if (addr.city || addr.town || addr.village) setCity(addr.city || addr.town || addr.village);
+          if (addr.suburb || addr.neighbourhood || addr.road) setArea(addr.suburb || addr.neighbourhood || addr.road);
+          const line = [data.display_name?.split(',')[0], addr.suburb || addr.neighbourhood, addr.road].filter(Boolean).join(', ');
+          if (line && !address) setAddress(line);
+        } catch {
+          // ponytail: ignore reverse geocode failure, allow manual input
+        } finally {
+          setDetecting(false);
+        }
+      },
+      () => { setDetecting(false); setPaymentError('Location access denied. Enter manually.'); },
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 }
+    );
+  };
+
   const handlePay = async () => {
     setAttempted(true);
     if (hasErrors(errors)) return;
@@ -220,6 +265,8 @@ export const ConfirmStep: React.FC<ConfirmStepProps> = ({
         patientHeight: patientHeight.trim() ? patientHeight : undefined,
         patientRelation: forOther ? relation : undefined,
         address: mode === 'home' ? address : undefined,
+        city: mode === 'home' ? city.trim() : undefined,
+        area: mode === 'home' ? area.trim() : undefined,
         paymentMode,
       });
       setCreatedAppointment(appointment);
@@ -583,6 +630,45 @@ export const ConfirmStep: React.FC<ConfirmStepProps> = ({
                 {attempted && errors.address && (
                   <p role="alert" className="text-[11px] font-semibold text-red-600">{errors.address}</p>
                 )}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-700">City *</label>
+                    <input
+                      type="text"
+                      value={city}
+                      onChange={e => setCity(e.target.value)}
+                      placeholder="City"
+                      className={`w-full px-4 py-3 bg-white border ${attempted && errors.city ? 'border-red-400 border-2' : 'border-slate-200'} rounded-xl text-sm font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 shadow-sm`}
+                    />
+                    {attempted && errors.city && (
+                      <p role="alert" className="text-[11px] font-semibold text-red-600">{errors.city}</p>
+                    )}
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-700">Area *</label>
+                    <input
+                      type="text"
+                      value={area}
+                      onChange={e => setArea(e.target.value)}
+                      placeholder="Area/Locality"
+                      className={`w-full px-4 py-3 bg-white border ${attempted && errors.area ? 'border-red-400 border-2' : 'border-slate-200'} rounded-xl text-sm font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 shadow-sm`}
+                    />
+                    {attempted && errors.area && (
+                      <p role="alert" className="text-[11px] font-semibold text-red-600">{errors.area}</p>
+                    )}
+                  </div>
+                </div>
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={detectLocation}
+                    disabled={detecting}
+                    className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-50 transition-colors"
+                  >
+                    {detecting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                    Auto-detect
+                  </button>
+                </div>
               </div>
             )}
           </div>

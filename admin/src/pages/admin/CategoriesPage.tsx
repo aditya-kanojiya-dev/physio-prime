@@ -244,10 +244,10 @@ export function CategoriesPage() {
   )
 }
 
-export function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+export function Modal({ title, onClose, children, width = 'max-w-xl' }: { title: string; onClose: () => void; children: React.ReactNode; width?: string }) {
   return (
     <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-white border border-slate-200 rounded-3xl max-w-xl w-full p-6 space-y-6 max-h-[90vh] overflow-y-auto">
+      <div className={`bg-white border border-slate-200 rounded-3xl ${width} w-full p-6 space-y-6 max-h-[90vh] overflow-y-auto`}>
         <div className="flex items-center justify-between border-b border-slate-200 pb-4">
           <h3 className="text-lg font-extrabold text-slate-900">{title}</h3>
           <button onClick={onClose} className="text-slate-500 hover:text-slate-900 transition-colors">
@@ -270,10 +270,11 @@ export const inputCls =
  * per-form styling. Keep the shared form primitives here -- six admin pages
  * already import them from this module.
  */
-export function Field({ label, error, action, children }: { label: string; error?: string | null; action?: React.ReactNode; children: React.ReactNode }) {
+export function Field({ label, error, action, hint, children }: { label: string; error?: string | null; action?: React.ReactNode; hint?: string; children: React.ReactNode }) {
   const autoId = useId()
   const child = isValidElement(children) ? (children as React.ReactElement<Record<string, unknown>>) : null
   const id = (child?.props.id as string) || autoId
+  const describedBy = [hint ? `${id}-hint` : null, error ? `${id}-error` : null].filter(Boolean).join(' ') || undefined
   return (
     <div className="space-y-1">
       <label htmlFor={id} className="font-bold text-slate-600">{label}</label>
@@ -282,11 +283,12 @@ export function Field({ label, error, action, children }: { label: string; error
           ? cloneElement(child, {
               id,
               'aria-invalid': error ? true : undefined,
-              'aria-describedby': error ? `${id}-error` : undefined,
+              'aria-describedby': describedBy,
             })
           : children}
         {action}
       </div>
+      {hint && <p id={`${id}-hint`} className="text-[10px] text-slate-400 leading-snug">{hint}</p>}
       {error && (
         <p id={`${id}-error`} role="alert" className="text-xs font-semibold text-rose-600">{error}</p>
       )}

@@ -11,15 +11,12 @@ import { DEPARTMENTS, DESIGNATIONS, EXPERIENCE_YEARS } from '../lib/options'
 import { useAuth } from '../lib/auth'
 import { Field } from './admin/CategoriesPage'
 import { hasErrors, maxLen, minLen, type Errors } from '../lib/validate'
+import { experienceFromText, experienceToText, splitLines, splitList } from '../lib/profileText'
 
 const inputCls = 'w-full p-2.5 bg-white border border-slate-200 rounded-xl text-slate-900 font-bold focus:outline-none focus:border-teal-500 transition-colors'
 const labelCls = 'font-bold text-slate-600'
 
 type Tab = 'personal' | 'professional' | 'security'
-
-function splitList(value: string): string[] {
-  return value.split(',').map((s) => s.trim()).filter(Boolean)
-}
 
 export function ProfilePage() {
   const qc = useQueryClient()
@@ -44,6 +41,10 @@ export function ProfilePage() {
   const [languages, setLanguages] = useState('')
   const [expertise, setExpertise] = useState('')
   const [treatments, setTreatments] = useState('')
+  const [education, setEducation] = useState('')
+  const [experienceEntries, setExperienceEntries] = useState('')
+  const [registrationNumber, setRegistrationNumber] = useState('')
+  const [registrationCouncil, setRegistrationCouncil] = useState('')
   const [hydrated, setHydrated] = useState(false)
 
   const { data: doctor, isLoading } = useQuery({
@@ -67,6 +68,10 @@ export function ProfilePage() {
     setLanguages((doctor.languages || []).join(', '))
     setExpertise((doctor.expertise || []).join(', '))
     setTreatments((doctor.treatments || []).join(', '))
+    setEducation((doctor.education || []).join(', '))
+    setExperienceEntries(experienceToText(doctor.experience))
+    setRegistrationNumber(doctor.registration?.number ?? '')
+    setRegistrationCouncil(doctor.registration?.council ?? '')
     setDeletionRequested(!!doctor.deletionRequestedAt)
     setHydrated(true)
   }
@@ -81,12 +86,28 @@ export function ProfilePage() {
     setErrors(next)
     if (hasErrors(next)) return false
     const longItem = [
+      ...splitList(education).map((v) => [v, 200, 'Education item'] as const),
+      [registrationNumber.trim(), 60, 'Registration number'] as const,
+      [registrationCouncil.trim(), 120, 'Registration council'] as const,
       ...splitList(expertise).map((v) => [v, 100, 'Expertise item'] as const),
       ...splitList(treatments).map((v) => [v, 100, 'Treatment item'] as const),
       ...splitList(languages).map((v) => [v, 50, 'Language'] as const),
+      ...splitLines(experienceEntries).flatMap((line) => {
+        const [role, institution, period] = line.split('|').map((s) => s.trim())
+        return [[role ?? '', 100, 'Role'], [institution ?? '', 150, 'Institution'], [period ?? '', 50, 'Period']] as const
+      }),
     ].find(([v, max]) => v.length > max)
     if (longItem) {
       setError(`${longItem[2]} is too long (max ${longItem[1]} characters)`)
+      return false
+    }
+    // mirrors the .max(20) on both list fields in profilePatchSchema
+    const tooMany = [
+      [splitList(education).length, 'education'] as const,
+      [splitLines(experienceEntries).length, 'experience'] as const,
+    ].find(([count]) => count > 20)
+    if (tooMany) {
+      setError(`You can list at most 20 ${tooMany[1]} entries`)
       return false
     }
     return true
@@ -112,6 +133,10 @@ export function ProfilePage() {
         languages: splitList(languages),
         expertise: splitList(expertise),
         treatments: splitList(treatments),
+        education: splitList(education),
+        experience: experienceFromText(experienceEntries),
+        // both keys are required by the schema; {} is how you clear a NOT NULL column
+        registration: { number: registrationNumber.trim(), council: registrationCouncil.trim() },
       }),
     onSuccess: (res) => {
       setMessage('Profile saved successfully')
@@ -280,6 +305,31 @@ export function ProfilePage() {
             <div>
               <label className={labelCls}>Treatments (comma separated)</label>
               <input value={treatments} onChange={(e) => setTreatments(e.target.value)} placeholder="Manual Therapy, Dry Needling" className={inputCls} />
+            </div>
+            <div>
+              <label className={labelCls}>Education (comma separated)</label>
+              <input value={education} onChange={(e) => setEducation(e.target.value)} placeholder="BPT - Nagpur University, MPT - Orthopedic" className={inputCls} />
+            </div>
+            <div>
+              <label className={labelCls}>Experience (one per line: Role | Institution | Period)</label>
+              <textarea
+                value={experienceEntries}
+                onChange={(e) => setExperienceEntries(e.target.value)}
+                rows={3}
+                placeholder={'Senior Physio | City Hospital | 2020-2024\nPhysio | Rehab Center | 2018-2020'}
+                className={`${inputCls} resize-none`}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className={labelCls}>Registration number</label>
+                <input value={registrationNumber} onChange={(e) => setRegistrationNumber(e.target.value)} placeholder="A12345" className={inputCls} />
+              </div>
+              <div>
+                <label className={labelCls}>Registration council</label>
+                <input value={registrationCouncil} onChange={(e) => setRegistrationCouncil(e.target.value)} placeholder="Maharashtra Council" className={inputCls} />
+              </div>
             </div>
 
             <div className="flex justify-end pt-2">

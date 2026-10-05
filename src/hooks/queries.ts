@@ -1,4 +1,4 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { api, getToken } from '../lib/api';
 import {
   ApiAppointment,
@@ -50,15 +50,17 @@ export function useDoctorDetail(slug: string) {
   });
 }
 
+export async function fetchCategories(queryClient: QueryClient): Promise<Category[]> {
+  const cats = await api.get<{ categories: ApiCategory[] }>('/categories');
+  const doctors = await queryClient.ensureQueryData({ queryKey: ['doctors'], queryFn: () => fetchDoctors() });
+  return cats.categories.map((c) => toCategory(c, doctors));
+}
+
 export function useCategories() {
   const queryClient = useQueryClient();
   return useQuery({
     queryKey: ['categories'],
-    queryFn: async (): Promise<Category[]> => {
-      const cats = await api.get<{ categories: ApiCategory[] }>('/categories');
-      const doctors = await queryClient.ensureQueryData({ queryKey: ['doctors'], queryFn: () => fetchDoctors() });
-      return cats.categories.map((c) => toCategory(c, doctors));
-    },
+    queryFn: () => fetchCategories(queryClient),
     staleTime: STALE,
   });
 }

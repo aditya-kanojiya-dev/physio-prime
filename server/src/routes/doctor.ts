@@ -3,7 +3,7 @@ import { createHash, randomInt } from 'node:crypto';
 import { and, asc, count, desc, eq, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '../db/pool';
-import { appointments, departments, doctors, doctorSchedules, patientProfiles, prescriptions, sessionOtps, users } from '../db/schema';
+import { appointments, departments, doctorCategoryCommissions, doctors, doctorSchedules, patientProfiles, prescriptions, sessionOtps, users } from '../db/schema';
 import { randomBookingId } from './appointments';
 import { requireAuth, requireRole } from '../middleware/auth';
 import { isValidDate, isPast, isJoinableNow, getNextFreeSlot, getAvailableWindows } from '../lib/slots';
@@ -47,6 +47,7 @@ const doctorColumns = {
   employeeId: doctors.employeeId,
   department: doctors.department,
   address: doctors.address,
+  payoutDetails: doctors.payoutDetails,
   deletionRequestedAt: doctors.deletionRequestedAt,
 };
 
@@ -73,6 +74,26 @@ const appointmentColumns = {
   createdAt: appointments.createdAt,
 };
 
+const experienceEntrySchema = z.object({
+  role: z.string().trim().max(100),
+  institution: z.string().trim().max(150),
+  period: z.string().trim().max(50),
+});
+
+// Where the admin sends money. Every part is optional so a doctor can save a
+// half-filled form and finish it later; the payout screen shows what is missing.
+const payoutDetailsSchema = z.object({
+  upiId: z.string().trim().max(100).nullable().optional(),
+  bank: z
+    .object({
+      holder: z.string().trim().max(100).nullable().optional(),
+      accountNumber: z.string().trim().max(34).nullable().optional(),
+      ifsc: z.string().trim().max(11).nullable().optional(),
+    })
+    .nullable()
+    .optional(),
+});
+
 const profilePatchSchema = z.object({
   name: z.string().trim().min(2).max(150).optional(),
   gender: z.enum(['male', 'female', 'other']).nullable().optional(),
@@ -86,6 +107,12 @@ const profilePatchSchema = z.object({
   designation: z.string().max(100).nullable().optional(),
   department: z.string().max(100).nullable().optional(),
   address: z.record(z.string(), z.unknown()).nullable().optional(),
+  education: z.array(z.string().trim().min(1).max(200)).max(20).optional(),
+  experience: z.array(experienceEntrySchema).max(20).optional(),
+  // doctors.registration is NOT NULL, so an explicit null would 500: clearing it
+  // is done by sending {}.
+  registration: z.object({ number: z.string().trim().max(60), council: z.string().trim().max(120) }).optional(),
+  payoutDetails: payoutDetailsSchema.optional(),
 });
 
 const windowSchema = z.object({
@@ -278,7 +305,6 @@ async function doctorAppointment(
   paymentStatus: string;
   feePaise: number;
   sessionStartedAt: Date | null;
-  platformFeePercent: number | null;
   patientPhone: string;
 } | null> {
   const [row] = await db
@@ -290,7 +316,6 @@ async function doctorAppointment(
       paymentStatus: appointments.paymentStatus,
       feePaise: appointments.feePaise,
       sessionStartedAt: appointments.sessionStartedAt,
-      platformFeePercent: doctors.platformFeePercent,
       patientPhone: appointments.patientPhone,
     })
     .from(appointments)
@@ -525,12 +550,18 @@ doctorRouter.post('/appointments/:id/collect/cash', async (req, res, next) => {
           paymentMode: appointments.paymentMode,
           paymentStatus: appointments.paymentStatus,
           feePaise: appointments.feePaise,
+          mode: appointments.mode,
           platformFeePercent: doctors.platformFeePercent,
+          platformFeeHomePercent: doctors.platformFeeHomePercent,
+          platformFeeOnlinePercent: doctors.platformFeeOnlinePercent,
+          categoryPlatformFeeHomePercent: doctorCategoryCommissions.platformFeeHomePercent,
+          categoryPlatformFeeOnlinePercent: doctorCategoryCommissions.platformFeeOnlinePercent,
           departmentPlatformFeePercent: departments.platformFeePercent,
         })
         .from(appointments)
         .innerJoin(doctors, eq(doctors.id, appointments.doctorId))
         .leftJoin(departments, eq(departments.name, doctors.department))
+        .leftJoin(doctorCategoryCommissions, and(eq(doctorCategoryCommissions.doctorId, doctors.id), eq(doctorCategoryCommissions.categoryId, appointments.categoryId)))
         .where(eq(appointments.bookingId, req.params.id))
         .for('update');
       if (!row || row.doctorId !== doctor.id) {
@@ -545,7 +576,7 @@ doctorRouter.post('/appointments/:id/collect/cash', async (req, res, next) => {
       if (row.status === 'cancelled' || row.status === 'no_show') {
         throw Object.assign(new Error('Cannot collect payment on a cancelled or no-show appointment'), { status: 400 });
       }
-      const c = computeCommission(row.feePaise, resolvePlatformFeePercent(row.platformFeePercent, row.departmentPlatformFeePercent));
+      const c = computeCommission(row.feePaise, resolvePlatformFeePercent({ categoryHome: row.categoryPlatformFeeHomePercent, categoryOnline: row.categoryPlatformFeeOnlinePercent, home: row.platformFeeHomePercent, online: row.platformFeeOnlinePercent, shared: row.platformFeePercent, department: row.departmentPlatformFeePercent }, row.mode));
       const [upd] = await tx
         .update(appointments)
         .set({

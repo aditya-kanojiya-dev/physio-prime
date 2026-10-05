@@ -520,6 +520,7 @@ export function DoctorsPage() {
                 <Detail label="Phone" value={viewApp.phone} />
                 <Detail label="Position" value={viewApp.position} />
                 <Detail label="Qualification" value={viewApp.qualification} />
+                <Detail label="College / Institute" value={viewApp.collegeName} />
                 <Detail label="Experience" value={viewApp.experience} />
                 <Detail label="Organization" value={viewApp.currentOrganization} />
                 <Detail label="Joining Date" value={viewApp.joiningDate} />
@@ -553,13 +554,13 @@ export function DoctorsPage() {
                   {viewApp.documentUrl && (
                     <a href={viewApp.documentUrl} target="_blank" rel="noreferrer"
                        className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-blue-50 border border-blue-200 text-blue-700 font-bold hover:bg-blue-100 transition-all">
-                      <Download className="w-3.5 h-3.5" /> {viewApp.documentType || 'Supporting Document'}
+                      <Download className="w-3.5 h-3.5" /> {viewApp.documentType || 'ID Proof'}
                     </a>
                   )}
                   {viewApp.doctorCertificateUrl && (
                     <a href={viewApp.doctorCertificateUrl} target="_blank" rel="noreferrer"
                        className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-violet-50 border border-violet-200 text-violet-700 font-bold hover:bg-violet-100 transition-all">
-                      <Download className="w-3.5 h-3.5" /> Doctor Certificate
+                      <Download className="w-3.5 h-3.5" /> Doctor Registration Certificate
                     </a>
                   )}
                 </div>

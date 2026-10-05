@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { and, asc, count, desc, eq, sql, type SQL } from 'drizzle-orm';
+import { and, asc, count, desc, eq, inArray, isNotNull, sql, type SQL } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '../db/pool';
 import {
@@ -22,7 +22,10 @@ import {
   users,
 } from '../db/schema';
 import { requireAuth, requireRole } from '../middleware/auth';
-import { getEarnedNet } from './payouts';
+import { getEarnedNet, getEarnedNetForPeriod, getAvailableBalance } from './payouts';
+import { sumEarnedSql, rateForModeSql } from '../lib/commission';
+import { isValidDate } from '../lib/slots';
+import { periodsOverlap } from '../lib/periods';
 import { notifyDoctor, sendNotification } from '../lib/notifications';
 import { jaasConfigured, signJaasJwt } from '../lib/jaas';
 import { getSupabaseAdmin } from '../lib/supabase';
@@ -84,6 +87,8 @@ const doctorColumns = {
   homeVisitsEnabled: doctors.homeVisitsEnabled,
   maxRadiusKm: doctors.maxRadiusKm,
   platformFeePercent: doctors.platformFeePercent,
+  platformFeeHomePercent: doctors.platformFeeHomePercent,
+  platformFeeOnlinePercent: doctors.platformFeeOnlinePercent,
   categoryId: doctors.categoryId,
   deletionRequestedAt: doctors.deletionRequestedAt,
 };
@@ -225,8 +230,10 @@ adminRouter.get('/doctors', async (_req, res, next) => {
         doctorId: doctorCategoryCommissions.doctorId,
         categoryId: doctorCategoryCommissions.categoryId,
         categoryTitle: categories.title,
-        platformFeePercent: doctorCategoryCommissions.platformFeePercent,
-        consultationFeePaise: doctorCategoryCommissions.consultationFeePaise,
+        platformFeeHomePercent: doctorCategoryCommissions.platformFeeHomePercent,
+        platformFeeOnlinePercent: doctorCategoryCommissions.platformFeeOnlinePercent,
+        consultationFeeHomePaise: doctorCategoryCommissions.consultationFeeHomePaise,
+        consultationFeeOnlinePaise: doctorCategoryCommissions.consultationFeeOnlinePaise,
       })
       .from(doctorCategoryCommissions)
       .leftJoin(categories, eq(categories.id, doctorCategoryCommissions.categoryId));
@@ -270,6 +277,8 @@ const doctorCreateSchema = z.object({
   homeVisitsEnabled: z.boolean().optional(),
   maxRadiusKm: z.string().optional(),
   platformFeePercent: z.number().int().min(0).max(100).nullable().optional(),
+  platformFeeHomePercent: z.number().int().min(0).max(100).nullable().optional(),
+  platformFeeOnlinePercent: z.number().int().min(0).max(100).nullable().optional(),
   categoryId: z.number().int().positive().nullable().optional(),
 });
 
@@ -367,6 +376,8 @@ const doctorPatchSchema = z.object({
   homeVisitsEnabled: z.boolean().optional(),
   maxRadiusKm: z.string().optional(),
   platformFeePercent: z.number().int().min(0).max(100).nullable().optional(),
+  platformFeeHomePercent: z.number().int().min(0).max(100).nullable().optional(),
+  platformFeeOnlinePercent: z.number().int().min(0).max(100).nullable().optional(),
   categoryId: z.number().int().positive().nullable().optional(),
 });
 
@@ -643,8 +654,10 @@ adminRouter.get('/doctors/:id/category-commissions', async (req, res, next) => {
         id: doctorCategoryCommissions.id,
         categoryId: doctorCategoryCommissions.categoryId,
         categoryTitle: categories.title,
-        platformFeePercent: doctorCategoryCommissions.platformFeePercent,
-        consultationFeePaise: doctorCategoryCommissions.consultationFeePaise,
+        platformFeeHomePercent: doctorCategoryCommissions.platformFeeHomePercent,
+        platformFeeOnlinePercent: doctorCategoryCommissions.platformFeeOnlinePercent,
+        consultationFeeHomePaise: doctorCategoryCommissions.consultationFeeHomePaise,
+        consultationFeeOnlinePaise: doctorCategoryCommissions.consultationFeeOnlinePaise,
       })
       .from(doctorCategoryCommissions)
       .leftJoin(categories, eq(categories.id, doctorCategoryCommissions.categoryId))
@@ -657,8 +670,10 @@ adminRouter.get('/doctors/:id/category-commissions', async (req, res, next) => {
 });
 
 const categoryCommissionSchema = z.object({
-  platformFeePercent: z.number().int().min(0).max(100).nullable().optional(),
-  consultationFeePaise: z.number().int().min(0).nullable().optional(),
+  platformFeeHomePercent: z.number().int().min(0).max(100).nullable().optional(),
+  platformFeeOnlinePercent: z.number().int().min(0).max(100).nullable().optional(),
+  consultationFeeHomePaise: z.number().int().min(0).nullable().optional(),
+  consultationFeeOnlinePaise: z.number().int().min(0).nullable().optional(),
 });
 
 adminRouter.put('/doctors/:id/category-commissions/:categoryId', async (req, res, next) => {
@@ -669,20 +684,18 @@ adminRouter.put('/doctors/:id/category-commissions/:categoryId', async (req, res
       return res.status(400).json({ error: { message: 'id must be an integer' } });
     }
     const body = categoryCommissionSchema.parse(req.body);
+    const values = {
+      platformFeeHomePercent: body.platformFeeHomePercent ?? null,
+      platformFeeOnlinePercent: body.platformFeeOnlinePercent ?? null,
+      consultationFeeHomePaise: body.consultationFeeHomePaise ?? null,
+      consultationFeeOnlinePaise: body.consultationFeeOnlinePaise ?? null,
+    };
     const [row] = await db
       .insert(doctorCategoryCommissions)
-      .values({
-        doctorId: id,
-        categoryId,
-        platformFeePercent: body.platformFeePercent ?? null,
-        consultationFeePaise: body.consultationFeePaise ?? null,
-      })
+      .values({ doctorId: id, categoryId, ...values })
       .onConflictDoUpdate({
         target: [doctorCategoryCommissions.doctorId, doctorCategoryCommissions.categoryId],
-        set: {
-          platformFeePercent: body.platformFeePercent ?? null,
-          consultationFeePaise: body.consultationFeePaise ?? null,
-        },
+        set: values,
       })
       .returning();
     res.json({ commission: row });
@@ -721,6 +734,7 @@ adminRouter.get('/doctor-applications', async (_req, res, next) => {
         position: doctorApplications.position,
         specializations: doctorApplications.specializations,
         qualification: doctorApplications.qualification,
+        collegeName: doctorApplications.collegeName,
         experience: doctorApplications.experience,
         currentOrganization: doctorApplications.currentOrganization,
         certifications: doctorApplications.certifications,
@@ -946,7 +960,7 @@ adminRouter.get('/doctors/:id', async (req, res, next) => {
     if (id === null) return res.status(400).json({ error: { message: 'id must be an integer' } });
 
     const [doctor] = await db
-      .select({ ...doctorColumns, email: users.email })
+      .select({ ...doctorColumns, email: users.email, payoutDetails: doctors.payoutDetails })
       .from(doctors)
       .innerJoin(users, eq(users.id, doctors.userId))
       .where(eq(doctors.id, id));
@@ -1725,6 +1739,201 @@ adminRouter.delete('/reviews/:id', async (req, res, next) => {
 
 // --- doctor payouts (admin) ----------------------------------------------
 
+// Every doctor with what they have earned and what is still payable, so the
+// admin can pay a doctor who never opened the request screen.
+adminRouter.get('/payouts/doctors', async (_req, res, next) => {
+  try {
+    const earnedRows = await db
+      .select({
+        doctorId: appointments.doctorId,
+        total: sql<number>`${sumEarnedSql(sql`${appointments.paymentStatus} = 'paid' and ${appointments.status} = 'completed'`, appointments.feePaise, rateForModeSql(appointments.mode, { category: doctorCategoryCommissions, doctor: doctors, department: departments }))}`,
+      })
+      .from(appointments)
+      .innerJoin(doctors, eq(doctors.id, appointments.doctorId))
+      .leftJoin(departments, eq(departments.name, doctors.department))
+      .leftJoin(doctorCategoryCommissions, and(eq(doctorCategoryCommissions.doctorId, doctors.id), eq(doctorCategoryCommissions.categoryId, appointments.categoryId)))
+      .groupBy(appointments.doctorId);
+
+    const reservedRows = await db
+      .select({
+        doctorId: doctorPayouts.doctorId,
+        total: sql<number>`coalesce(sum(case when ${doctorPayouts.status} in ('pending', 'processing', 'completed') then ${doctorPayouts.amountPaise} else 0 end), 0)`,
+      })
+      .from(doctorPayouts)
+      .groupBy(doctorPayouts.doctorId);
+
+    const rows = await db
+      .select({
+        id: doctors.id,
+        name: doctors.name,
+        slug: doctors.slug,
+        department: doctors.department,
+        payoutDetails: doctors.payoutDetails,
+      })
+      .from(doctors)
+      .orderBy(asc(doctors.name));
+
+    const earned = new Map(earnedRows.map((r) => [r.doctorId, Number(r.total)]));
+    const reserved = new Map(reservedRows.map((r) => [r.doctorId, Number(r.total)]));
+
+    res.json({
+      doctors: rows.map((r) => {
+        const earnedPaise = earned.get(r.id) ?? 0;
+        const reservedPaise = reserved.get(r.id) ?? 0;
+        return {
+          ...r,
+          earnedPaise,
+          reservedPaise,
+          availablePaise: earnedPaise - reservedPaise,
+        };
+      }),
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'date must be YYYY-MM-DD');
+
+// One appointment can only be paid once. A period that overlaps money already
+// earmarked or paid out would pay the same appointment twice.
+async function findPeriodClash(doctorId: number, periodStart: string, periodEnd: string) {
+  const existing = await db
+    .select({
+      id: doctorPayouts.id,
+      periodStart: doctorPayouts.periodStart,
+      periodEnd: doctorPayouts.periodEnd,
+    })
+    .from(doctorPayouts)
+    .where(
+      and(
+        eq(doctorPayouts.doctorId, doctorId),
+        inArray(doctorPayouts.status, ['pending', 'processing', 'completed']),
+        isNotNull(doctorPayouts.periodStart),
+        isNotNull(doctorPayouts.periodEnd),
+      ),
+    );
+
+  return existing.find(
+    (p) => p.periodStart && p.periodEnd && periodsOverlap(periodStart, periodEnd, p.periodStart, p.periodEnd),
+  );
+}
+
+// What a period is worth, so the admin can see the number before committing.
+adminRouter.get('/payouts/preview', async (req, res, next) => {
+  try {
+    const query = z
+      .object({
+        doctorId: z.coerce.number().int().positive(),
+        periodStart: isoDate,
+        periodEnd: isoDate,
+      })
+      .refine((v) => v.periodStart <= v.periodEnd, {
+        message: 'periodEnd must be on or after periodStart',
+        path: ['periodEnd'],
+      })
+      .parse(req.query);
+
+    for (const date of [query.periodStart, query.periodEnd]) {
+      if (!isValidDate(date)) {
+        res.status(400).json({ error: { message: `Invalid date: ${date}` } });
+        return;
+      }
+    }
+
+    const [doctor] = await db.select({ id: doctors.id }).from(doctors).where(eq(doctors.id, query.doctorId));
+    if (!doctor) {
+      res.status(404).json({ error: { message: 'Doctor not found' } });
+      return;
+    }
+
+    const clash = await findPeriodClash(query.doctorId, query.periodStart, query.periodEnd);
+    const amountPaise = await getEarnedNetForPeriod(query.doctorId, query.periodStart, query.periodEnd);
+
+    res.json({
+      amountPaise: amountPaise > 0 ? amountPaise : 0,
+      availablePaise: await getAvailableBalance(query.doctorId),
+      overlapWith: clash ? { id: clash.id, periodStart: clash.periodStart, periodEnd: clash.periodEnd } : null,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Admin pays a doctor for a period. The amount is always computed server-side
+// from that period's completed+paid appointments, so the admin cannot fat-finger it.
+adminRouter.post('/payouts', async (req, res, next) => {
+  try {
+    const body = z
+      .object({
+        doctorId: z.number().int().positive(),
+        periodStart: isoDate,
+        periodEnd: isoDate,
+        paymentMethod: z.enum(['upi', 'bank_transfer']),
+        notes: z.string().max(500).optional(),
+      })
+      .refine((v) => v.periodStart <= v.periodEnd, {
+        message: 'periodEnd must be on or after periodStart',
+        path: ['periodEnd'],
+      })
+      .parse(req.body);
+
+    for (const date of [body.periodStart, body.periodEnd]) {
+      if (!isValidDate(date)) {
+        res.status(400).json({ error: { message: `Invalid date: ${date}` } });
+        return;
+      }
+    }
+
+    const [doctor] = await db
+      .select({ id: doctors.id, payoutDetails: doctors.payoutDetails })
+      .from(doctors)
+      .where(eq(doctors.id, body.doctorId));
+    if (!doctor) {
+      res.status(404).json({ error: { message: 'Doctor not found' } });
+      return;
+    }
+
+    const clash = await findPeriodClash(body.doctorId, body.periodStart, body.periodEnd);
+    if (clash) {
+      res.status(409).json({
+        error: {
+          message: `That period overlaps payout #${clash.id} (${clash.periodStart} to ${clash.periodEnd})`,
+        },
+      });
+      return;
+    }
+
+    const amountPaise = await getEarnedNetForPeriod(body.doctorId, body.periodStart, body.periodEnd);
+    if (amountPaise <= 0) {
+      res.status(400).json({ error: { message: 'No completed, paid appointments in that period' } });
+      return;
+    }
+
+    const availablePaise = await getAvailableBalance(body.doctorId);
+    if (amountPaise > availablePaise) {
+      res.status(400).json({ error: { message: 'Payout exceeds the doctor\u2019s available balance' } });
+      return;
+    }
+
+    const [payout] = await db
+      .insert(doctorPayouts)
+      .values({
+        doctorId: body.doctorId,
+        amountPaise,
+        paymentMethod: body.paymentMethod,
+        notes: body.notes,
+        periodStart: body.periodStart,
+        periodEnd: body.periodEnd,
+      })
+      .returning();
+
+    res.status(201).json({ payout: { ...payout, createdAt: payout.createdAt.toISOString() } });
+  } catch (err) {
+    next(err);
+  }
+});
+
 adminRouter.get('/payouts', async (req, res, next) => {
   try {
     const page = Math.max(1, Number(req.query.page) || 1);
@@ -1747,11 +1956,14 @@ adminRouter.get('/payouts', async (req, res, next) => {
         paymentMethod: doctorPayouts.paymentMethod,
         transactionId: doctorPayouts.transactionId,
         notes: doctorPayouts.notes,
+        periodStart: doctorPayouts.periodStart,
+        periodEnd: doctorPayouts.periodEnd,
         createdAt: doctorPayouts.createdAt,
         processedAt: doctorPayouts.processedAt,
         doctorId: doctors.id,
         doctorName: doctors.name,
         doctorSlug: doctors.slug,
+        payoutDetails: doctors.payoutDetails,
       })
       .from(doctorPayouts)
       .innerJoin(doctors, eq(doctors.id, doctorPayouts.doctorId))

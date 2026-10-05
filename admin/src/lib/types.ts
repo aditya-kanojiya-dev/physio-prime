@@ -27,7 +27,13 @@ export interface DoctorProfile {
   employeeId?: string | null;
   department?: string | null;
   address?: Record<string, unknown> | null;
+  payoutDetails?: PayoutDetails | null;
   deletionRequestedAt?: string | null;
+}
+
+export interface PayoutDetails {
+  upiId?: string | null;
+  bank?: { holder?: string | null; accountNumber?: string | null; ifsc?: string | null } | null;
 }
 
 export type AppointmentStatus = 'upcoming' | 'completed' | 'cancelled' | 'no_show';
@@ -99,10 +105,13 @@ export interface AdminDoctor {
   homeVisitsEnabled: boolean;
   maxRadiusKm: string;
   platformFeePercent: number | null;
+  platformFeeHomePercent: number | null;
+  platformFeeOnlinePercent: number | null;
   categoryId: number | null;
   categoryTitle?: string | null;
   departmentPlatformFeePercent?: number | null;
-  categoryCommissions?: { categoryId: number; categoryTitle: string | null; platformFeePercent: number | null; consultationFeePaise: number | null }[];
+  categoryCommissions?: DoctorCategoryCommission[];
+  payoutDetails?: { upiId?: string | null; bank?: { holder?: string | null; accountNumber?: string | null; ifsc?: string | null } | null } | null;
   deletionRequestedAt: string | null;
   status: 'active' | 'inactive';
 }
@@ -122,6 +131,7 @@ export interface AdminApplication {
   position: string | null;
   specializations: string[];
   qualification: string | null;
+  collegeName: string | null;
   experience: string | null;
   currentOrganization: string | null;
   certifications: string | null;
@@ -356,6 +366,8 @@ export interface Payout {
   paymentMethod: string | null;
   transactionId: string | null;
   notes: string | null;
+  periodStart?: string | null;
+  periodEnd?: string | null;
   createdAt: string;
   processedAt: string | null;
 }
@@ -369,12 +381,17 @@ export interface ServiceArea {
   sortOrder: number;
 }
 
+// `id`/`doctorId` are present on the per-doctor GET but omitted from the
+// doctors-list embed, so both shapes must satisfy this.
 export interface DoctorCategoryCommission {
-  id: number;
+  id?: number;
+  doctorId?: number;
   categoryId: number;
   categoryTitle: string | null;
-  platformFeePercent: number | null;
-  consultationFeePaise: number | null;
+  platformFeeHomePercent: number | null;
+  platformFeeOnlinePercent: number | null;
+  consultationFeeHomePaise: number | null;
+  consultationFeeOnlinePaise: number | null;
 }
 
 export interface DoctorLocation {

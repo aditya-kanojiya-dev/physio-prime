@@ -7,6 +7,7 @@ import {
   file,
   type Errors,
 } from '../../src/lib/validate';
+import { periodsOverlap } from '../src/lib/periods';
 
 // The client mirrors of the server's Zod rules are pure functions, so they are
 // testable without a database even though the suite's setup demands one.
@@ -67,5 +68,19 @@ describe('client validation mirrors', () => {
     // a typed decimal or negative would 400 the whole commission batch
     expect(intInRange('12.5', 0, 100, 'Commission')).toMatch(/whole number/);
     expect(intInRange('-1', 0, 100, 'Commission')).toMatch(/between/);
+  });
+});
+
+describe('payout period overlap guard', () => {
+  it('blocks a period that would pay an already-paid appointment twice', () => {
+    expect(periodsOverlap('2026-09-01', '2026-09-07', '2026-09-07', '2026-09-13')).toBe(true);
+    expect(periodsOverlap('2026-09-01', '2026-09-30', '2026-09-10', '2026-09-10')).toBe(true);
+    // touching endpoints count as overlap: the boundary day is shared
+    expect(periodsOverlap('2026-09-01', '2026-09-10', '2026-09-10', '2026-09-20')).toBe(true);
+  });
+
+  it('allows the next period after a settled one', () => {
+    expect(periodsOverlap('2026-09-01', '2026-09-07', '2026-09-08', '2026-09-14')).toBe(false);
+    expect(periodsOverlap('2026-09-01', '2026-09-30', '2026-10-01', '2026-10-31')).toBe(false);
   });
 });

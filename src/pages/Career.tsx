@@ -10,6 +10,7 @@ type CareerErrors = Errors<
   | 'position'
   | 'specialization'
   | 'qualification'
+  | 'collegeName'
   | 'experience'
   | 'resume'
   | 'supportingDocType'
@@ -43,6 +44,7 @@ interface CareerFormData {
   position: string;
   specialization: string[];
   qualification: string;
+  collegeName: string;
   experience: string;
   currentOrganization: string;
   certifications: string;
@@ -64,6 +66,7 @@ export const Career: React.FC = () => {
     position: '',
     specialization: [],
     qualification: '',
+    collegeName: '',
     experience: '',
     currentOrganization: '',
     certifications: '',
@@ -89,7 +92,7 @@ export const Career: React.FC = () => {
   const resetForm = () => {
     setFormData({
       fullName: '', email: '', phone: '', position: '', specialization: [],
-      qualification: '', experience: '', currentOrganization: '',
+      qualification: '', collegeName: '', experience: '', currentOrganization: '',
       certifications: '', resume: null, coverLetter: '', joiningDate: '',
       consent: false, supportingDocType: '', supportingDoc: null,
       photo: null, doctorCertificate: null,
@@ -231,12 +234,13 @@ export const Career: React.FC = () => {
       position: required(f.position, 'Position'),
       specialization: f.specialization.length ? undefined : 'Select at least one specialization',
       qualification: required(f.qualification, 'Qualification'),
+      collegeName: required(f.collegeName, 'College / Institute name'),
       experience: required(f.experience, 'Years of experience'),
       resume: file(f.resume, { label: 'Resume', types: ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'], maxMb: 10 }),
-      supportingDocType: required(f.supportingDocType, 'Document type'),
-      supportingDoc: file(f.supportingDoc, { label: 'Supporting document', types: ['application/pdf', 'image/jpeg', 'image/png'], maxMb: 10 }),
+      supportingDocType: required(f.supportingDocType, 'ID proof type'),
+      supportingDoc: file(f.supportingDoc, { label: 'ID proof', types: ['application/pdf', 'image/jpeg', 'image/png'], maxMb: 10 }),
       photo: file(f.photo, { label: 'Photo', types: ['image/jpeg', 'image/png', 'image/webp'], maxMb: 10 }),
-      doctorCertificate: file(f.doctorCertificate, { label: 'Doctor certificate', types: ['application/pdf', 'image/jpeg', 'image/png'], maxMb: 10 }),
+      doctorCertificate: file(f.doctorCertificate, { label: 'Doctor registration certificate', types: ['application/pdf', 'image/jpeg', 'image/png'], maxMb: 10 }),
       joiningDate: required(f.joiningDate, 'Joining preference'),
       consent: f.consent ? undefined : 'Consent is required',
     };
@@ -262,6 +266,7 @@ export const Career: React.FC = () => {
           position: formData.position,
           specialization: formData.specialization,
           qualification: formData.qualification,
+          collegeName: formData.collegeName,
           experience: formData.experience,
           currentOrganization: formData.currentOrganization,
           certifications: formData.certifications,
@@ -501,6 +506,30 @@ export const Career: React.FC = () => {
                 </div>
               </div>
 
+              {/* College / Institute Name */}
+              <div className="space-y-1.5">
+                <label htmlFor="career-collegeName" className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                  <GraduationCap className="w-3.5 h-3.5 text-blue-500" />
+                  College / Institute Name <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  id="career-collegeName"
+                  name="collegeName"
+                  type="text"
+                  value={formData.collegeName}
+                  onChange={handleInputChange}
+                  placeholder="e.g. Manipal College of Physiotherapy"
+                  aria-invalid={errors.collegeName ? true : undefined}
+                  aria-describedby={errors.collegeName ? 'career-collegeName-error' : undefined}
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 focus:bg-white transition-all"
+                />
+                {errors.collegeName ? (
+                  <p id="career-collegeName-error" role="alert" className="text-xs font-semibold text-red-600">{errors.collegeName}</p>
+                ) : (
+                  <p className="text-[10px] text-slate-400">The college or institute that awarded your highest qualification.</p>
+                )}
+              </div>
+
               {/* Current Organization */}
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
@@ -563,11 +592,11 @@ export const Career: React.FC = () => {
                   )}
                 </div>
 
-              {/* Supporting Document (for verification) */}
+              {/* ID Proof (for verification) */}
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
                   <FileText className="w-3.5 h-3.5 text-blue-500" />
-                  Supporting Document <span className="text-rose-500">*</span>
+                  ID Proof <span className="text-rose-500">*</span>
                 </label>
                   <select
                     id="career-supportingDocType"
@@ -578,7 +607,7 @@ export const Career: React.FC = () => {
                     aria-describedby={errors.supportingDocType ? 'career-supportingDocType-error' : undefined}
                     className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 focus:outline-none focus:border-blue-600 focus:bg-white transition-all"
                   >
-                    <option value="">Select document type</option>
+                    <option value="">Select ID proof type</option>
                     {documentTypes.map(doc => (
                       <option key={doc} value={doc}>{doc}</option>
                     ))}
@@ -638,11 +667,11 @@ export const Career: React.FC = () => {
                   )}
                 </div>
 
-              {/* Doctor Certificate Upload */}
+              {/* Doctor Registration Certificate Upload */}
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
                   <GraduationCap className="w-3.5 h-3.5 text-blue-500" />
-                  Doctor Certificate <span className="text-rose-500">*</span>
+                  Doctor Registration Certificate <span className="text-rose-500">*</span>
                 </label>
                 <div className="relative">
                     <input

@@ -2,10 +2,10 @@ import { Router } from 'express';
 import { and, asc, desc, eq, sql, gte, lte, ilike, count, type SQLWrapper } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '../db/pool';
-import { appointments, departments, doctors } from '../db/schema';
+import { appointments, departments, doctorCategoryCommissions, doctors } from '../db/schema';
 import { requireAuth, requireRole } from '../middleware/auth';
 import { requireDoctor, noProfile } from '../lib/doctor';
-import { sumEarnedSql, resolvePlatformFeePercentSql } from '../lib/commission';
+import { sumEarnedSql, rateForModeSql } from '../lib/commission';
 
 export const doctorEarningsRouter = Router();
 
@@ -71,7 +71,7 @@ doctorEarningsRouter.get('/earnings/summary', async (req, res, next) => {
     );
 
     const sumNet = (cond: SQLWrapper) =>
-      sql<number>`${sumEarnedSql(cond, appointments.feePaise, resolvePlatformFeePercentSql(doctors.platformFeePercent, departments.platformFeePercent))}`;
+      sql<number>`${sumEarnedSql(cond, appointments.feePaise, rateForModeSql(appointments.mode, { category: doctorCategoryCommissions, doctor: doctors, department: departments }))}`;
 
     const [totals] = await db
       .select({
@@ -87,6 +87,7 @@ doctorEarningsRouter.get('/earnings/summary', async (req, res, next) => {
       .from(appointments)
       .innerJoin(doctors, eq(doctors.id, appointments.doctorId))
       .leftJoin(departments, eq(departments.name, doctors.department))
+      .leftJoin(doctorCategoryCommissions, and(eq(doctorCategoryCommissions.doctorId, doctors.id), eq(doctorCategoryCommissions.categoryId, appointments.categoryId)))
       .where(base);
 
     // comparison: shift the window back by its length
@@ -105,6 +106,7 @@ doctorEarningsRouter.get('/earnings/summary', async (req, res, next) => {
       .from(appointments)
       .innerJoin(doctors, eq(doctors.id, appointments.doctorId))
       .leftJoin(departments, eq(departments.name, doctors.department))
+      .leftJoin(doctorCategoryCommissions, and(eq(doctorCategoryCommissions.doctorId, doctors.id), eq(doctorCategoryCommissions.categoryId, appointments.categoryId)))
       .where(
         and(
           eq(appointments.doctorId, doctor.id),
@@ -153,7 +155,7 @@ doctorEarningsRouter.get('/earnings/chart', async (req, res, next) => {
     const { start, end } = periodRange(period);
 
     const sumNet = (cond: SQLWrapper) =>
-      sql<number>`${sumEarnedSql(cond, appointments.feePaise, resolvePlatformFeePercentSql(doctors.platformFeePercent, departments.platformFeePercent))}`;
+      sql<number>`${sumEarnedSql(cond, appointments.feePaise, rateForModeSql(appointments.mode, { category: doctorCategoryCommissions, doctor: doctors, department: departments }))}`;
 
     const rows = await db
       .select({
@@ -164,6 +166,7 @@ doctorEarningsRouter.get('/earnings/chart', async (req, res, next) => {
       .from(appointments)
       .innerJoin(doctors, eq(doctors.id, appointments.doctorId))
       .leftJoin(departments, eq(departments.name, doctors.department))
+      .leftJoin(doctorCategoryCommissions, and(eq(doctorCategoryCommissions.doctorId, doctors.id), eq(doctorCategoryCommissions.categoryId, appointments.categoryId)))
       .where(
         and(
           eq(appointments.doctorId, doctor.id),

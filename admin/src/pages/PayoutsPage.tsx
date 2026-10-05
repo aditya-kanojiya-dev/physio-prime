@@ -2,17 +2,20 @@ import React, { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   AlertCircle,
+  Building2,
   CheckCircle,
   Clock,
   CreditCard,
   Download,
   Loader2,
+  Save,
   Wallet,
 } from 'lucide-react'
 import { api } from '../lib/api'
-import { formatFee, type PayoutSummary, type Payout } from '../lib/types'
+import { formatFee, type DoctorProfile, type PayoutSummary, type Payout } from '../lib/types'
 import { Modal, inputCls, Field } from './admin/CategoriesPage'
 import { AdminLayout } from '../components/admin/AdminLayout'
+import { hasErrors, maxLen, type Errors } from '../lib/validate'
 
 const statusStyles: Record<string, string> = {
   completed: 'bg-emerald-100 text-emerald-700 border border-emerald-200',
@@ -37,6 +40,11 @@ export function PayoutsPage() {
   const { data: payoutsResp, isLoading: payoutsLoading } = useQuery({
     queryKey: ['doctor/payouts', page],
     queryFn: () => api.get<{ payouts: Payout[]; pagination: { page: number; totalPages: number; total: number } }>(`/doctor/payouts?page=${page}&limit=15`),
+  })
+
+  const { data: profile } = useQuery({
+    queryKey: ['doctor/profile'],
+    queryFn: async () => (await api.get<{ doctor: DoctorProfile }>('/doctor/profile')).doctor,
   })
 
   const requestMutation = useMutation({
@@ -120,6 +128,8 @@ export function PayoutsPage() {
           </div>
         </div>
       )}
+
+      <PayoutDetailsCard profile={profile} />
 
       <div className="p-6 rounded-3xl bg-white border border-slate-200 shadow-xl">
         <h3 className="text-base font-extrabold text-slate-900 mb-4">Payout History</h3>
@@ -241,5 +251,149 @@ export function PayoutsPage() {
       )}
     </div>
     </AdminLayout>
+  )
+}
+
+/**
+ * Where the admin sends the money. The server stores it verbatim, so this form
+ * is the doctor's only copy of their own bank details — it must round-trip.
+ * Every field is optional (a half-filled form is legal server-side); the badge
+ * tells the doctor whether there is enough here to pay them.
+ */
+function PayoutDetailsCard({ profile }: { profile: DoctorProfile | undefined }) {
+  const qc = useQueryClient()
+  const saved = profile?.payoutDetails
+  const [upiId, setUpiId] = useState(saved?.upiId ?? '')
+  const [holder, setHolder] = useState(saved?.bank?.holder ?? '')
+  const [accountNumber, setAccountNumber] = useState(saved?.bank?.accountNumber ?? '')
+  const [ifsc, setIfsc] = useState(saved?.bank?.ifsc ?? '')
+  const [hydrated, setHydrated] = useState(false)
+  const [errors, setErrors] = useState<Errors<'upiId' | 'holder' | 'accountNumber' | 'ifsc'>>({})
+  const [message, setMessage] = useState<string | null>(null)
+
+  if (profile && !hydrated) {
+    setUpiId(saved?.upiId ?? '')
+    setHolder(saved?.bank?.holder ?? '')
+    setAccountNumber(saved?.bank?.accountNumber ?? '')
+    setIfsc(saved?.bank?.ifsc ?? '')
+    setHydrated(true)
+  }
+
+  const bankReady = !!(holder.trim() && accountNumber.trim() && ifsc.trim())
+  const upiReady = !!upiId.trim()
+
+  const save = useMutation({
+    mutationFn: () =>
+      api.patch<{ doctor: DoctorProfile }>('/doctor/profile', {
+        payoutDetails: {
+          upiId: upiId.trim() || null,
+          bank: {
+            holder: holder.trim() || null,
+            accountNumber: accountNumber.trim() || null,
+            ifsc: ifsc.trim() || null,
+          },
+        },
+      }),
+    onSuccess: (res) => {
+      qc.setQueryData(['doctor/profile'], res.doctor)
+      setErrors({})
+      setMessage('Saved. The admin can now pay you to these details.')
+    },
+    onError: (err) => setMessage(err instanceof Error ? err.message : 'Could not save'),
+  })
+
+  const submit = () => {
+    // mirrors payoutDetailsSchema: upiId/holder <=100, accountNumber <=34, ifsc <=11
+    const next = {
+      upiId: maxLen(upiId, 100, 'UPI ID'),
+      holder: maxLen(holder, 100, 'Account holder'),
+      accountNumber: maxLen(accountNumber, 34, 'Account number'),
+      ifsc: maxLen(ifsc, 11, 'IFSC'),
+    }
+    setErrors(next)
+    if (hasErrors(next)) return
+    setMessage(null)
+    save.mutate()
+  }
+
+  return (
+    <div className="p-6 rounded-3xl bg-white border border-slate-200 shadow-xl space-y-4">
+      <div className="flex items-center justify-between">
+        <h3 className="text-base font-extrabold text-slate-900">Payout Details</h3>
+        <span
+          className={`px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase ${
+            bankReady || upiReady
+              ? 'bg-emerald-100 text-emerald-700'
+              : 'bg-amber-100 text-amber-700'
+          }`}
+        >
+          {bankReady || upiReady ? 'Set' : 'Not set'}
+        </span>
+      </div>
+      <p className="text-[11px] font-semibold text-slate-500">
+        Where we send your earnings. Add a UPI ID or a bank account — whichever you prefer.
+      </p>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <Field label="UPI ID" error={errors.upiId}>
+          <input
+            value={upiId}
+            onChange={(e) => { setUpiId(e.target.value); setErrors((p) => ({ ...p, upiId: undefined })) }}
+            placeholder="name@bank"
+            className={inputCls}
+          />
+        </Field>
+        <Field label="Account holder name" error={errors.holder}>
+          <input
+            value={holder}
+            onChange={(e) => { setHolder(e.target.value); setErrors((p) => ({ ...p, holder: undefined })) }}
+            placeholder="As printed on the account"
+            className={inputCls}
+          />
+        </Field>
+        <Field label="Account number" error={errors.accountNumber}>
+          <input
+            value={accountNumber}
+            onChange={(e) => { setAccountNumber(e.target.value); setErrors((p) => ({ ...p, accountNumber: undefined })) }}
+            placeholder="Bank account number"
+            className={inputCls}
+          />
+        </Field>
+        <Field label="IFSC" error={errors.ifsc}>
+          <input
+            value={ifsc}
+            onChange={(e) => { setIfsc(e.target.value); setErrors((p) => ({ ...p, ifsc: undefined })) }}
+            placeholder="ABCD0001234"
+            maxLength={11}
+            className={`${inputCls} font-mono`}
+          />
+        </Field>
+      </div>
+
+      <div className="flex items-center gap-3">
+        <button
+          onClick={submit}
+          disabled={save.isPending}
+          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-teal-600 to-blue-600 text-white text-xs font-extrabold shadow-lg shadow-teal-600/20 hover:from-teal-500 hover:to-blue-500 transition-all disabled:opacity-70"
+        >
+          {save.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+          Save details
+        </button>
+        {message && (
+          <p
+            role="status"
+            className={`text-[11px] font-bold ${message.startsWith('Saved') ? 'text-emerald-600' : 'text-rose-600'}`}
+          >
+            {message}
+          </p>
+        )}
+      </div>
+
+      {!bankReady && !upiReady && (
+        <p className="text-[11px] font-semibold text-amber-700 flex items-center gap-1.5">
+          <Building2 className="w-3.5 h-3.5" /> We cannot pay you out until one of these is filled in.
+        </p>
+      )}
+    </div>
   )
 }

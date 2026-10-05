@@ -3,7 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Appointment, ConsultationMode } from '../types';
 import { api } from '../lib/api';
 import { ApiAppointment, toAppointment } from '../lib/adapters';
-import { useAppointments } from '../hooks/queries';
+import { fetchCategories, useAppointments } from '../hooks/queries';
 
 export type PageView = 'home' | 'doctors' | 'doctor-detail' | 'categories' | 'conditions' | 'appointments' | 'dashboard' | 'about' | 'career' | 'blog';
 
@@ -22,6 +22,8 @@ export interface CreateAppointmentParams {
   patientHeight?: string;
   patientRelation?: string;
   address?: string;
+  city?: string;
+  area?: string;
   paymentMode?: 'prepay' | 'postpay';
 }
 
@@ -71,11 +73,21 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const createMutation = useMutation({
     mutationFn: async (data: CreateAppointmentParams) => {
+      // The category the patient booked through decides the commission split, so
+        // resolve the tracked slug to an id. Await the cached list so a booking
+        // started before categories loaded still carries the right rate; an
+        // absent slug just omits it and the server falls back to the
+        // doctor/department rate.
+        const cats = selectedCategorySlug
+          ? await queryClient.ensureQueryData({ queryKey: ['categories'], queryFn: () => fetchCategories(queryClient) })
+          : undefined;
+        const categoryId = selectedCategorySlug ? Number(cats?.find((c) => c.slug === selectedCategorySlug)?.id) : NaN;
       const result = await api.post<{
         appointment: ApiAppointment;
         razorpayOrder: { id: string; amountPaise: number } | null;
       }>('/appointments', {
         doctorSlug: data.doctorSlug,
+        categoryId: Number.isFinite(categoryId) && categoryId > 0 ? categoryId : undefined,
         mode: data.mode,
         date: data.date,
         slot: data.slot,
@@ -88,7 +100,7 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
         patientWeight: data.patientWeight,
         patientHeight: data.patientHeight,
         patientRelation: data.patientRelation,
-        address: data.address ? { text: data.address } : undefined,
+        address: data.address ? { text: data.address, ...(data.city && { city: data.city }), ...(data.area && { area: data.area }) } : undefined,
         paymentMode: data.paymentMode,
       });
       return { appointment: toAppointment(result.appointment), razorpayOrder: result.razorpayOrder };
