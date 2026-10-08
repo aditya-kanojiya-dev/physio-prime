@@ -164,6 +164,69 @@ export function getConditionDetail(symptom: Symptom, allSymptoms: Symptom[]): Co
   };
 }
 
+// --- chatbot free-text symptom matching ------------------------------------
+
+const normalizeText = (t: string): string =>
+  t.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+
+function levenshtein(a: string, b: string): number {
+  if (a === b) return 0;
+  if (!a.length) return b.length;
+  if (!b.length) return a.length;
+  let prev = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    const cur = [i];
+    for (let j = 1; j <= b.length; j++) {
+      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    }
+    prev = cur;
+  }
+  return prev[b.length];
+}
+
+export type SymptomMatchKind = 'exact' | 'partial' | 'fuzzy';
+
+// Match what the user typed against the symptom list:
+//  - exact:   typed text equals the label ("back pain")
+//  - partial: label/keyword sits inside the typed sentence ("i have back pain"),
+//             or the typed text starts a label ("back" -> Back Pain)
+//  - fuzzy:   typo within edit distance of the label -> "did you mean" material
+export function matchSymptomQuery<T extends { label: string; conditions?: string[] }>(
+  query: string,
+  options: T[],
+): { item: T; kind: SymptomMatchKind } | null {
+  const q = normalizeText(query);
+  if (!q) return null;
+
+  let bestContains: { item: T; len: number } | null = null;
+  let bestPrefix: { item: T; len: number } | null = null;
+  for (const item of options) {
+    const label = normalizeText(item.label);
+    if (q === label) return { item, kind: 'exact' };
+    for (const k of [label, ...(item.conditions ?? []).map(normalizeText)]) {
+      if (!k) continue;
+      if (q.includes(k)) {
+        if (!bestContains || k.length > bestContains.len) bestContains = { item, len: k.length };
+      } else if (k.includes(q) && q.length >= 3) {
+        if (!bestPrefix || label.length < bestPrefix.len) bestPrefix = { item, len: label.length };
+      }
+    }
+  }
+  if (bestContains) return { item: bestContains.item, kind: 'partial' };
+  if (bestPrefix) return { item: bestPrefix.item, kind: 'partial' };
+
+  // typo tolerance — labels only; conditions are specialty names ("Musculoskeletal /
+  // Orthopedic") and make nonsense did-you-mean suggestions.
+  if (q.length < 3) return null;
+  let best: { item: T; dist: number } | null = null;
+  for (const item of options) {
+    const dist = levenshtein(q, normalizeText(item.label));
+    const limit = Math.max(2, Math.floor(Math.min(q.length, normalizeText(item.label).length) / 4));
+    if (dist <= limit && (!best || dist < best.dist)) best = { item, dist };
+  }
+  return best ? { item: best.item, kind: 'fuzzy' } : null;
+}
+
 // Shared across every condition page — platform-level comparison, not condition-specific
 export const COMPARISON_ROWS: { label: string; home: string; online: string }[] = [
   { label: 'Typical fee', home: '₹600 – ₹2,000 / session', online: '₹400 – ₹1,000 / session' },

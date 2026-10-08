@@ -5,7 +5,7 @@ import { useDoctors, useCategories, useSymptoms } from '../../hooks/queries';
 import { ConsultationMode, Doctor } from '../../types';
 import { DoctorChatCard } from './DoctorChatCard';
 import { feeFor } from '../../lib/fees';
-import { categorySlugForSymptom } from '../../data/conditions';
+import { categorySlugForSymptom, matchSymptomQuery } from '../../data/conditions';
 import {
   X, Send, User, Bot, Shield,
   Mic, MicOff, Minimize2, Maximize2,
@@ -464,6 +464,8 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, onMinimize })
   // Doctors actually shown as cards — the card click looks them up here first,
   // so it still works if the query cache refetches empty in between.
   const shownDoctorsRef = useRef<Doctor[]>([]);
+  // Waiting on the user to confirm a "did you mean" suggestion from free text.
+  const pendingSymptomRef = useRef<{ id: string; label: string } | null>(null);
 
   const SYMPTOMS = useMemo(() => 
     symptoms.map((s) => ({
@@ -720,32 +722,41 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, onMinimize })
     );
   }, [addBotMessage, simulateTyping, chatState, SYMPTOMS, SPECIALTIES, symptoms]);
 
+  // Type-first symptom prompt instead of dumping every symptom as a button.
+  const askSymptomInput = useCallback(async (typeLabel?: string) => {
+    await simulateTyping(800);
+    addBotMessage(
+      (typeLabel
+        ? `Great! I'll help you find the best physiotherapist for a ${typeLabel}.\n\n`
+        : "Let me help you find the right specialist.\n\n") +
+      `What's bothering you? Type it below — e.g. "back pain", "knee injury".`,
+      [{ id: 'browse', label: '📋 Browse all symptoms', action: 'browse-symptoms', color: 'bg-purple-50/80 hover:bg-purple-100/80 text-purple-700 border-purple-200' }]
+    );
+    setChatState(prev => ({ ...prev, step: 'symptom' }));
+  }, [simulateTyping, addBotMessage]);
+
   const handleQuickReply = useCallback(async (action: string, label: string) => {
+    pendingSymptomRef.current = null;
     addUserMessage(label);
 
     // Handle appointment type selection
     if (action === 'home' || action === 'video') {
       setChatState(prev => ({ ...prev, appointmentType: action as 'home' | 'video' }));
-      await simulateTyping(800);
-      
-      const typeLabel = action === 'home' ? 'Home Visit' : 'Video Consultation';
-      addBotMessage(
-        `Great! I'll help you find the best physiotherapist for a ${typeLabel}.\n\nPlease select your primary concern or symptom:`,
-        SYMPTOMS.map(s => ({
-          id: s.id,
-          label: `${s.icon} ${s.label}`,
-          action: s.id
-        }))
-      );
-      setChatState(prev => ({ ...prev, step: 'symptom' }));
+      await askSymptomInput(action === 'home' ? 'Home Visit' : 'Video Consultation');
       return;
     }
 
     // Handle symptom check
     if (action === 'symptom') {
+      await askSymptomInput();
+      return;
+    }
+
+    // Explicit browse — only then list every symptom as a button.
+    if (action === 'browse-symptoms') {
       await simulateTyping(800);
       addBotMessage(
-        "Let me help you identify your condition. Please select the area that's bothering you:",
+        "Here are all the concerns I can help with — pick one, or type your own:",
         SYMPTOMS.map(s => ({
           id: s.id,
           label: `${s.icon} ${s.label}`,
@@ -901,7 +912,7 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, onMinimize })
       onClose();
       return;
     }
-  }, [addUserMessage, simulateTyping, addBotMessage, addMessage, askDuration, askTreatment, askSummary, SYMPTOMS, chatState, doctors, refetchDoctors, navigate, onClose]);
+  }, [addUserMessage, simulateTyping, addBotMessage, addMessage, askDuration, askTreatment, askSummary, askSymptomInput, SYMPTOMS, chatState, doctors, refetchDoctors, navigate, onClose]);
 
 
   const handleSendMessage = useCallback(async () => {
@@ -936,31 +947,46 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, onMinimize })
       return reask("I didn't catch that — have you consulted a physiotherapist or other professional about this before?", withSkip(treatmentOptions()));
     }
 
-    const matchedSymptom = SYMPTOMS.find(s => 
-      lowerInput.includes(s.label.toLowerCase()) ||
-      s.conditions.some(c => lowerInput.includes(c.toLowerCase()))
-    );
-    
-    if (matchedSymptom) {
-      return handleQuickReply(matchedSymptom.id, matchedSymptom.label);
-    } else if (lowerInput.includes('home') || lowerInput.includes('visit')) {
+    // Free text: confirm a pending "did you mean" before anything else.
+    const pending = pendingSymptomRef.current;
+    pendingSymptomRef.current = null;
+    if (pending && /^(y|yes|yep|yeah|correct|right|sure|ok|okay)\b/.test(lowerInput)) {
+      return handleQuickReply(pending.id, userMessage);
+    }
+
+    const match = matchSymptomQuery(userMessage, SYMPTOMS);
+    if (match && match.kind !== 'fuzzy') {
+      return handleQuickReply(match.item.id, match.item.label);
+    }
+
+    if (lowerInput.includes('home') || lowerInput.includes('visit')) {
       return handleQuickReply('home', 'Home Visit');
     } else if (lowerInput.includes('video') || lowerInput.includes('consult')) {
       return handleQuickReply('video', 'Video Consultation');
     } else if (lowerInput.includes('slot') || lowerInput.includes('availability')) {
       return handleQuickReply('view-slots', 'Check Slots');
-    } else {
+    }
+
+    if (match) {
+      // Close but not exact — confirm instead of guessing.
+      pendingSymptomRef.current = { id: match.item.id, label: match.item.label };
       addUserMessage(userMessage);
-      await simulateTyping(1000);
+      await simulateTyping(800);
       return addBotMessage(
-        "I understand you have concerns about your health. Let me help you find the right specialist.\n\nPlease select the area that's bothering you:",
-        SYMPTOMS.map(s => ({
-          id: s.id,
-          label: `${s.icon} ${s.label}`,
-          action: s.id
-        }))
+        `Did you mean "${match.item.label}"?`,
+        [
+          { id: 'did-you-mean-yes', label: '✅ Yes, that\'s it', action: match.item.id, color: 'bg-purple-50/80 hover:bg-purple-100/80 text-purple-700 border-purple-200' },
+          { id: 'did-you-mean-no', label: '❌ No, show options', action: 'browse-symptoms', color: 'bg-slate-50/80 hover:bg-slate-100/80 text-slate-700 border-slate-200' }
+        ]
       );
     }
+
+    addUserMessage(userMessage);
+    await simulateTyping(900);
+    return addBotMessage(
+      "I couldn't catch that. Type the concern again — like \"back pain\" — or pick from the list:",
+      [{ id: 'browse', label: '📋 Browse all symptoms', action: 'browse-symptoms', color: 'bg-purple-50/80 hover:bg-purple-100/80 text-purple-700 border-purple-200' }]
+    );
   }, [input, chatState, addUserMessage, simulateTyping, SYMPTOMS, handleQuickReply, addBotMessage]);
 
   // Speech-to-text support detection + cleanup
