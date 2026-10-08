@@ -19,16 +19,19 @@ import { Appointment, Category, Doctor, Symptom } from '../types';
 
 const STALE = 5 * 60 * 1000;
 
-async function fetchDoctors(area?: string): Promise<Doctor[]> {
-  const params = area ? `?area=${encodeURIComponent(area)}` : '';
-  const data = await api.get<{ doctors: ApiDoctor[] }>(`/doctors${params}`);
+async function fetchDoctors(area?: string, symptom?: string): Promise<Doctor[]> {
+  const params = new URLSearchParams();
+  if (area) params.set('area', area);
+  if (symptom) params.set('symptom', symptom);
+  const qs = params.toString();
+  const data = await api.get<{ doctors: ApiDoctor[] }>(`/doctors${qs ? `?${qs}` : ''}`);
   return data.doctors.map(toDoctor);
 }
 
-export function useDoctors(area?: string) {
+export function useDoctors(area?: string, symptom?: string) {
   return useQuery({
-    queryKey: ['doctors', area],
-    queryFn: () => fetchDoctors(area),
+    queryKey: ['doctors', area, symptom],
+    queryFn: () => fetchDoctors(area, symptom),
     staleTime: STALE,
   });
 }

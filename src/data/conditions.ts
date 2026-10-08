@@ -32,6 +32,12 @@ const SPECIALTY_TO_CATEGORY: Record<string, string> = {
 // Treatment modalities (Dry Needling, Cupping...) are not patient-facing conditions
 const EXCLUDED_SPECIALTIES = new Set(['Therapy Techniques']);
 
+// Symptom slug -> category slug, for booking flows that start from a condition.
+export function categorySlugForSymptom(s: Symptom): string | null {
+  const specialty = specialtyOf(s);
+  return specialty ? SPECIALTY_TO_CATEGORY[specialty] ?? null : null;
+}
+
 export function conditionsForCategory(categorySlug: string, symptoms: Symptom[]): ConditionLink[] {
   const specialty = Object.entries(SPECIALTY_TO_CATEGORY).find(([, s]) => s === categorySlug)?.[0];
   if (!specialty) return [];

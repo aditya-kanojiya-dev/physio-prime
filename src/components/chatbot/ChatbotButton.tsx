@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronUp } from 'lucide-react';
 import { Chatbot } from './Chatbot';
 // If you must use an image, use one with transparent background
 import chatbotImg from '../../assets/chatbot.png';
@@ -9,7 +8,6 @@ export const ChatbotButton: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [showTooltip, setShowTooltip] = useState(true);
-  const [isMinimized, setIsMinimized] = useState(false);
 
   useEffect(() => {
     const checkMobile = () => {
@@ -41,9 +39,6 @@ export const ChatbotButton: React.FC = () => {
 
   const handleToggleChat = () => {
     setIsOpen(!isOpen);
-    if (!isOpen) {
-      setIsMinimized(false);
-    }
   };
 
   return (
@@ -110,23 +105,6 @@ export const ChatbotButton: React.FC = () => {
         isOpen={isOpen} 
         onClose={() => setIsOpen(false)}
       />
-
-      <AnimatePresence>
-        {isOpen && isMinimized && (
-          <motion.button
-            initial={{ scale: 0.8, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0.8, opacity: 0 }}
-            onClick={() => setIsMinimized(false)}
-            className={`fixed z-40 bg-gradient-to-r from-teal-600 to-blue-600 text-white shadow-lg rounded-full flex items-center justify-center
-              ${isMobile ? 'bottom-4 right-4 w-12 h-12' : 'bottom-4 right-4 w-14 h-14'}
-            `}
-          >
-            <ChevronUp className={`${isMobile ? 'w-5 h-5' : 'w-6 h-6'}`} />
-            <span className="absolute -top-1 -right-1 w-3 h-3 bg-green-400 rounded-full border-2 border-white animate-pulse"></span>
-          </motion.button>
-        )}
-      </AnimatePresence>
     </>
   );
 };

@@ -2,8 +2,10 @@ import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { motion, AnimatePresence, type Variants } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useDoctors, useCategories, useSymptoms } from '../../hooks/queries';
-import { Doctor } from '../../types';
+import { ConsultationMode, Doctor } from '../../types';
 import { DoctorChatCard } from './DoctorChatCard';
+import { feeFor } from '../../lib/fees';
+import { categorySlugForSymptom } from '../../data/conditions';
 import {
   X, Send, User, Bot, Shield,
   Mic, MicOff, Minimize2, Maximize2,
@@ -311,7 +313,9 @@ const MessageBubble: React.FC<{
   message: Message;
   isNew: boolean;
   mode: 'home' | 'online';
-}> = ({ message, isNew, mode }) => {
+  onQuickReply: (action: string, label: string) => void;
+  disabled?: boolean;
+}> = ({ message, isNew, mode, onQuickReply, disabled }) => {
   const isBot = message.type === 'bot';
   const isUser = message.type === 'user';
   
@@ -344,8 +348,9 @@ const MessageBubble: React.FC<{
                     key={option.id}
                     whileHover={{ scale: 1.03, y: -1 }}
                     whileTap={{ scale: 0.95 }}
-                    onClick={() => (window as any).handleQuickReply?.(option.action, option.label)}
-                    className={`px-3 py-2 rounded-xl text-xs font-medium transition-all border shadow-sm ${
+                    onClick={() => onQuickReply(option.action, option.label)}
+                    disabled={disabled}
+                    className={`px-3 py-2 rounded-xl text-xs font-medium transition-all border shadow-sm disabled:opacity-50 disabled:cursor-not-allowed ${
                       option.color || 'bg-teal-50 hover:bg-teal-100 text-teal-700 border-teal-200 hover:border-teal-300'
                     }`}
                   >
@@ -357,7 +362,7 @@ const MessageBubble: React.FC<{
             {message.doctors && message.doctors.length > 0 && (
               <div className="mt-2.5 space-y-2">
                 {message.doctors.map((doctor) => (
-                  <DoctorChatCard key={doctor.id} doctor={doctor} mode={mode} />
+                  <DoctorChatCard key={doctor.id} doctor={doctor} mode={mode} onQuickReply={onQuickReply} />
                 ))}
               </div>
             )}
@@ -452,9 +457,13 @@ interface ChatbotProps {
 
 export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, onMinimize }) => {
   const navigate = useNavigate();
-  const { data: doctors = [] } = useDoctors();
+  const [doctorSymptom, setDoctorSymptom] = useState<string | null>(null);
+  const { data: doctors = [], refetch: refetchDoctors } = useDoctors(undefined, doctorSymptom ?? undefined);
   const { data: categories = [] } = useCategories();
   const { data: symptoms = [] } = useSymptoms();
+  // Doctors actually shown as cards — the card click looks them up here first,
+  // so it still works if the query cache refetches empty in between.
+  const shownDoctorsRef = useRef<Doctor[]>([]);
 
   const SYMPTOMS = useMemo(() => 
     symptoms.map((s) => ({
@@ -590,21 +599,20 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, onMinimize })
 
   // Initial greeting
   useEffect(() => {
-    if (isOpen && messages.length === 0) {
-      const greeting: Message = {
-        id: `greeting-${Date.now()}`,
-        type: 'bot',
-        content: "👋 Hello! I'm your PhysioPrime assistant. I'll help you find the right physiotherapist for your needs.\n\nWhat type of care are you looking for?",
-        timestamp: new Date(),
-        options: [
-          { id: 'home-visit', label: '🏠 Home Visit', action: 'home', color: 'bg-blue-50/80 hover:bg-blue-100/80 text-blue-700 border-blue-200' },
-          { id: 'video-consult', label: '📹 Video Consult', action: 'video', color: 'bg-teal-50/80 hover:bg-teal-100/80 text-teal-700 border-teal-200' },
-          { id: 'symptom-check', label: '🤔 Symptom Check', action: 'symptom', color: 'bg-purple-50/80 hover:bg-purple-100/80 text-purple-700 border-purple-200' }
-        ]
-      };
-      setMessages([greeting]);
-    }
-  }, [isOpen, messages.length]);
+    if (!isOpen) return;
+    const greeting: Message = {
+      id: `greeting-${Date.now()}`,
+      type: 'bot',
+      content: "👋 Hello! I'm your PhysioPrime assistant. I'll help you find the right physiotherapist for your needs.\n\nWhat type of care are you looking for?",
+      timestamp: new Date(),
+      options: [
+        { id: 'home-visit', label: '🏠 Home Visit', action: 'home', color: 'bg-blue-50/80 hover:bg-blue-100/80 text-blue-700 border-blue-200' },
+        { id: 'video-consult', label: '📹 Video Consult', action: 'video', color: 'bg-teal-50/80 hover:bg-teal-100/80 text-teal-700 border-teal-200' },
+        { id: 'symptom-check', label: '🤔 Symptom Check', action: 'symptom', color: 'bg-purple-50/80 hover:bg-purple-100/80 text-purple-700 border-purple-200' }
+      ]
+    };
+    setMessages(prev => (prev.length > 0 ? prev : [greeting]));
+  }, [isOpen]);
 
   const handleMinimize = useCallback(() => {
     setIsMinimized(prev => !prev);
@@ -664,18 +672,8 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, onMinimize })
 
   const askSummary = useCallback(async (treatment: string | null) => {
     const symptomId = chatState.selectedSymptom;
-    let matchingSpecialtyId = '';
-    if (['back-pain', 'neck-pain', 'knee-pain', 'frozen-shoulder', 'knee-replacement'].includes(symptomId || '')) {
-      matchingSpecialtyId = 'orthopedic';
-    } else if (['stroke-rehab', 'sciatica', 'post-fracture-rehab'].includes(symptomId || '')) {
-      matchingSpecialtyId = 'neurological';
-    } else if (symptomId === 'sports-injury') {
-      matchingSpecialtyId = 'sports-injury';
-    } else if (symptomId === 'arthritis' || symptomId === 'geriatric-care') {
-      matchingSpecialtyId = 'geriatric';
-    } else if (symptomId === 'hand-wrist-rehab') {
-      matchingSpecialtyId = 'hand-rehab';
-    }
+    const symptomRow = symptoms.find(s => s.slug === symptomId);
+    const matchingSpecialtyId = (symptomRow ? categorySlugForSymptom(symptomRow) : null) ?? '';
 
     setChatState(prev => ({
       ...prev,
@@ -720,7 +718,7 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, onMinimize })
       ],
       matchingSpecialtyId
     );
-  }, [addBotMessage, simulateTyping, chatState, SYMPTOMS, SPECIALTIES]);
+  }, [addBotMessage, simulateTyping, chatState, SYMPTOMS, SPECIALTIES, symptoms]);
 
   const handleQuickReply = useCallback(async (action: string, label: string) => {
     addUserMessage(label);
@@ -761,6 +759,7 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, onMinimize })
     // Handle symptom selection
     const selectedSymptom = SYMPTOMS.find(s => s.id === action);
     if (selectedSymptom) {
+      setDoctorSymptom(action);
       setChatState(prev => ({ 
         ...prev, 
         selectedSymptom: action,
@@ -821,15 +820,11 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, onMinimize })
     if (action === 'show-doctors') {
       await simulateTyping(1200);
 
-      const specialty = SPECIALTIES.find(s => s.id === chatState.selectedSpecialty);
-      const filteredDoctors = doctors.filter((d: any) => 
-        d.specialty.toLowerCase().includes(specialty?.label?.toLowerCase() || '') ||
-        d.expertise.some((e: string) => specialty?.conditions?.some((c: string) => 
-          e.toLowerCase().includes(c.toLowerCase())
-        ))
-      );
+      let list = doctors;
+      if (list.length === 0) list = (await refetchDoctors()).data ?? [];
+      shownDoctorsRef.current = list.slice(0, 3);
 
-      if (filteredDoctors.length === 0) {
+      if (shownDoctorsRef.current.length === 0) {
         addBotMessage(
           "I couldn't find any doctors matching your criteria. Please try selecting a different symptom or check our available slots.",
           [
@@ -845,7 +840,7 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, onMinimize })
         type: 'bot',
         content: 'Here are the top specialists for your condition:',
         timestamp: new Date(),
-        doctors: filteredDoctors.slice(0, 3),
+        doctors: shownDoctorsRef.current,
       });
       addBotMessage(
         'Tap **Book Now** on your preferred doctor, or explore other options:',
@@ -861,13 +856,16 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, onMinimize })
     // Handle doctor selection
     if (action.startsWith('doctor-')) {
       const doctorId = action.replace('doctor-', '');
-      const doctor = doctors.find((d: any) => d.id === doctorId);
+      const doctor = shownDoctorsRef.current.find((d) => d.id === doctorId) ??
+        doctors.find((d) => d.id === doctorId);
       if (doctor) {
         setChatState(prev => ({ ...prev, selectedDoctor: doctor }));
         await simulateTyping(1000);
 
-        const typeLabel = chatState.appointmentType === 'home' ? 'Home Visit' : 'Video Consultation';
-        const fee = doctor.fees[chatState.appointmentType === 'home' ? 'home' : 'online'];
+        const mode: ConsultationMode = chatState.appointmentType === 'video' ? 'online' : 'home';
+        const typeLabel = mode === 'home' ? 'Home Visit' : 'Video Consultation';
+        const categoryId = doctor.categories?.find((c) => c.slug === chatState.selectedSpecialty)?.categoryId;
+        const fee = feeFor(doctor, mode, categoryId);
         
         addBotMessage(
           `Great choice! Here are the details for ${doctor.name}:\n\n👨‍⚕️ Specialty: ${doctor.specialty}\n⭐ Rating: ${doctor.rating} (${doctor.reviewCount} reviews)\n📍 Location: ${doctor.location.area}, ${doctor.location.city}\n⏰ Experience: ${doctor.experienceYears} years\n💰 Fee: ₹${fee}/session (${typeLabel})\n🕐 Next Available: ${doctor.nextAvailable}\n🌐 Languages: ${doctor.languages.join(', ')}\n\nWould you like to book a ${typeLabel} with ${doctor.name}?`,
@@ -879,6 +877,7 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, onMinimize })
         );
         setChatState(prev => ({ ...prev, step: 'booking' }));
       }
+      return;
     }
 
     // Handle view profile
@@ -891,59 +890,19 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, onMinimize })
 
     // Handle booking
     if (action === 'book-now') {
-      await simulateTyping(1200);
-
       const doctor = chatState.selectedDoctor;
-      const mode = chatState.appointmentType === 'video' ? 'online' : 'home';
-      
-      navigate('/book', { state: { doctor, mode } });
-      
+      if (!doctor) return;
+
+      const mode: ConsultationMode = chatState.appointmentType === 'video' ? 'online' : 'home';
+      const categoryId = doctor.categories?.find((c: any) => c.slug === chatState.selectedSpecialty)?.categoryId;
+
+      navigate('/book', { state: { doctor, mode, categoryId } });
+
       onClose();
       return;
     }
+  }, [addUserMessage, simulateTyping, addBotMessage, addMessage, askDuration, askTreatment, askSummary, SYMPTOMS, chatState, doctors, refetchDoctors, navigate, onClose]);
 
-    // Handle new booking
-    if (action === 'new-booking') {
-      setChatState({
-        step: 'greeting',
-        selectedSymptom: null,
-        selectedSeverity: null,
-        selectedDuration: null,
-        previousTreatment: null,
-        selectedSpecialty: null,
-        selectedDoctor: null,
-        appointmentType: null,
-        bookingDetails: null,
-        symptomDetails: null
-      });
-      await simulateTyping(600);
-      addBotMessage(
-        "👋 Let's start a new booking! What type of care are you looking for?",
-        [
-          { id: 'home-visit', label: '🏠 Home Visit', action: 'home', color: 'bg-blue-50/80 hover:bg-blue-100/80 text-blue-700 border-blue-200' },
-          { id: 'video-consult', label: '📹 Video Consult', action: 'video', color: 'bg-teal-50/80 hover:bg-teal-100/80 text-teal-700 border-teal-200' },
-          { id: 'symptom-check', label: '🤔 Symptom Check', action: 'symptom', color: 'bg-purple-50/80 hover:bg-purple-100/80 text-purple-700 border-purple-200' }
-        ]
-      );
-    }
-
-    // Handle end chat
-    if (action === 'end-chat') {
-      await simulateTyping(500);
-      addBotMessage(
-        "💚 Thank you for using PhysioPrime! We hope you feel better soon.\n\nIf you need any further assistance, I'm always here to help. Take care! 💪"
-      );
-      setTimeout(() => onClose(), 3000);
-    }
-  }, [addUserMessage, simulateTyping, addBotMessage, addMessage, askDuration, askTreatment, askSummary, SYMPTOMS, SPECIALTIES, chatState, doctors, navigate, onClose]);
-
-  // Expose handleQuickReply globally for button clicks
-  useEffect(() => {
-    (window as any).handleQuickReply = handleQuickReply;
-    return () => {
-      delete (window as any).handleQuickReply;
-    };
-  }, [handleQuickReply]);
 
   const handleSendMessage = useCallback(async () => {
     if (!input.trim()) return;
@@ -1175,7 +1134,9 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, onMinimize })
                     key={message.id} 
                     message={message}
                     isNew={index === messages.length - 1 && message.type !== 'system'}
-                    mode={chatState.appointmentType === 'home' ? 'home' : 'online'}
+                    mode={chatState.appointmentType === 'video' ? 'online' : 'home'}
+                    onQuickReply={handleQuickReply}
+                    disabled={isTyping}
                   />
                 ))}
                 
@@ -1220,30 +1181,3 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, onMinimize })
     </AnimatePresence>
   );
 };
-
-// Add to your global CSS (or include in the component's styles)
-const globalStyles = `
-  @keyframes slow-float {
-    0%, 100% { transform: translate(0, 0) scale(1); }
-    33% { transform: translate(30px, -20px) scale(1.1); }
-    66% { transform: translate(-20px, 30px) scale(0.9); }
-  }
-  @keyframes slow-float-delayed {
-    0%, 100% { transform: translate(0, 0) scale(1); }
-    33% { transform: translate(-30px, 20px) scale(0.9); }
-    66% { transform: translate(20px, -30px) scale(1.1); }
-  }
-  .animate-slow-float {
-    animation: slow-float 20s ease-in-out infinite;
-  }
-  .animate-slow-float-delayed {
-    animation: slow-float-delayed 25s ease-in-out infinite;
-  }
-`;
-
-// Add styles if not already present
-if (typeof document !== 'undefined') {
-  const styleSheet = document.createElement("style");
-  styleSheet.textContent = globalStyles;
-  document.head.appendChild(styleSheet);
-}

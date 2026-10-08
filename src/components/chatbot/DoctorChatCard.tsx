@@ -2,10 +2,12 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { Star, MapPin, BadgeCheck, Clock } from 'lucide-react';
 import { Doctor } from '../../types';
+import { feeLabel } from '../../lib/fees';
 
 interface DoctorChatCardProps {
   doctor: Doctor;
   mode: 'home' | 'online';
+  onQuickReply: (action: string, label: string) => void;
 }
 
 const MODE_LABELS: Record<'home' | 'online', string> = {
@@ -13,9 +15,9 @@ const MODE_LABELS: Record<'home' | 'online', string> = {
   online: 'Video Consult',
 };
 
-export const DoctorChatCard: React.FC<DoctorChatCardProps> = ({ doctor, mode }) => {
+export const DoctorChatCard: React.FC<DoctorChatCardProps> = ({ doctor, mode, onQuickReply }) => {
   const handleBook = () => {
-    (window as any).handleQuickReply?.(`doctor-${doctor.id}`, doctor.name);
+    onQuickReply(`doctor-${doctor.id}`, doctor.name);
   };
 
   return (
@@ -54,7 +56,7 @@ export const DoctorChatCard: React.FC<DoctorChatCardProps> = ({ doctor, mode }) 
 
       <div className="px-3 pb-3 flex items-end justify-between gap-2">
         <div>
-          <p className="text-[10px] text-slate-400 font-medium">₹{doctor.fees[mode]}/session · {MODE_LABELS[mode]}</p>
+          <p className="text-[10px] text-slate-400 font-medium">₹{feeLabel(doctor.feeRange, doctor.fees[mode])}/session · {MODE_LABELS[mode]}</p>
           <p className="flex items-center gap-1 text-[11px] font-semibold text-teal-600 mt-0.5">
             <Clock className="w-3 h-3 text-teal-500" /> Next: {doctor.nextAvailable}
           </p>
