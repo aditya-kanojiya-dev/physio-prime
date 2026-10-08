@@ -2,9 +2,10 @@ import { Router } from 'express';
 import { and, desc, eq, inArray, isNotNull, lt, ne } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '../db/pool';
-import { appointments, categories, doctors, doctorSchedules, users } from '../db/schema';
+import { appointments, categories, doctors, doctorCategoryCommissions, doctorSchedules, users } from '../db/schema';
 import { requireAuth, requireRole } from '../middleware/auth';
 import { availableFromSchedules, dayOfWeek, EXPIRED_REASON, isJoinableNow, isPast, isStaleUnpaid, isValidDate, PAYMENT_GRACE_MS } from '../lib/slots';
+import { effectiveFees } from '../lib/commission';
 import { createOrder, verifySignature } from '../lib/razorpay';
 import { jaasConfigured, signJaasJwt } from '../lib/jaas';
 import { sendNotification, notifyDoctor, templates, type NotificationCtx } from '../lib/notifications';
@@ -440,8 +441,19 @@ appointmentsRouter.post('/', async (req, res, next) => {
       }
       categoryId = category.id;
     }
-    const fees = (doctor.fees ?? {}) as Record<string, number>;
-    const feeRupees = fees[body.mode];
+    // Price: the booked category's per-category fee when there is one, else the
+    // doctor's own fee. Same helper the API feeds the UI, so the price shown and
+    // the price charged cannot drift apart.
+    const [override] = categoryId != null
+      ? await db
+          .select({
+            homePaise: doctorCategoryCommissions.consultationFeeHomePaise,
+            onlinePaise: doctorCategoryCommissions.consultationFeeOnlinePaise,
+          })
+          .from(doctorCategoryCommissions)
+          .where(and(eq(doctorCategoryCommissions.doctorId, doctor.id), eq(doctorCategoryCommissions.categoryId, categoryId)))
+      : [];
+    const feeRupees = effectiveFees((doctor.fees ?? {}) as Record<string, number>, override ?? null)[body.mode];
     if (feeRupees == null) {
       res.status(400).json({ error: { message: `This doctor does not offer ${body.mode} appointments` } });
       return;

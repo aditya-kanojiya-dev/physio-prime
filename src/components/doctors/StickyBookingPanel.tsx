@@ -2,14 +2,16 @@ import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Doctor, ConsultationMode } from '../../types';
 import { useSlots } from '../../hooks/queries';
+import { feeFor } from '../../lib/fees';
 import { windowFirstSlot, formatTime } from '../../lib/adapters';
 import { Home, Video, Calendar, Clock, Sparkles, Shield, Loader2 } from 'lucide-react';
 
 interface StickyBookingPanelProps {
   doctor: Doctor;
+  categoryId?: number | null;
 }
 
-export const StickyBookingPanel: React.FC<StickyBookingPanelProps> = ({ doctor }) => {
+export const StickyBookingPanel: React.FC<StickyBookingPanelProps> = ({ doctor, categoryId }) => {
   const navigate = useNavigate();
   const [selectedMode, setSelectedMode] = useState<ConsultationMode>('home');
 
@@ -30,7 +32,7 @@ export const StickyBookingPanel: React.FC<StickyBookingPanelProps> = ({ doctor }
   const [selectedSlot, setSelectedSlot] = useState('');
   const { data: slots, isLoading, error } = useSlots(doctor.id, selectedDate);
 
-  const fee = doctor.fees[selectedMode];
+  const fee = feeFor(doctor, selectedMode, categoryId);
 
   return (
     <div className="glass-panel rounded-3xl p-6 sm:p-7 border border-slate-200 shadow-xl space-y-6 sticky top-28 bg-white">
@@ -177,7 +179,7 @@ export const StickyBookingPanel: React.FC<StickyBookingPanelProps> = ({ doctor }
 
       {/* Proceed CTA Button */}
       <button
-        onClick={() => navigate('/book', { state: { doctor, mode: selectedMode } })}
+        onClick={() => navigate('/book', { state: { doctor, mode: selectedMode, categoryId: categoryId ?? undefined } })}
         className="w-full btn-gradient text-white py-4 rounded-2xl font-extrabold text-sm shadow-xl shadow-blue-500/25 flex items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98] transition-all"
       >
         <Sparkles className="w-4 h-4 text-teal-200" />

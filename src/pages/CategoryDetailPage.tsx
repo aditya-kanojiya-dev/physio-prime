@@ -318,11 +318,12 @@ export const CategoryDetailPage: React.FC = () => {
                   experienceYears={doctor.experienceYears}
                   availabilityDate={doctor.nextAvailable}
                   sessionFee={doctor.fees.home}
+                  feeRange={doctor.feeRange}
                   visitTypes={visitTypes}
                   locationTags={areas}
                   profileUrl={`/doctor/${doctor.id}`}
-                  onBookHomeVisit={() => navigate('/book', { state: { doctor, mode: 'home' } })}
-                  onBookOnline={() => navigate('/book', { state: { doctor, mode: 'online' } })}
+                  onBookHomeVisit={() => navigate('/book', { state: { doctor, mode: 'home', categoryId: category?.numericId } })}
+                  onBookOnline={() => navigate('/book', { state: { doctor, mode: 'online', categoryId: category?.numericId } })}
                   shareUrl={`${window.location.origin}/doctor/${doctor.id}`}
                 />
               );

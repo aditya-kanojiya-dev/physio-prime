@@ -16,6 +16,7 @@ export interface ApiDoctor {
   languages: string[];
   location: { area?: string; city?: string; address?: string } | null;
   fees: Partial<Record<ConsultationMode, number>> | null;
+  feeRange?: { min: number; max: number } | null;
   nextAvailable: string | null;
   verified: boolean;
   featured: boolean;
@@ -31,6 +32,7 @@ export interface ApiDoctorDetail extends ApiDoctor {
   education: string[];
   experience: { role: string; institution: string; period: string }[];
   registration: { number?: string; council?: string };
+  categories?: { categoryId: number; slug: string; title: string; feeHome: number | null; feeOnline: number | null }[];
 }
 
 export interface ApiReview {
@@ -44,6 +46,7 @@ export interface ApiReview {
 
 export interface ApiCategory {
   id: string;
+  numericId?: number;
   title: string;
   slug: string;
   description: string;
@@ -174,6 +177,7 @@ export function toDoctor(d: ApiDoctor): Doctor {
       home: d.fees?.home || 0,
       online: d.fees?.online || 0,
     },
+    feeRange: d.feeRange ?? null,
     nextAvailable: formatNextAvailable(d.nextAvailable),
     verified: d.verified,
     featured: d.featured,
@@ -204,6 +208,7 @@ export function mergeDoctorDetail(base: Doctor, detail: ApiDoctorDetail): Doctor
     bio: detail.bio || base.bio,
     homeVisitsEnabled: detail.homeVisitsEnabled ?? base.homeVisitsEnabled,
     locations: detail.locations || base.locations,
+    categories: detail.categories || base.categories,
   };
 }
 
@@ -243,6 +248,7 @@ export function toCategory(c: ApiCategory, doctors: Doctor[]): Category {  const
   }).length;
   return {
     id: c.id,
+    numericId: c.numericId,
     title: c.title,
     slug: c.slug,
     description: c.description,

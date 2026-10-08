@@ -3,12 +3,15 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Appointment, ConsultationMode } from '../types';
 import { api } from '../lib/api';
 import { ApiAppointment, toAppointment } from '../lib/adapters';
-import { fetchCategories, useAppointments } from '../hooks/queries';
+import { useAppointments } from '../hooks/queries';
 
 export type PageView = 'home' | 'doctors' | 'doctor-detail' | 'categories' | 'conditions' | 'appointments' | 'dashboard' | 'about' | 'career' | 'blog';
 
 export interface CreateAppointmentParams {
   doctorSlug: string;
+  // Speciality the patient booked through; decides the commission split and
+  // which per-category price is charged. Absent = doctor/department rate.
+  categoryId?: number;
   mode: ConsultationMode;
   date: string;
   slot: string;
@@ -73,21 +76,12 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const createMutation = useMutation({
     mutationFn: async (data: CreateAppointmentParams) => {
-      // The category the patient booked through decides the commission split, so
-        // resolve the tracked slug to an id. Await the cached list so a booking
-        // started before categories loaded still carries the right rate; an
-        // absent slug just omits it and the server falls back to the
-        // doctor/department rate.
-        const cats = selectedCategorySlug
-          ? await queryClient.ensureQueryData({ queryKey: ['categories'], queryFn: () => fetchCategories(queryClient) })
-          : undefined;
-        const categoryId = selectedCategorySlug ? Number(cats?.find((c) => c.slug === selectedCategorySlug)?.id) : NaN;
       const result = await api.post<{
         appointment: ApiAppointment;
         razorpayOrder: { id: string; amountPaise: number } | null;
       }>('/appointments', {
         doctorSlug: data.doctorSlug,
-        categoryId: Number.isFinite(categoryId) && categoryId > 0 ? categoryId : undefined,
+        categoryId: data.categoryId,
         mode: data.mode,
         date: data.date,
         slot: data.slot,

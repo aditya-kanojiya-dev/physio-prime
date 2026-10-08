@@ -11,6 +11,19 @@ import { SERVICE_AREAS } from './seed-data/service-areas';
 // ponytail: truncates users too so dev seed stays idempotent; drop `users` from
 // this list once real registrations land in later phases.
 export async function seed(): Promise<void> {
+  // This TRUNCATEs every table CASCADE, so pointing it at the live database
+  // wipes the real accounts and refills the demo doctors. Refuse by default and
+  // require an explicit opt-in, the same way the test suite refuses
+  // DATABASE_URL. ponytail: matches on the host only; a throwaway Supabase
+  // branch also ends in supabase.co and needs the same flag.
+  if (/\.supabase\.co/.test(process.env.DATABASE_URL ?? '') && process.env.SEED_ALLOW_PRODUCTION !== '1') {
+    throw new Error(
+      'Refusing to seed: DATABASE_URL points at a Supabase host and seed() TRUNCATEs every ' +
+        'table CASCADE. Point DATABASE_URL at a throwaway database, or set ' +
+        'SEED_ALLOW_PRODUCTION=1 if you genuinely mean to overwrite this one.',
+    );
+  }
+
   await db.execute(
     sql`TRUNCATE users, doctors, doctor_applications, categories, departments, symptoms, patient_profiles, appointments, reviews, prescriptions, community_categories, doctor_locations, doctor_payouts, community_posts, community_replies, community_votes, conversations, messages, doctor_notifications, admin_notifications, payment_transactions, doctor_cash_ledger, refunds, payment_webhooks, settlements, service_areas, blog_categories, blog_tags, blog_posts, blog_post_tags RESTART IDENTITY CASCADE`,
   );
@@ -96,6 +109,25 @@ export async function seed(): Promise<void> {
   const seededAppointments = await seedShowcase(insertedDoctors);
 
   await db.insert(categories).values(CATEGORIES_DATA);
+
+  // Primary category per seeded doctor. Admin requires one (it decides which
+  // category rate applies, and lists the doctor on that category page), so the
+  // seed sets it instead of leaving every doctor with no speciality pricing.
+  const primaryCategoryByDoctor: Record<string, string> = {
+    'doc-tarannum-sayyed': 'orthopedic',
+    'doc-pritam-rathod': 'sports-injury',
+    'doc-jayshree-ingole': 'womens-health',
+    'doc-pratyush-kulkarni': 'orthopedic',
+    'doc-shubham-deshmukh': 'neurological',
+    'doc-ananya-sharma': 'geriatric',
+  };
+  for (const [doctorSlug, categorySlug] of Object.entries(primaryCategoryByDoctor)) {
+    await db.execute(sql`
+      UPDATE doctors SET category_id = (SELECT id FROM categories WHERE slug = ${categorySlug})
+      WHERE slug = ${doctorSlug}
+    `);
+  }
+
   await db.insert(departments).values([
     { name: 'Orthopedic', slug: 'orthopedic', sortOrder: 1 },
     { name: 'Sports', slug: 'sports', sortOrder: 2 },

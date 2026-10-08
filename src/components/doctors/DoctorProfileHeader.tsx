@@ -1,15 +1,19 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Doctor } from '../../types';
+import { feeFor } from '../../lib/fees';
 import { Star, ShieldCheck, MapPin, CheckCircle2, Home, Video } from 'lucide-react';
 import primeBadge from '../../assets/prime-badge.png';
 
 interface DoctorProfileHeaderProps {
   doctor: Doctor;
+  categoryId?: number | null;
 }
 
-export const DoctorProfileHeader: React.FC<DoctorProfileHeaderProps> = ({ doctor }) => {
+export const DoctorProfileHeader: React.FC<DoctorProfileHeaderProps> = ({ doctor, categoryId }) => {
   const navigate = useNavigate();
+  const homeFee = feeFor(doctor, 'home', categoryId);
+  const onlineFee = feeFor(doctor, 'online', categoryId);
 
   return (
     <div className="relative glass-panel rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-xl bg-white overflow-hidden">
@@ -85,19 +89,19 @@ export const DoctorProfileHeader: React.FC<DoctorProfileHeaderProps> = ({ doctor
           {/* Consultation Modes & Action */}
           <div className="flex flex-wrap items-center justify-center lg:justify-start gap-4">
             <button
-              onClick={() => navigate('/book', { state: { doctor, mode: 'home' } })}
+              onClick={() => navigate('/book', { state: { doctor, mode: 'home', categoryId: categoryId ?? undefined } })}
               className="btn-gradient text-white px-6 py-3 rounded-xl font-extrabold text-sm shadow-lg shadow-blue-500/25 flex items-center gap-2 hover:scale-[1.02] active:scale-[0.98] transition-all"
             >
               <Home className="w-4 h-4 text-teal-200" />
-              <span>Book Home Visit (₹{doctor.fees.home})</span>
+              <span>Book Home Visit (₹{homeFee})</span>
             </button>
 
             <button
-              onClick={() => navigate('/book', { state: { doctor, mode: 'online' } })}
+              onClick={() => navigate('/book', { state: { doctor, mode: 'online', categoryId: categoryId ?? undefined } })}
               className="px-6 py-3 rounded-xl font-bold text-sm text-slate-600 bg-white border border-slate-200 hover:border-teal-400 hover:bg-slate-50 transition-colors flex items-center gap-2 shadow-sm"
             >
               <Video className="w-4 h-4 text-teal-500" />
-              <span>Video Consult (₹{doctor.fees.online})</span>
+              <span>Video Consult (₹{onlineFee})</span>
             </button>
           </div>
 

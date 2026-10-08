@@ -1,10 +1,11 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { usePageMeta } from '../lib/usePageMeta';
 import { useBooking } from '../context/BookingContext';
 import { useDoctorDetail } from '../hooks/queries';
 import { DoctorProfileHeader } from '../components/doctors/DoctorProfileHeader';
 import { DoctorProfileTabs } from '../components/doctors/DoctorProfileTabs';
+import { DoctorCategoryFees } from '../components/doctors/DoctorCategoryFees';
 import { StickyBookingPanel } from '../components/doctors/StickyBookingPanel';
 import { HomeVisitCoverage } from '../components/doctors/HomeVisitCoverage';
 import { ArrowLeft, AlertCircle, Loader2 } from 'lucide-react';
@@ -14,6 +15,7 @@ export const DoctorDetailPage: React.FC = () => {
   const navigate = useNavigate();
   const { setSelectedDoctorId } = useBooking();
   const { data: doctor, isLoading, error } = useDoctorDetail(id || '');
+  const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
   usePageMeta(doctor?.name ? `${doctor.name} | PhysioPrime` : 'Doctor Profile | PhysioPrime', doctor?.name ? `Book ${doctor.name} for physiotherapy consultations.` : 'View physiotherapist profile, specialties, and book an appointment.');
 
   // Update context when doctor is found
@@ -58,6 +60,15 @@ export const DoctorDetailPage: React.FC = () => {
     );
   }
 
+  // Selected speciality drives every price on this page. Fall back to the
+  // first category so a single-speciality doctor is priced (and booked) under
+  // it automatically, and drop a selection left over from another doctor.
+  const categoryIds = (doctor.categories ?? []).map((c) => c.categoryId);
+  const activeCategoryId =
+    selectedCategoryId != null && categoryIds.includes(selectedCategoryId)
+      ? selectedCategoryId
+      : categoryIds[0] ?? null;
+
   return (
     <div className="pt-28 pb-20 min-h-screen">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
@@ -72,7 +83,14 @@ export const DoctorDetailPage: React.FC = () => {
         </button>
 
         {/* Doctor Header Banner */}
-        <DoctorProfileHeader doctor={doctor} />
+        <DoctorProfileHeader doctor={doctor} categoryId={activeCategoryId} />
+
+        {/* Per-speciality prices; also the picker for the active price */}
+        <DoctorCategoryFees
+          doctor={doctor}
+          selectedCategoryId={activeCategoryId}
+          onSelect={setSelectedCategoryId}
+        />
 
         {/* Main Grid: Tabs on Left, Sticky Booking Sidebar on Right */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
@@ -84,7 +102,7 @@ export const DoctorDetailPage: React.FC = () => {
           </div>
 
           <div className="lg:col-span-4">
-            <StickyBookingPanel doctor={doctor} />
+            <StickyBookingPanel doctor={doctor} categoryId={activeCategoryId} />
           </div>
         </div>
 

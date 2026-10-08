@@ -1,9 +1,10 @@
 import { Router } from 'express';
-import { and, asc, eq, sql, type SQL } from 'drizzle-orm';
+import { and, asc, eq, inArray, sql, type SQL } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '../db/pool';
-import { doctors, categories, symptoms, doctorLocations, serviceAreas, users } from '../db/schema';
+import { doctors, categories, symptoms, doctorLocations, doctorCategoryCommissions, serviceAreas, users } from '../db/schema';
 import { getAvailableWindows, isPast, isValidDate } from '../lib/slots';
+import { effectiveFees, type FeeOverride } from '../lib/commission';
 import { PAN_INDIA } from '../lib/locations';
 
 export const doctorsRouter = Router();
@@ -76,6 +77,7 @@ const doctorColumns = {
   expertise: doctors.expertise,
   treatments: doctors.treatments,
   homeVisitsEnabled: doctors.homeVisitsEnabled,
+  categoryId: doctors.categoryId,
 };
 
 const summaryColumns = {
@@ -109,6 +111,29 @@ const leastFeeSql = sql`LEAST(
   COALESCE((${doctors.fees}->>'home')::numeric, 'Infinity'::numeric),
   COALESCE((${doctors.fees}->>'online')::numeric, 'Infinity'::numeric)
 )`;
+
+// Lowest and highest price a patient can actually pay this doctor: the base
+// fees plus every per-category override. Cards show the bracket when a
+// speciality carries its own price, one number when it does not. null when
+// the doctor prices nothing at all (card falls back to fees[mode]).
+function feeRangeFor(
+  base: { home?: number | null; online?: number | null },
+  overrides: FeeOverride[] = [],
+): { min: number; max: number } | null {
+  const prices: number[] = [];
+  const push = (v: number | null | undefined) => {
+    if (v != null) prices.push(v);
+  };
+  push(base.home);
+  push(base.online);
+  for (const o of overrides) {
+    const fees = effectiveFees(base, o);
+    push(fees.home);
+    push(fees.online);
+  }
+  if (prices.length === 0) return null;
+  return { min: Math.min(...prices), max: Math.max(...prices) };
+}
 
 doctorsRouter.get('/', async (req, res) => {
   const query = querySchema.parse(req.query);
@@ -193,6 +218,28 @@ doctorsRouter.get('/', async (req, res) => {
     return true;
   });
 
+  // Per-category consultation fees for the doctors actually being returned, so
+  // the list can price a bracket without a commission fetch per doctor.
+  const slugs = [...seen];
+  const overridesBySlug = new Map<string, FeeOverride[]>();
+  if (slugs.length) {
+    const feeRows = await db
+      .select({
+        slug: doctors.slug,
+        homePaise: doctorCategoryCommissions.consultationFeeHomePaise,
+        onlinePaise: doctorCategoryCommissions.consultationFeeOnlinePaise,
+      })
+      .from(doctorCategoryCommissions)
+      .innerJoin(doctors, eq(doctors.id, doctorCategoryCommissions.doctorId))
+      .innerJoin(categories, eq(categories.id, doctorCategoryCommissions.categoryId))
+      .where(and(inArray(doctors.slug, slugs), eq(categories.active, true)));
+    for (const r of feeRows) {
+      const list = overridesBySlug.get(r.slug) ?? [];
+      list.push({ homePaise: r.homePaise, onlinePaise: r.onlinePaise });
+      overridesBySlug.set(r.slug, list);
+    }
+  }
+
   // Fetch active locations for the returned doctors so the patient app can show area badges.
   const slugToId = seen.size
     ? await db
@@ -228,6 +275,10 @@ doctorsRouter.get('/', async (req, res) => {
       ...row,
       id: row.slug,
       rating: Number(row.rating),
+      feeRange: feeRangeFor(
+        (row.fees ?? {}) as { home?: number | null; online?: number | null },
+        overridesBySlug.get(row.slug),
+      ),
       locations: (locsBySlug.get(row.slug) || []).map((l) => ({
         id: l.id,
         name: l.name,
@@ -293,6 +344,31 @@ doctorsRouter.get('/:slug', async (req, res) => {
     .from(doctorLocations)
     .where(eq(doctorLocations.doctorId, row.id));
 
+  // Specialities this doctor can be booked through, each priced by its own
+  // category override where the admin set one, else by the doctor's own fee.
+  // The patient app uses this both as the picker and as the price source.
+  const feeRows = await db
+    .select({
+      categoryId: categories.id,
+      slug: categories.slug,
+      title: categories.title,
+      homePaise: doctorCategoryCommissions.consultationFeeHomePaise,
+      onlinePaise: doctorCategoryCommissions.consultationFeeOnlinePaise,
+    })
+    .from(doctorCategoryCommissions)
+    .innerJoin(categories, eq(categories.id, doctorCategoryCommissions.categoryId))
+    .where(and(eq(doctorCategoryCommissions.doctorId, row.id), eq(categories.active, true)))
+    .orderBy(categories.sortOrder, categories.id);
+  // The doctor's primary category is bookable even with no commission row
+  // (it then charges the doctor's own fees).
+  if (row.categoryId != null && !feeRows.some((r) => r.categoryId === row.categoryId)) {
+    const [primary] = await db
+      .select({ categoryId: categories.id, slug: categories.slug, title: categories.title })
+      .from(categories)
+      .where(and(eq(categories.id, row.categoryId), eq(categories.active, true)));
+    if (primary) feeRows.push({ ...primary, homePaise: null, onlinePaise: null });
+  }
+
   res.json({
     doctor: {
       id: row.slug,
@@ -320,6 +396,18 @@ doctorsRouter.get('/:slug', async (req, res) => {
       treatments: row.treatments,
       homeVisitsEnabled: row.homeVisitsEnabled,
       locations: locRows,
+      categories: feeRows.map((c) => {
+        const fees = effectiveFees((row.fees ?? {}) as { home?: number | null; online?: number | null }, c);
+        return {
+          // categoryId, not id: the app's slug-as-id contract belongs to the
+          // /categories collection, while this is the booking FK's own number.
+          categoryId: c.categoryId,
+          slug: c.slug,
+          title: c.title,
+          feeHome: fees.home,
+          feeOnline: fees.online,
+        };
+      }),
     },
   });
 });

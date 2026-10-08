@@ -1,13 +1,13 @@
 import { describe, it, beforeAll, afterAll, expect } from 'vitest';
 import request from 'supertest';
-import { sql } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { db } from '../src/db/pool';
 import { runMigrations } from '../src/db/migrate';
 import { seed } from '../src/lib/seed';
 import { CATEGORIES_DATA } from '../src/lib/seed-data/categories';
 import { SYMPTOMS_DATA } from '../src/lib/seed-data/symptoms';
 import { createApp } from '../src/index';
-import { contentSections } from '../src/db/schema';
+import { categories, contentSections, doctorCategoryCommissions, doctors } from '../src/db/schema';
 
 const api = request(createApp());
 
@@ -32,6 +32,7 @@ describe('GET /api/v1/categories', () => {
     const cat = res.body.categories[0];
     expect(cat).toMatchObject({
       id: expect.any(String),
+      numericId: expect.any(Number),
       title: expect.any(String),
       slug: expect.any(String),
       description: expect.any(String),
@@ -99,6 +100,8 @@ describe('GET /api/v1/doctors', () => {
       bio: expect.any(String),
     });
     expect(d.id).toBe(d.slug);
+    // cards price a bracket across the doctor's own fees and any per-category override
+    expect(d.feeRange).toEqual({ min: expect.any(Number), max: expect.any(Number) });
     // detail fields are excluded, but searchable expertise/treatments are kept
     for (const key of ['education', 'experience', 'registration']) {
       expect(d).not.toHaveProperty(key);
@@ -193,6 +196,17 @@ describe('GET /api/v1/doctors/:slug', () => {
     expect(d.registration).toMatchObject({ number: expect.any(String), council: expect.any(String) });
     expect(d.rating).toBe(4.9);
     expect(d.fees).toEqual({ home: 1000, online: 599 });
+    // bookable specialities, each priced: primary category at the doctor's own
+    // fee until an override exists for it
+    expect(d.categories).toEqual([
+      {
+        categoryId: expect.any(Number),
+        slug: expect.any(String),
+        title: expect.any(String),
+        feeHome: 1000,
+        feeOnline: 599,
+      },
+    ]);
 
     const missing = await api.get('/api/v1/doctors/not-a-real-doctor');
     expect(missing.status).toBe(404);
@@ -219,5 +233,34 @@ describe('GET /api/v1/cms/:page', () => {
   it('rejects an unknown page with 400', async () => {
     const res = await api.get('/api/v1/cms/not-a-page');
     expect(res.status).toBe(400);
+  });
+});
+
+// Declared last: the override row only exists inside this test, so nothing
+// above can see a widened bracket.
+describe('per-category consultation fees', () => {
+  it('widens the list feeRange and prices the matching speciality on the detail', async () => {
+    const [doc] = await db.select({ id: doctors.id }).from(doctors).where(eq(doctors.slug, 'doc-tarannum-sayyed'));
+    const [cat] = await db.select({ id: categories.id }).from(categories).where(eq(categories.slug, 'orthopedic'));
+    try {
+      await db.insert(doctorCategoryCommissions).values({
+        doctorId: doc.id,
+        categoryId: cat.id,
+        consultationFeeHomePaise: 1200_00,
+        consultationFeeOnlinePaise: 699_00,
+      });
+
+      const list = await api.get('/api/v1/doctors');
+      const d = list.body.doctors.find((x: { slug: string }) => x.slug === 'doc-tarannum-sayyed');
+      // the doctor's own 1000/599 plus the orthopedic override's 1200/699
+      expect(d.feeRange).toEqual({ min: 599, max: 1200 });
+
+      const detail = await api.get('/api/v1/doctors/doc-tarannum-sayyed');
+      expect(detail.body.doctor.categories).toEqual([
+        { categoryId: cat.id, slug: 'orthopedic', title: expect.any(String), feeHome: 1200, feeOnline: 699 },
+      ]);
+    } finally {
+      await db.delete(doctorCategoryCommissions).where(eq(doctorCategoryCommissions.doctorId, doc.id));
+    }
   });
 });

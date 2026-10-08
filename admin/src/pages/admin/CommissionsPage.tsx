@@ -187,9 +187,9 @@ export function CommissionsPage() {
                 <p className="text-slate-400 leading-snug">
                   Set a <span className="font-extrabold text-slate-600">home</span> and a
                   <span className="font-extrabold text-slate-600"> video</span> commission for this category. Each applies when a
-                  patient books this doctor from that category page, and overrides the doctor's own rate for that visit type.
-                  Leave a field blank to inherit the doctor's rate. The consultation fee is a reference figure; payouts always use
-                  what the patient was actually charged.
+                  patient books this speciality from the doctor's page or a category page, and overrides the doctor's own rate for
+                  that visit type. Leave a field blank to inherit the doctor's rate. The consultation fee is the price shown to the
+                  patient for this speciality (blank = the doctor's own fee); payouts always use what the patient was actually charged.
                 </p>
               </div>
               {(!commissions || commissions.length === 0) && (
@@ -471,11 +471,11 @@ function CommissionRow({
           aria: `${title} video consult commission percent`,
         })}
         {field('Home', '₹', homeFee, setHomeFee, {
-          title: 'Consultation fee in ₹ (reference only; blank = inherit the doctor\'s own fee)',
+          title: 'Consultation fee in ₹ shown and charged for this speciality (blank = inherit the doctor\'s own fee)',
           aria: `${title} home visit fee in rupees`,
         })}
         {field('Video', '₹', onlineFee, setOnlineFee, {
-          title: 'Consultation fee in ₹ (reference only; blank = inherit the doctor\'s own fee)',
+          title: 'Consultation fee in ₹ shown and charged for this speciality (blank = inherit the doctor\'s own fee)',
           aria: `${title} video consult fee in rupees`,
         })}
         <div className="col-span-2 sm:col-span-1 flex gap-1.5 sm:justify-end w-[4.5rem]">

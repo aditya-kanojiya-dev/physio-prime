@@ -5,7 +5,7 @@ import { db } from '../src/db/pool';
 import { runMigrations } from '../src/db/migrate';
 import { seed } from '../src/lib/seed';
 import { createApp } from '../src/index';
-import { doctors, appointments } from '../src/db/schema';
+import { categories, doctors, appointments, doctorCategoryCommissions } from '../src/db/schema';
 import { getAvailableWindows, PAYMENT_GRACE_MS } from '../src/lib/slots';
 import { futureWeekday, nowHHmm, pickSlot, registerPatient, todayStr } from './helpers';
 
@@ -602,5 +602,51 @@ describe('POST /api/v1/razorpay/webhook', () => {
     const res = await webhook({ event: 'payment.captured' });
     expect(res.status).toBe(500);
     expect(res.body.error.message).toContain('RAZORPAY_WEBHOOK_SECRET');
+  });
+});
+
+describe('per-category consultation fee', () => {
+  // Own weekday: the earlier booking tests exhaust the seeded MONDAY capacity.
+  const WEDNESDAY = futureWeekday(3);
+
+  it('charges the booked category fee when one is set, else the doctor fee', async () => {
+    const { token } = await registerPatient('apt.catfee@example.com');
+    const [doc] = await db.select({ id: doctors.id }).from(doctors).where(eq(doctors.slug, DOCTOR));
+    const [cat] = await db.select({ id: categories.id }).from(categories).where(eq(categories.slug, 'orthopedic'));
+    try {
+      await db.insert(doctorCategoryCommissions).values({
+        doctorId: doc!.id,
+        categoryId: cat!.id,
+        consultationFeeHomePaise: null,
+        consultationFeeOnlinePaise: 799_00,
+      });
+
+      const withCategory = await api
+        .post('/api/v1/appointments')
+        .set('Authorization', `Bearer ${token}`)
+        .send(bookPayload({ date: WEDNESDAY, slot: await pickSlot(WEDNESDAY, DOCTOR), categoryId: cat!.id }));
+      expect(withCategory.status).toBe(201);
+      expect(withCategory.body.appointment.feePaise).toBe(799_00);
+      expect(withCategory.body.razorpayOrder).toEqual({ id: 'order_default', amountPaise: 799_00 });
+
+      const withoutCategory = await api
+        .post('/api/v1/appointments')
+        .set('Authorization', `Bearer ${token}`)
+        .send(bookPayload({ date: WEDNESDAY, slot: await pickSlot(WEDNESDAY, DOCTOR) }));
+      expect(withoutCategory.status).toBe(201);
+      expect(withoutCategory.body.appointment.feePaise).toBe(599_00);
+    } finally {
+      await db.delete(doctorCategoryCommissions).where(eq(doctorCategoryCommissions.doctorId, doc!.id));
+    }
+  });
+
+  it('rejects a categoryId that is not a real, active category', async () => {
+    const { token } = await registerPatient('apt.catbad@example.com');
+    const res = await api
+      .post('/api/v1/appointments')
+      .set('Authorization', `Bearer ${token}`)
+      .send(bookPayload({ categoryId: 999999 }));
+    expect(res.status).toBe(400);
+    expect(res.body.error.message).toContain('category');
   });
 });

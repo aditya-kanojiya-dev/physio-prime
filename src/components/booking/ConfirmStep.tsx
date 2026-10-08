@@ -6,6 +6,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useBooking } from '../../context/BookingContext';
 import { Doctor, ConsultationMode, Symptom } from '../../types';
 import { ApiError } from '../../lib/api';
+import { feeFor } from '../../lib/fees';
 import { openRazorpayCheckout } from '../../lib/razorpayCheckout';
 import { fadeUp } from '../../lib/motion';
 import {
@@ -33,6 +34,7 @@ import {
 interface ConfirmStepProps {
   doctor: Doctor;
   mode: ConsultationMode;
+  categoryId?: number;
   symptom: Symptom | null;
   selectedDate: string;
   selectedTime: string;
@@ -71,6 +73,7 @@ function addressFromUser(address: Record<string, unknown> | null | undefined): s
 export const ConfirmStep: React.FC<ConfirmStepProps> = ({
   doctor,
   mode,
+  categoryId,
   symptom,
   selectedDate,
   selectedTime,
@@ -114,7 +117,9 @@ export const ConfirmStep: React.FC<ConfirmStepProps> = ({
 
   const [attempted, setAttempted] = useState(false);
 
-  const fee = doctor.fees[mode];
+  const fee = feeFor(doctor, mode, categoryId);
+  const speciality =
+    doctor.categories?.find((c) => c.categoryId === categoryId)?.title ?? doctor.specialty;
 
   const errors = useMemo<BookingErrors>(() => {
     const e: BookingErrors = {};
@@ -252,6 +257,7 @@ export const ConfirmStep: React.FC<ConfirmStepProps> = ({
     try {
       const { appointment, razorpayOrder } = await createAppointment({
         doctorSlug: doctor.id,
+        categoryId,
         mode,
         date: selectedDate,
         slot: selectedTime,
@@ -401,10 +407,10 @@ export const ConfirmStep: React.FC<ConfirmStepProps> = ({
             <p className="text-xs font-bold text-blue-600 uppercase tracking-wider">Booking Summary</p>
             <div className="flex items-start gap-4">
               <img src={doctor.photo} alt={doctor.name} className="w-14 h-14 rounded-xl object-cover flex-shrink-0" />
-              <div className="flex-1 min-w-0">
-                <h3 className="text-sm font-extrabold text-slate-900">{doctor.name}</h3>
-                <p className="text-xs text-slate-500">{doctor.specialty}</p>
-              </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-sm font-extrabold text-slate-900">{doctor.name}</h3>
+                  <p className="text-xs text-slate-500">{speciality}</p>
+                </div>
             </div>
             <div className="grid grid-cols-2 gap-3 text-xs">
               {symptom && (

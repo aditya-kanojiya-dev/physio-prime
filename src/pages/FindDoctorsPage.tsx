@@ -453,6 +453,7 @@ export const FindDoctorsPage: React.FC = () => {
                     experienceYears={doctor.experienceYears}
                     availabilityDate={doctor.nextAvailable}
                     sessionFee={doctor.fees.home}
+                    feeRange={doctor.feeRange}
                     visitTypes={visitTypes}
                     locationTags={areas}
                     availabilityNote={availabilityNote}

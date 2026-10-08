@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 import { and, eq, sql } from 'drizzle-orm';
 import { db, pool } from '../db/pool';
 import { appointments, departments, doctorCategoryCommissions, doctors } from '../db/schema';
-import { computeCommission, rateForModeSql, resolvePlatformFeePercent, DEFAULT_PLATFORM_FEE_PERCENT } from './commission';
+import { computeCommission, effectiveFees, rateForModeSql, resolvePlatformFeePercent, DEFAULT_PLATFORM_FEE_PERCENT } from './commission';
 import { formatPaise, resolveRate, splitFee } from '../../../admin/src/lib/commission';
 
 const FAILURES: string[] = [];
@@ -74,6 +74,21 @@ check('split always sums back to the gross', () => {
       assert.ok(c.platformFeePaise >= 0 && c.doctorEarningsPaise >= 0, `negative split gross=${gross} rate=${rate}`);
     }
   }
+});
+
+// 1b. Consultation fee override: the price shown and the price charged.
+check('category fee override wins per mode, paise converts to rupees', () => {
+  const fees = effectiveFees({ home: 500, online: 400 }, { homePaise: 750_00, onlinePaise: null });
+  assert.deepEqual(fees, { home: 750, online: 400 });
+});
+check('a null override falls back to the doctor fee', () => {
+  assert.deepEqual(effectiveFees({ home: 500, online: 400 }, { homePaise: null, onlinePaise: null }), { home: 500, online: 400 });
+  assert.deepEqual(effectiveFees({ home: 500, online: 400 }, null), { home: 500, online: 400 });
+  assert.deepEqual(effectiveFees({ home: 500, online: 400 }), { home: 500, online: 400 });
+});
+check('a mode nobody prices comes back null, not zero', () => {
+  assert.deepEqual(effectiveFees({ home: 500, online: 0 }, { homePaise: 750_00, onlinePaise: null }).online, 0);
+  assert.equal(effectiveFees({ home: null, online: undefined }, null).home, null);
 });
 
 // 2. The admin mirror must not drift from the server resolver.

@@ -16,6 +16,7 @@ interface BookingState {
   mode?: ConsultationMode;
   date?: string;
   time?: string;
+  categoryId?: number;
 }
 
 const STEPS = [
@@ -47,6 +48,7 @@ export const BookingPage: React.FC = () => {
   const [condition, setCondition] = useState<Symptom | null>(state.condition || null);
   const [doctor, setDoctor] = useState<Doctor | null>(state.doctor || null);
   const [mode, setMode] = useState<ConsultationMode>(state.mode || 'home');
+  const categoryId = state.categoryId;
   const [selectedDate, setSelectedDate] = useState(state.date || '');
   const [selectedTime, setSelectedTime] = useState(state.time || '');
 
@@ -174,6 +176,7 @@ export const BookingPage: React.FC = () => {
               <ConfirmStep
                 doctor={doctor}
                 mode={mode}
+                categoryId={categoryId}
                 symptom={condition}
                 selectedDate={selectedDate}
                 selectedTime={selectedTime}

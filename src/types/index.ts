@@ -45,12 +45,25 @@ export interface Doctor {
     number: string;
     council: string;
   };
+  // Lowest/highest price across every speciality this doctor prices (server
+  // `feeRange`); null when the doctor prices nothing -> card uses fees[mode].
+  feeRange?: { min: number; max: number } | null;
+  // Per-speciality prices, present on the detail endpoint only.
+  categories?: DoctorCategoryFee[];
   expertise: string[];
   treatments: string[];
   reviewsList: DoctorReview[];
   gender: 'male' | 'female';
   homeVisitsEnabled?: boolean;
   locations?: DoctorLocation[];
+}
+
+export interface DoctorCategoryFee {
+  categoryId: number;
+  slug: string;
+  title: string;
+  feeHome: number | null;
+  feeOnline: number | null;
 }
 
 export interface DoctorLocation {
@@ -76,8 +89,10 @@ export interface Symptom {
 }
 
 export interface Category {
-  id: string;
-  title: string;
+    id: string;
+    // Booking FK (numeric); `id` is the slug.
+    numericId?: number;
+    title: string;
   slug: string;
   description: string;
   doctorCount: number;

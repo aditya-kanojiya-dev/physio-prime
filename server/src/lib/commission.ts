@@ -37,6 +37,28 @@ export function resolvePlatformFeePercent(rates: PerModeRates, mode: VisitMode |
   return categoryPerMode ?? doctorPerMode ?? rates.shared ?? rates.department ?? DEFAULT_PLATFORM_FEE_PERCENT;
 }
 
+// Per-category consultation fee overrides, in paise, straight from
+// doctor_category_commissions. NULL means "no override for this mode".
+export interface FeeOverride {
+  homePaise: number | null;
+  onlinePaise: number | null;
+}
+
+// Effective consultation fees in rupees for one category. A per-category
+// override wins per mode; otherwise the doctor's own fee stands; a mode
+// neither provides comes back null so the caller can reject the booking
+// instead of charging 0. Display and charge both read this, so the price a
+// patient sees and the price they pay cannot drift apart.
+export function effectiveFees(
+  base: { home?: number | null; online?: number | null },
+  override?: FeeOverride | null,
+): { home: number | null; online: number | null } {
+  return {
+    home: override?.homePaise != null ? Math.round(override.homePaise / 100) : base.home ?? null,
+    online: override?.onlinePaise != null ? Math.round(override.onlinePaise / 100) : base.online ?? null,
+  };
+}
+
 export function computeCommission(grossPaise: number, platformFeePercent: number): Commission {
   const platformFeePaise = Math.round((grossPaise * platformFeePercent) / 100);
   return {

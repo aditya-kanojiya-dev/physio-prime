@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Star, BadgeCheck, MapPin, Clock } from 'lucide-react';
+import { feeLabel } from '../../lib/fees';
 import primeBadge from '../../assets/prime-badge.png';
 
 export interface DoctorCardProps {
@@ -14,6 +15,7 @@ export interface DoctorCardProps {
   featured?: boolean;
   experienceYears: number;
   consultationFee: number;
+  feeRange?: { min: number; max: number } | null;
   nextAvailableDate?: string | null;
   profileUrl?: string;
   onBookNow?: () => void;
@@ -40,6 +42,7 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
   featured,
   experienceYears,
   consultationFee,
+  feeRange,
   nextAvailableDate,
   profileUrl,
   onBookNow,
@@ -109,9 +112,9 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
           <p className="text-[13px] font-extrabold text-slate-900">{experienceYears} years</p>
         </div>
         <div>
-          <p className="text-[10px] font-medium text-slate-400">Home consultation</p>
+          <p className="text-[10px] font-medium text-slate-400">Consultation fee</p>
           <p className="text-[13px] font-extrabold text-blue-600">
-            ₹{consultationFee.toLocaleString('en-IN')}
+            ₹{feeLabel(feeRange, consultationFee)}
             <span className="text-[10px] font-medium text-slate-400"> / session</span>
           </p>
         </div>

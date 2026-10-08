@@ -11,10 +11,12 @@ categoriesRouter.get('/', async (_req, res) => {
     .from(categories)
     .where(eq(categories.active, true))
     .orderBy(categories.sortOrder, categories.id);
-  // ponytail: `id` mirrors the app's slug-as-id contract.
+  // ponytail: `id` mirrors the app's slug-as-id contract; `numericId` is what
+  // the booking API's categoryId FK wants (a slug there is NaN).
   res.json({
     categories: rows.map((row) => ({
       id: row.slug,
+      numericId: row.id,
       title: row.title,
       slug: row.slug,
       description: row.description,

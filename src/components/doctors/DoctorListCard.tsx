@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { BadgeCheck, Calendar, Share2, Check, Home, Video, MapPin } from 'lucide-react';
+import { feeLabel } from '../../lib/fees';
 import primeBadge from '../../assets/prime-badge.png';
 
 export interface DoctorListCardProps {
@@ -13,6 +14,7 @@ export interface DoctorListCardProps {
   experienceYears: number;
   availabilityDate?: string | null;
   sessionFee: number;
+  feeRange?: { min: number; max: number } | null;
   visitTypes: string[];
   locationTags: string[];
   profileUrl?: string;
@@ -36,6 +38,7 @@ export const DoctorListCard: React.FC<DoctorListCardProps> = ({
   experienceYears,
   availabilityDate,
   sessionFee,
+  feeRange,
   visitTypes,
   locationTags,
   profileUrl,
@@ -138,7 +141,7 @@ export const DoctorListCard: React.FC<DoctorListCardProps> = ({
           <p className="text-[11px] text-slate-400 font-medium">Session fee</p>
           <p className="leading-tight mt-0.5">
             <span className="text-xl font-extrabold text-slate-900 tabular-nums">
-              ₹{sessionFee.toLocaleString('en-IN')}
+              ₹{feeLabel(feeRange, sessionFee)}
             </span>
             <span className="text-xs text-slate-400"> /session</span>
           </p>

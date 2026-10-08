@@ -75,6 +75,7 @@ export const FeaturedDoctors: React.FC = () => {
                       featured={doctor.featured}
                       experienceYears={doctor.experienceYears}
                       consultationFee={doctor.fees.home}
+                      feeRange={doctor.feeRange}
                       nextAvailableDate={doctor.nextAvailable}
                       profileUrl={`/doctor/${doctor.id}`}
                       onBookNow={() => navigate('/book', { state: { doctor, mode: 'home' } })}
